@@ -1,0 +1,111 @@
+@page "/demo"
+@layout DemoLayout
+@inherits LiveComponentBase
+
+<PageTitle>Demo panel – Backstop</PageTitle>
+
+<h1>Demo panel</h1>
+<p class="lead">Pick a made-up email and watch Backstop check it. Everything here is pretend.</p>
+
+<section class="card" aria-labelledby="sim-title">
+    <h2 id="sim-title">Simulate incoming email</h2>
+    <div class="field">
+        <label for="scenario">Scenario</label>
+        <select id="scenario" @bind="_scenarioId" disabled="@_running">
+            @foreach (var s in Mail.Scenarios)
+            {
+                <option value="@s.Id">@s.Title</option>
+            }
+        </select>
+        <p class="hint">@Current.Description</p>
+    </div>
+    <div class="field field--check">
+        <input id="fail" type="checkbox" @bind="_fail" disabled="@_running" />
+        <label for="fail">Make the checker crash (shows that errors are held, never let through)</label>
+    </div>
+    <div class="actions">
+        <button type="button" class="btn btn-primary" @onclick="Run" disabled="@_running">
+            <Icon Name="mail" /> @(_running ? "Checking…" : "Simulate incoming email")
+        </button>
+        <button type="button" class="btn btn-quiet" @onclick="ResetDemo" disabled="@_running">
+            <Icon Name="refresh" /> Reset demo
+        </button>
+    </div>
+</section>
+
+<section class="card" aria-labelledby="pipe-title">
+    <h2 id="pipe-title">Checking steps</h2>
+    <PipelineTimeline Tiers="_tiers" />
+    <div class="outcome" role="status">
+        @if (_result is not null)
+        {
+            <StatusBadge State="_result.State" ForHelper="true" />
+            <p>@OutcomeText</p>
+        }
+    </div>
+</section>
+
+<section class="split-controls">
+    <button type="button" class="btn btn-quiet" aria-pressed="@_split.ToString().ToLowerInvariant()" @onclick="() => _split = !_split">
+        <Icon Name="@(_split ? "check" : "circle")" /> Side by side: @(_split ? "on" : "off")
+    </button>
+</section>
+
+@if (_split)
+{
+    <section class="split" aria-label="User and helper side by side">
+        <div class="split__pane">
+            <h2>What the user sees</h2>
+            <iframe title="User view" src="/" loading="lazy"></iframe>
+        </div>
+        <div class="split__pane">
+            <h2>What the helper sees</h2>
+            <iframe title="Helper view" src="/helper" loading="lazy"></iframe>
+        </div>
+    </section>
+}
+
+@code {
+    private string _scenarioId = MockData.Scenarios[0].Id;
+    private bool _fail, _running, _split = true;
+    private MailMessage? _result;
+    private TierResult[] _tiers = Fresh();
+
+    private Scenario Current => Mail.Scenarios.First(s => s.Id == _scenarioId);
+
+    private static TierResult[] Fresh() =>
+        [.. MockData.TierNames.Select(n => new TierResult(n, 0, TierStatus.Pending, "Waiting"))];
+
+    private string OutcomeText => _result?.State switch
+    {
+        MessageState.Cleared => "Cleared. It is now in the user's inbox.",
+        MessageState.Blocked => "Blocked. The user never sees it.",
+        _ => "Held. It is in the helper's queue. The user only sees a count.",
+    };
+
+    private async Task Run()
+    {
+        _running = true;
+        _result = null;
+        _tiers = Fresh();
+        try
+        {
+            _result = await Mail.ReceiveAsync(_scenarioId, _fail, (i, r) =>
+            {
+                _tiers[i] = r;
+                _ = InvokeAsync(StateHasChanged);
+            });
+        }
+        finally
+        {
+            _running = false;
+        }
+    }
+
+    private void ResetDemo()
+    {
+        Mail.Reset();
+        _result = null;
+        _tiers = Fresh();
+    }
+}

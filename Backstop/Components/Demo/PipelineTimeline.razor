@@ -1,0 +1,54 @@
+<ol class="timeline" aria-label="Checking steps" aria-live="polite">
+    @foreach (var t in Tiers)
+    {
+        <li class="step step--@Kind(t.Status)">
+            <span class="step__icon">
+                @if (t.Status == TierStatus.Running)
+                {
+                    <span class="spinner" aria-hidden="true"></span>
+                }
+                else
+                {
+                    <Icon Name="@IconName(t.Status)" />
+                }
+            </span>
+            <span class="step__body">
+                <span class="step__head">
+                    <strong>@t.Name</strong>
+                    <span class="step__word">@Word(t.Status)</span>
+                    <span class="step__ms">@Latency(t)</span>
+                </span>
+                <span class="step__note">@t.Note</span>
+            </span>
+        </li>
+    }
+</ol>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<TierResult> Tiers { get; set; } = [];
+
+    private static string Kind(TierStatus s) => s.ToString().ToLowerInvariant();
+
+    private static string IconName(TierStatus s) => s switch
+    {
+        TierStatus.Passed => "check",
+        TierStatus.Flagged => "alert",
+        TierStatus.Failed => "cross",
+        TierStatus.Skipped => "minus",
+        _ => "clock",
+    };
+
+    private static string Word(TierStatus s) => s switch
+    {
+        TierStatus.Pending => "Waiting",
+        TierStatus.Running => "Checking",
+        TierStatus.Passed => "Passed",
+        TierStatus.Flagged => "Found a problem",
+        TierStatus.Failed => "Failed",
+        _ => "Skipped",
+    };
+
+    // Latencies are fake. MOCK: real values come from the real pipeline.
+    private static string Latency(TierResult t) =>
+        t.Status is TierStatus.Pending or TierStatus.Running or TierStatus.Skipped ? "" : $"{t.LatencyMs} ms";
+}
