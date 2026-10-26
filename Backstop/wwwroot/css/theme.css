@@ -1,0 +1,28 @@
+/* "Calm Clinical" theme. Change colours here only. */
+:root {
+  --bg: #FFFFFF;
+  --surface: #F5F7FA;
+  --border: #E3E8EF;
+  --text: #1D1D1F;
+  --text-2: #4B5563;
+
+  --accent: #0064E0;
+  --accent-hover: #0050B8;
+  --accent-soft: #E8F1FE;
+
+  --safe: #1B7A4B;
+  --safe-soft: #E7F5EC;
+  --check: #8A5A00;
+  --check-soft: #FFF4D6;
+  --block: #C0262D;
+  --block-soft: #FDECEC;
+
+  --radius: 16px;
+  --radius-lg: 24px;
+  --shadow: 0 2px 12px rgba(16, 24, 40, .06);
+
+  --focus: #0064E0;
+
+  /* Inter if the device has it (or self-hosted later), otherwise the system font. */
+  --font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
