@@ -1,0 +1,121 @@
+<article class="evidence" aria-labelledby="ev-title">
+    <p class="evidence__status">
+        <StatusBadge State="Message.State" ForHelper="true" />
+        <span class="confidence confidence--@Message.Confidence.ToString().ToLowerInvariant()">
+            <Icon Name="@ConfidenceIcon" />
+            <span>How sure are we: <strong>@Message.Confidence</strong></span>
+        </span>
+    </p>
+    <h1 id="ev-title">Check this message</h1>
+
+    <section class="card" aria-labelledby="ev-plain">
+        <h2 id="ev-plain">In plain words</h2>
+        <p class="lead">@Message.Summary</p>
+    </section>
+
+    @if (Message.Flags.Count > 0)
+    {
+        <section class="card" aria-labelledby="ev-flags">
+            <h2 id="ev-flags">What looked wrong</h2>
+            <ul class="flags">
+                @foreach (var f in Message.Flags)
+                {
+                    <li class="flag">
+                        <span class="flag__icon"><Icon Name="@f.Icon" /></span>
+                        <span>
+                            <strong>@f.Title</strong>
+                            <span class="flag__text">@f.Explanation</span>
+                        </span>
+                    </li>
+                }
+            </ul>
+        </section>
+    }
+
+    @if (Message.Links.Count > 0)
+    {
+        <section class="card" aria-labelledby="ev-links">
+            <h2 id="ev-links">Link check</h2>
+            @foreach (var l in Message.Links)
+            {
+                <div class="linkcheck">
+                    <p><Icon Name="link" /> <code>@l.DefangedUrl</code></p>
+                    <p>@l.Verdict</p>
+                    <p>
+                        @(l.Hops.Count <= 1 ? "Went straight to the page." : $"Went through {l.Hops.Count} websites:")
+                    </p>
+                    @if (l.Hops.Count > 1)
+                    {
+                        <ol class="hops">
+                            @foreach (var h in l.Hops)
+                            {
+                                <li><code>@h</code></li>
+                            }
+                        </ol>
+                    }
+                    @if (l.TrackerWarning is not null)
+                    {
+                        <p class="warn"><Icon Name="eye" /> <span><strong>Tracker warning.</strong> @l.TrackerWarning</span></p>
+                    }
+                </div>
+            }
+        </section>
+    }
+
+    <section class="card" aria-labelledby="ev-preview">
+        <h2 id="ev-preview">The message (text only, links made safe)</h2>
+        <p class="preview-meta">From @Message.FromName, <code>@Defang.ForHelper(Message.FromAddress)</code><br />Subject: @Message.Subject</p>
+        <pre class="preview">@Defang.ForHelper(Message.Body)</pre>
+        <ReadAloudButton Text="@($"{Message.Summary} {string.Join(' ', Message.Flags.Select(f => f.Title + ". " + f.Explanation))}")" />
+    </section>
+
+    @if (Message.State == MessageState.Held)
+    {
+        <div class="actions actions--helper">
+            <button type="button" class="btn btn-primary" @onclick="OnApprove">
+                <Icon Name="check" /> Approve
+            </button>
+            <button type="button" class="btn btn-quiet btn-danger" @onclick="OnBlock">
+                <Icon Name="cross" /> Block
+            </button>
+            <button type="button" class="btn btn-text" @onclick="OnCallFirst">
+                <Icon Name="phone" /> Call them first
+            </button>
+        </div>
+        <p class="call-note" role="status">
+            @if (Message.CallRequested)
+            {
+                <Icon Name="phone" /><span>You will call @Message.FromName before you decide. The message stays held and the user cannot see it.</span>
+            }
+        </p>
+    }
+    else
+    {
+        <div class="banner @(Message.State == MessageState.Blocked ? "banner--block" : "banner--safe")" role="status">
+            <Icon Name="@(Message.State == MessageState.Blocked ? "cross" : "check")" />
+            <p>@DecisionText</p>
+        </div>
+        <p class="actions"><a class="btn btn-primary" href="/helper"><Icon Name="arrow-left" /> Back to the queue</a></p>
+    }
+</article>
+
+@code {
+    [Parameter, EditorRequired] public MailMessage Message { get; set; } = default!;
+    [Parameter] public EventCallback OnApprove { get; set; }
+    [Parameter] public EventCallback OnBlock { get; set; }
+    [Parameter] public EventCallback OnCallFirst { get; set; }
+
+    private string ConfidenceIcon => Message.Confidence switch
+    {
+        Confidence.High => "shield",
+        Confidence.Medium => "circle",
+        _ => "alert",
+    };
+
+    private string DecisionText => (Message.State, Message.HelperDecision) switch
+    {
+        (MessageState.Blocked, null) => "The checker blocked this automatically. The user never saw it.",
+        (MessageState.Blocked, _) => "You blocked this message. The user will never see it.",
+        _ => "You approved this message. It is now in the user's inbox.",
+    };
+}

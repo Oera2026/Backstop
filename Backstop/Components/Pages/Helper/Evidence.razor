@@ -1,0 +1,30 @@
+@page "/helper/{Id}"
+@layout HelperLayout
+@inherits LiveComponentBase
+
+@{ var m = Guardian.Get(Id); }
+
+@if (m is null)
+{
+    <PageTitle>Not found – Backstop Helper</PageTitle>
+    <h1>We cannot find that message</h1>
+    <p class="actions"><a class="btn btn-primary" href="/helper"><Icon Name="arrow-left" /> Back to the queue</a></p>
+}
+else
+{
+    <PageTitle>Check: @m.Subject – Backstop Helper</PageTitle>
+    <EvidenceCard Message="m"
+                  OnApprove="@(() => Decide(() => Guardian.Approve(m.Id)))"
+                  OnBlock="@(() => Decide(() => Guardian.Block(m.Id)))"
+                  OnCallFirst="@(() => Guardian.CallFirst(m.Id))" />
+}
+
+@code {
+    [Parameter] public string Id { get; set; } = "";
+
+    private void Decide(Action decision)
+    {
+        decision();
+        Nav.NavigateTo("helper");
+    }
+}

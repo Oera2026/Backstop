@@ -1,0 +1,63 @@
+@page "/helper"
+@layout HelperLayout
+@inherits LiveComponentBase
+
+<PageTitle>Messages to check – Backstop Helper</PageTitle>
+
+<h1>Messages waiting for you</h1>
+
+@{
+    var queue = Guardian.GetQueue();
+    var decided = Guardian.GetDecided();
+}
+
+@if (queue.Count == 0)
+{
+    <div class="banner banner--safe" role="status">
+        <Icon Name="check" />
+        <p>Nothing to check right now. All clear.</p>
+    </div>
+}
+else
+{
+    <ul class="rows" aria-label="Held messages">
+        @foreach (var m in queue)
+        {
+            <li>
+                <a class="row" href="helper/@m.Id">
+                    <span class="row__main">
+                        <span class="row__from">@m.FromName</span>
+                        <span class="row__subject">@m.Subject</span>
+                        <span class="row__preview">@m.Summary</span>
+                    </span>
+                    <span class="row__side">
+                        <StatusBadge State="m.State" ForHelper="true" />
+                        <span class="row__time">@m.ReceivedAt.ToString("h:mm tt")</span>
+                    </span>
+                </a>
+            </li>
+        }
+    </ul>
+}
+
+@if (decided.Count > 0)
+{
+    <h2>Decided already</h2>
+    <ul class="rows rows--compact" aria-label="Messages already decided">
+        @foreach (var m in decided)
+        {
+            <li>
+                <a class="row" href="helper/@m.Id">
+                    <span class="row__main">
+                        <span class="row__from">@m.FromName</span>
+                        <span class="row__subject">@m.Subject</span>
+                    </span>
+                    <span class="row__side">
+                        <StatusBadge State="m.State" ForHelper="true" />
+                        <span class="row__time">@(m.HelperDecision is null ? "Blocked by checker" : $"{m.HelperDecision} by you")</span>
+                    </span>
+                </a>
+            </li>
+        }
+    </ul>
+}
