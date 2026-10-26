@@ -1,0 +1,42 @@
+@page "/message/{Id}"
+@inherits LiveComponentBase
+
+@* Fail closed: GetClearedMessage returns null for anything that is not Cleared. *@
+@{ var m = Mail.GetClearedMessage(Id); }
+
+@if (m is null)
+{
+    <PageTitle>Message not ready – Backstop</PageTitle>
+    <h1>This message is not ready</h1>
+    <p>You cannot read it right now. Your helper may be checking it.</p>
+    <p class="actions">
+        <a class="btn btn-primary" href="/"><Icon Name="arrow-left" /> Back to my messages</a>
+    </p>
+}
+else
+{
+    <PageTitle>@m.Subject – Backstop</PageTitle>
+    <article class="reading" aria-labelledby="subject">
+        <p class="reading__meta">
+            <StatusBadge State="MessageState.Cleared" />
+        </p>
+        <h1 id="subject">@m.Subject</h1>
+        <p class="reading__from">From <strong>@m.FromName</strong> (@m.FromAddress)<br />@m.ReceivedAt.ToString("dddd d MMMM, h:mm tt")</p>
+        <div class="reading__body">
+            @foreach (var line in Defang.ForUser(m.Body).Split('\n'))
+            {
+                @if (line.Length == 0) { continue; }
+                <p>@line</p>
+            }
+        </div>
+        <p class="sr-note">Links in messages are switched off to keep you safe.</p>
+    </article>
+    <div class="actions">
+        <ReadAloudButton Primary="true" Text="@($"Message from {m.FromName}. {m.Subject}. {Defang.ForUser(m.Body)}")" />
+        <a class="btn btn-quiet" href="/"><Icon Name="arrow-left" /> Back to my messages</a>
+    </div>
+}
+
+@code {
+    [Parameter] public string Id { get; set; } = "";
+}

@@ -1,0 +1,43 @@
+@page "/"
+@inherits LiveComponentBase
+
+<PageTitle>My messages – Backstop</PageTitle>
+
+<h1>My messages</h1>
+
+<p class="actions">
+    <a class="btn btn-primary" href="compose"><Icon Name="pen" /> Write a message</a>
+</p>
+
+@* The user is only ever told a NUMBER of held messages: no sender, no subject. *@
+@if (Mail.HeldCount > 0)
+{
+    <div class="banner banner--check" role="status">
+        <Icon Name="hourglass" />
+        <p>@(Mail.HeldCount == 1 ? "1 message is being checked by your helper." : $"{Mail.HeldCount} messages are being checked by your helper.")</p>
+    </div>
+}
+
+@{ var inbox = Mail.GetInbox(); }
+@if (inbox.Count == 0)
+{
+    <p class="empty">You have no safe messages yet.</p>
+}
+else
+{
+    <ul class="rows" aria-label="Messages that are safe to read">
+        @foreach (var m in inbox)
+        {
+            <li>
+                <a class="row" href="message/@m.Id">
+                    <span class="row__main">
+                        <span class="row__from">@m.FromName</span>
+                        <span class="row__subject">@m.Subject</span>
+                        <span class="row__preview">@Defang.ForUser(m.Preview)</span>
+                    </span>
+                    <StatusBadge State="MessageState.Cleared" />
+                </a>
+            </li>
+        }
+    </ul>
+}

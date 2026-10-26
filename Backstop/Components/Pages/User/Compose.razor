@@ -1,0 +1,114 @@
+@page "/compose"
+@inherits LiveComponentBase
+
+@switch (_stage)
+{
+    case Stage.Pause:
+        <PageTitle>Please wait – Backstop</PageTitle>
+        <section class="pause" aria-labelledby="pause-title">
+            <span class="pause__icon" aria-hidden="true"><Icon Name="hand" /></span>
+            <h1 id="pause-title">You are about to send something private.</h1>
+            <p class="lead">Your helper will check first.</p>
+            @if (_reasons.Count > 0)
+            {
+                <ul class="plain-list">
+                    @foreach (var r in _reasons)
+                    {
+                        <li>@r</li>
+                    }
+                </ul>
+            }
+            <div class="actions">
+                <button type="button" class="btn btn-primary" @onclick="AskHelper"><Icon Name="shield" /> Ask my helper</button>
+                <button type="button" class="btn btn-quiet" @onclick="GoBack"><Icon Name="arrow-left" /> Go back</button>
+            </div>
+            <ReadAloudButton Text="@PauseSpeech" />
+        </section>
+        break;
+
+    case Stage.Asked:
+        <PageTitle>Your helper will check – Backstop</PageTitle>
+        <section aria-labelledby="asked-title">
+            <p><StatusBadge State="MessageState.Held" /></p>
+            <h1 id="asked-title">We have not sent your message.</h1>
+            <p class="lead">Your helper will look at it first.</p>
+            <p class="actions"><a class="btn btn-primary" href="/">Back to my messages</a></p>
+        </section>
+        break;
+
+    case Stage.Sent:
+        <PageTitle>Message sent – Backstop</PageTitle>
+        <section aria-labelledby="sent-title">
+            <p><span class="badge badge--safe"><Icon Name="check" /><span>Sent</span></span></p>
+            <h1 id="sent-title">Your message has been sent.</h1>
+            <p class="actions"><a class="btn btn-primary" href="/">Back to my messages</a></p>
+        </section>
+        break;
+
+    default:
+        <PageTitle>Write a message – Backstop</PageTitle>
+        <h1>Write a message</h1>
+        <form class="form" @onsubmit="Send" novalidate>
+            <div class="field">
+                <label for="to">To</label>
+                <input id="to" type="email" @bind="_to" autocomplete="off" placeholder="name@example.com" />
+            </div>
+            <div class="field">
+                <label for="subject">Subject</label>
+                <input id="subject" type="text" @bind="_subject" autocomplete="off" />
+            </div>
+            <div class="field">
+                <label for="body">Message</label>
+                <textarea id="body" rows="7" @bind="_body"></textarea>
+            </div>
+            <p class="form-error" role="alert">@_error</p>
+            <div class="actions">
+                <button type="submit" class="btn btn-primary"><Icon Name="arrow-right" /> Send</button>
+                <a class="btn btn-quiet" href="/"><Icon Name="arrow-left" /> Go back</a>
+            </div>
+        </form>
+        break;
+}
+
+@code {
+    private enum Stage { Form, Pause, Asked, Sent }
+
+    private Stage _stage = Stage.Form;
+    private string _to = "", _subject = "", _body = "", _error = "";
+    private IReadOnlyList<string> _reasons = [];
+
+    private string PauseSpeech =>
+        "You are about to send something private. Your helper will check first. " + string.Join(' ', _reasons);
+
+    private void Send()
+    {
+        _error = "";
+        if (string.IsNullOrWhiteSpace(_to) || !_to.Contains('@'))
+        {
+            _error = "Please type who this is for, like name@example.com.";
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(_body))
+        {
+            _error = "Please write your message first.";
+            return;
+        }
+
+        // MOCK outgoing check. A real service would scan the message and decide.
+        var check = Mail.CheckOutgoing(_to, _subject, _body);
+        if (check.NeedsPause)
+        {
+            _reasons = check.Reasons;
+            _stage = Stage.Pause;
+            return;
+        }
+
+        Mail.Send(_to, _subject, _body);
+        _stage = Stage.Sent;
+    }
+
+    // MOCK: the held outgoing message is not queued anywhere yet. Nothing is sent.
+    private void AskHelper() => _stage = Stage.Asked;
+
+    private void GoBack() => _stage = Stage.Form;
+}
