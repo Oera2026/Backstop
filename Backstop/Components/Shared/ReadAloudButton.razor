@@ -1,0 +1,28 @@
+@inject IJSRuntime JS
+
+<button type="button" class="btn @(Primary ? "btn-primary" : "btn-text")" @onclick="Speak">
+    <Icon Name="speaker" /> Read this to me
+</button>
+<p class="sr-note" role="status">@_note</p>
+
+@code {
+    [Parameter, EditorRequired] public string Text { get; set; } = "";
+    [Parameter] public bool Primary { get; set; }
+
+    private string _note = "";
+
+    private async Task Speak()
+    {
+        _note = "";
+        try
+        {
+            // backstop.js wraps the browser's speechSynthesis. Returns false when not supported.
+            var ok = await JS.InvokeAsync<bool>("backstop.speak", Text);
+            if (!ok) _note = "Sorry, this device cannot read out loud.";
+        }
+        catch (Exception)
+        {
+            _note = "Sorry, this device cannot read out loud.";
+        }
+    }
+}

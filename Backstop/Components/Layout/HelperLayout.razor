@@ -1,0 +1,20 @@
+@inherits LayoutComponentBase
+
+<a class="skip-link" href="#main">Skip to the content</a>
+<header class="site-header site-header--helper" role="banner">
+    <a class="brand" href="/helper" aria-label="Backstop helper, go to the queue">
+        <Icon Name="shield" /> <span>Backstop</span> <span class="role-tag">Helper</span>
+    </a>
+</header>
+<main id="main" class="page page--wide" tabindex="-1">
+    @Body
+</main>
+<footer class="site-footer">
+    <p>You are the helper. Nothing reaches the user until you or the checker says it is safe.</p>
+</footer>
+
+<div id="blazor-error-ui" data-nosnippet>
+    Something went wrong.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss" aria-hidden="true">✕</span>
+</div>

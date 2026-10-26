@@ -1,0 +1,33 @@
+<span class="badge badge--@Kind">
+    <Icon Name="@IconName" />
+    <span>@Text</span>
+</span>
+
+@code {
+    [Parameter, EditorRequired] public MessageState State { get; set; }
+
+    /// <summary>Helper wording ("Waiting for you") instead of the user wording.</summary>
+    [Parameter] public bool ForHelper { get; set; }
+
+    // Fail closed: every state except Cleared and Blocked reads as "being checked".
+    private string Kind => State switch
+    {
+        MessageState.Cleared => "safe",
+        MessageState.Blocked => "block",
+        _ => "check",
+    };
+
+    private string IconName => State switch
+    {
+        MessageState.Cleared => "check",
+        MessageState.Blocked => "cross",
+        _ => "hourglass",
+    };
+
+    private string Text => State switch
+    {
+        MessageState.Cleared => "Safe",
+        MessageState.Blocked => "Blocked",
+        _ => ForHelper ? "Waiting for you" : "Your helper is checking this",
+    };
+}
