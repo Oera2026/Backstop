@@ -9,6 +9,7 @@
             <span class="pause__icon" aria-hidden="true"><Icon Name="hand" /></span>
             <h1 id="pause-title">You are about to send something private.</h1>
             <p class="lead">Your helper will check first.</p>
+            <ReadAloudButton Text="@PauseSpeech" />
             @if (_reasons.Count > 0)
             {
                 <ul class="plain-list">
@@ -22,7 +23,6 @@
                 <button type="button" class="btn btn-primary" @onclick="AskHelper"><Icon Name="shield" /> Ask my helper</button>
                 <button type="button" class="btn btn-quiet" @onclick="GoBack"><Icon Name="arrow-left" /> Go back</button>
             </div>
-            <ReadAloudButton Text="@PauseSpeech" />
         </section>
         break;
 

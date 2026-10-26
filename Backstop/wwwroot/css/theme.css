@@ -21,6 +21,9 @@
   --radius-lg: 24px;
   --shadow: 0 2px 12px rgba(16, 24, 40, .06);
 
+  --on-accent: #FFFFFF;
+  --block-hover: #9E1F25;
+
   --focus: #0064E0;
 
   /* Inter if the device has it (or self-hosted later), otherwise the system font. */

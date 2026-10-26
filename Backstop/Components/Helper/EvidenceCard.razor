@@ -1,17 +1,24 @@
+@implements IDisposable
+
 <article class="evidence" aria-labelledby="ev-title">
     <p class="evidence__status">
         <StatusBadge State="Message.State" ForHelper="true" />
-        <span class="confidence confidence--@Message.Confidence.ToString().ToLowerInvariant()">
-            <Icon Name="@ConfidenceIcon" />
-            <span>How sure are we: <strong>@Message.Confidence</strong></span>
-        </span>
     </p>
     <h1 id="ev-title">Check this message</h1>
 
-    <section class="card" aria-labelledby="ev-plain">
-        <h2 id="ev-plain">In plain words</h2>
-        <p class="lead">@Message.Summary</p>
-    </section>
+    @if (Message.State == MessageState.Held)
+    {
+        <div class="banner @(Message.Confidence == Confidence.High ? "banner--block" : "banner--check")">
+            <Icon Name="alert" />
+            <div>
+                <p class="verdict__head">@VerdictHead</p>
+                <p class="verdict__sub">@VerdictSub</p>
+            </div>
+        </div>
+    }
+
+    <p class="lead">@Message.Summary</p>
+    <ReadAloudButton Text="@($"{VerdictHead} {Message.Summary} {string.Join(' ', Message.Flags.Select(f => f.Title + ". " + f.Explanation))}")" />
 
     @if (Message.Flags.Count > 0)
     {
@@ -34,8 +41,8 @@
 
     @if (Message.Links.Count > 0)
     {
-        <section class="card" aria-labelledby="ev-links">
-            <h2 id="ev-links">Link check</h2>
+        <details class="card fold">
+            <summary>Link check (@Message.Links.Count)</summary>
             @foreach (var l in Message.Links)
             {
                 <div class="linkcheck">
@@ -59,35 +66,60 @@
                     }
                 </div>
             }
-        </section>
+        </details>
     }
 
-    <section class="card" aria-labelledby="ev-preview">
-        <h2 id="ev-preview">The message (text only, links made safe)</h2>
+    <details class="card fold">
+        <summary>Read the message (text only, links made safe)</summary>
         <p class="preview-meta">From @Message.FromName, <code>@Defang.ForHelper(Message.FromAddress)</code><br />Subject: @Message.Subject</p>
         <pre class="preview">@Defang.ForHelper(Message.Body)</pre>
-        <ReadAloudButton Text="@($"{Message.Summary} {string.Join(' ', Message.Flags.Select(f => f.Title + ". " + f.Explanation))}")" />
-    </section>
+    </details>
 
     @if (Message.State == MessageState.Held)
     {
-        <div class="actions actions--helper">
-            <button type="button" class="btn btn-primary" @onclick="OnApprove">
-                <Icon Name="check" /> Approve
-            </button>
-            <button type="button" class="btn btn-quiet btn-danger" @onclick="OnBlock">
-                <Icon Name="cross" /> Block
-            </button>
-            <button type="button" class="btn btn-text" @onclick="OnCallFirst">
-                <Icon Name="phone" /> Call them first
-            </button>
-        </div>
-        <p class="call-note" role="status">
-            @if (Message.CallRequested)
+        <div class="actionbar" role="group" aria-label="Your decision">
+            @if (_pending is not null)
             {
-                <Icon Name="phone" /><span>You will call @Message.FromName before you decide. The message stays held and the user cannot see it.</span>
+                <p class="actionbar__msg" role="status">
+                    <Icon Name="hourglass" />
+                    <span>@(_pending == "Blocked" ? "Blocking" : "Approving") in @_secs seconds. Nothing has happened yet.</span>
+                </p>
+                <div class="actions">
+                    <button type="button" class="btn btn-primary" @onclick="Undo"><Icon Name="arrow-left" /> Undo</button>
+                </div>
             }
-        </p>
+            else if (_confirming)
+            {
+                <p class="actionbar__msg" role="alert">
+                    <Icon Name="alert" />
+                    <span>We think this is risky. Approve it anyway? The user will see it.</span>
+                </p>
+                <div class="actions">
+                    <button type="button" class="btn btn-primary" @onclick="CancelConfirm"><Icon Name="arrow-left" /> No, go back</button>
+                    <button type="button" class="btn btn-quiet" @onclick="@(() => Start("Approved"))"><Icon Name="check" /> Yes, approve</button>
+                </div>
+            }
+            else
+            {
+                <div class="actions actions--helper">
+                    <button type="button" class="btn btn-block" @onclick="@(() => Start("Blocked"))">
+                        <Icon Name="cross" /> Block
+                    </button>
+                    <button type="button" class="btn btn-quiet" @onclick="AskConfirm">
+                        <Icon Name="check" /> Approve
+                    </button>
+                    <button type="button" class="btn btn-text" @onclick="OnCallFirst">
+                        <Icon Name="phone" /> Call them first
+                    </button>
+                </div>
+            }
+            <p class="call-note" role="status">
+                @if (Message.CallRequested)
+                {
+                    <Icon Name="phone" /><span>You will call @Message.FromName before you decide. The message stays held and the user cannot see it.</span>
+                }
+            </p>
+        </div>
     }
     else
     {
@@ -100,22 +132,77 @@
 </article>
 
 @code {
+    private const int UndoSeconds = 6;
+
     [Parameter, EditorRequired] public MailMessage Message { get; set; } = default!;
     [Parameter] public EventCallback OnApprove { get; set; }
     [Parameter] public EventCallback OnBlock { get; set; }
     [Parameter] public EventCallback OnCallFirst { get; set; }
 
-    private string ConfidenceIcon => Message.Confidence switch
+    private bool _confirming;
+    private string? _pending;
+    private int _secs;
+    private CancellationTokenSource? _cts;
+
+    private string VerdictHead => Message.Confidence switch
     {
-        Confidence.High => "shield",
-        Confidence.Medium => "circle",
-        _ => "alert",
+        Confidence.High => "This looks like a scam.",
+        Confidence.Medium => "This might be a scam.",
+        _ => "We cannot tell if this is safe.",
+    };
+
+    private string VerdictSub => Message.Confidence switch
+    {
+        Confidence.High => "We are very sure. We suggest you block it.",
+        Confidence.Medium => "We are fairly sure. Please read it with care.",
+        _ => "We are not sure. Please read it with care.",
     };
 
     private string DecisionText => (Message.State, Message.HelperDecision) switch
     {
         (MessageState.Blocked, null) => "The checker blocked this automatically. The user never saw it.",
-        (MessageState.Blocked, _) => "You blocked this message. The user will never see it.",
-        _ => "You approved this message. It is now in the user's inbox.",
+        (MessageState.Blocked, _) => "Done. You blocked this message. The user will never see it. Thank you for keeping them safe.",
+        _ => "Done. You approved this message. It is now in the user's inbox.",
     };
+
+    private void AskConfirm() => _confirming = true;
+    private void CancelConfirm() => _confirming = false;
+
+    // Nothing is committed until the countdown ends. Leaving the page cancels it,
+    // so the message stays held (fail closed).
+    private async Task Start(string decision)
+    {
+        _confirming = false;
+        _pending = decision;
+        _secs = UndoSeconds;
+        _cts?.Cancel();
+        _cts = new CancellationTokenSource();
+        var token = _cts.Token;
+        try
+        {
+            while (_secs > 0)
+            {
+                await Task.Delay(1000, token);
+                _secs--;
+                StateHasChanged();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        var chosen = _pending;
+        _pending = null;
+        if (chosen == "Blocked") await OnBlock.InvokeAsync();
+        else if (chosen == "Approved") await OnApprove.InvokeAsync();
+    }
+
+    private void Undo()
+    {
+        _cts?.Cancel();
+        _pending = null;
+    }
+
+    public void Dispose() => _cts?.Cancel();
 }

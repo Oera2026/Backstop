@@ -1,0 +1,33 @@
+@page "/help"
+
+<PageTitle>Help – Backstop</PageTitle>
+
+<h1>How Backstop works</h1>
+<p class="lead">Backstop checks every message before you see it. Here is what the words mean.</p>
+<ReadAloudButton Text="@Speech" />
+
+<section aria-labelledby="h-safe">
+    <h2 id="h-safe">What does Safe mean?</h2>
+    <p><StatusBadge State="MessageState.Cleared" /></p>
+    <p>We checked this message. It is fine to open and read.</p>
+</section>
+
+<section aria-labelledby="h-checking">
+    <h2 id="h-checking">Why is my helper checking something?</h2>
+    <p><StatusBadge State="MessageState.Held" /></p>
+    <p>Your helper is a person you trust. They look at messages that might be a trick. You do not need to do anything. The message appears here when it is safe.</p>
+</section>
+
+<section aria-labelledby="h-blocked">
+    <h2 id="h-blocked">What if a message never comes?</h2>
+    <p>Sometimes your helper decides a message is not safe. You will not see it. That is on purpose. It keeps you safe.</p>
+</section>
+
+<p class="actions"><a class="btn btn-primary" href="/"><Icon Name="arrow-left" /> Back to my messages</a></p>
+
+@code {
+    private const string Speech =
+        "Backstop checks every message before you see it. Safe means we checked this message and it is fine to read. " +
+        "Your helper is a person you trust. They look at messages that might be a trick. You do not need to do anything. " +
+        "Sometimes your helper decides a message is not safe. You will not see it. That keeps you safe.";
+}

@@ -22,9 +22,6 @@ else
 @code {
     [Parameter] public string Id { get; set; } = "";
 
-    private void Decide(Action decision)
-    {
-        decision();
-        Nav.NavigateTo("helper");
-    }
+    // The card stays open and shows the "Done" message, so the helper sees the result.
+    private void Decide(Action decision) => decision();
 }
