@@ -25,6 +25,7 @@ else
         {
             <li>
                 <a class="row" href="helper/@m.Id">
+                    <span class="pic pic--check" aria-hidden="true"><Icon Name="hourglass" /></span>
                     <span class="row__main">
                         <span class="row__from">@m.FromName</span>
                         <span class="row__subject">@m.Subject</span>
@@ -48,6 +49,7 @@ else
         {
             <li>
                 <a class="row" href="helper/@m.Id">
+                    <span class="pic @(m.State == MessageState.Blocked ? "pic--block" : "pic--safe")" aria-hidden="true"><Icon Name="@(m.State == MessageState.Blocked ? "cross" : "check")" /></span>
                     <span class="row__main">
                         <span class="row__from">@m.FromName</span>
                         <span class="row__subject">@m.Subject</span>
