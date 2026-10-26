@@ -1,0 +1,14 @@
+bin/
+obj/
+node_modules/
+.vs/
+.vscode/
+*.user
+*.suo
+.env
+.env.*
+!.env.example
+appsettings.*.local.json
+secrets.json
+launchSettings.local.json
+graphify-out/
