@@ -7,21 +7,20 @@
 @if (m is null)
 {
     <PageTitle>Message not ready – Backstop</PageTitle>
-    <h1>This message is not ready</h1>
-    <p>You cannot read it right now. Your helper may be checking it.</p>
+    <h1>We cannot find that message</h1>
+    <p>It is not available.</p>
     <p class="actions">
         <a class="btn btn-primary" href="/"><Icon Name="arrow-left" /> Back to my messages</a>
     </p>
 }
 else
 {
+    var noReply = NoReply.IsNoReply(m.FromAddress);
     <PageTitle>@m.Subject – Backstop</PageTitle>
+    <BackLink />
     <article class="reading" aria-labelledby="subject">
-        <p class="reading__meta">
-            <StatusBadge State="MessageState.Cleared" />
-        </p>
         <h1 id="subject">@m.Subject</h1>
-        <p class="reading__from">From <strong>@m.FromName</strong> (@m.FromAddress)<br />@m.ReceivedAt.ToString("dddd d MMMM, h:mm tt")</p>
+        <p class="reading__from">From <strong>@m.FromName</strong> (@m.FromAddress)<br />@Clock.Long(m.ReceivedAt)</p>
         <div class="reading__body">
             @foreach (var line in Defang.ForUser(m.Body).Split('\n'))
             {
@@ -29,11 +28,17 @@ else
                 <p>@line</p>
             }
         </div>
-        <p class="sr-note">Links in messages are switched off to keep you safe.</p>
     </article>
+    @if (noReply)
+    {
+        <p class="note"><Icon Name="cross" /> <span>You cannot reply to this message.</span></p>
+    }
     <div class="actions">
         <ReadAloudButton Primary="true" Text="@($"Message from {m.FromName}. {m.Subject}. {Defang.ForUser(m.Body)}")" />
-        <a class="btn btn-quiet" href="/"><Icon Name="arrow-left" /> Back to my messages</a>
+        @if (!noReply)
+        {
+            <a class="btn btn-quiet" href="compose?reply=@m.Id"><Icon Name="pen" /> Reply</a>
+        }
     </div>
 }
 

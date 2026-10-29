@@ -1,0 +1,16 @@
+@* A contact's picture, or a plain person drawing when they have none. The name is always written next to it. *@
+<span class="pic pic--blue @(Contact?.PhotoUrl is null ? "" : "pic--photo") @(Large ? "pic--large" : "")" aria-hidden="true">
+    @if (Contact?.PhotoUrl is { } url)
+    {
+        <img src="@url" alt="" />
+    }
+    else
+    {
+        <Icon Name="user" />
+    }
+</span>
+
+@code {
+    [Parameter] public Contact? Contact { get; set; }
+    [Parameter] public bool Large { get; set; }
+}

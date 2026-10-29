@@ -1,0 +1,37 @@
+@page "/contacts"
+@inherits LiveComponentBase
+
+<PageTitle>My contacts – Backstop</PageTitle>
+
+<BackLink />
+<h1>My contacts</h1>
+<p class="lead">Tap a person to write to them.</p>
+
+@{ var contacts = Mail.GetContacts(); }
+@if (contacts.Count == 0)
+{
+    <p class="empty">You have no contacts yet.</p>
+}
+else
+{
+    <ul class="rows" aria-label="Your contacts">
+        @foreach (var c in contacts)
+        {
+            <li>
+                <div class="row row--static">
+                    <a class="row__link" href="compose?to=@Uri.EscapeDataString(c.Address)">
+                        <Avatar Contact="c" />
+                        <span class="row__main">
+                            <span class="row__from">@c.Name</span>
+                            <span class="row__subject">@c.Relationship</span>
+                            <span class="row__preview">@c.Address</span>
+                        </span>
+                    </a>
+                    <a class="btn btn-quiet" href="contacts/@c.Id" aria-label="@(c.PhotoUrl is null ? "Add a photo of" : "Change the photo of") @c.Name">
+                        <Icon Name="pen" /> @(c.PhotoUrl is null ? "Add photo" : "Change photo")
+                    </a>
+                </div>
+            </li>
+        }
+    </ul>
+}

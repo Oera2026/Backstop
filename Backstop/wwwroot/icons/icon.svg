@@ -1,5 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!-- PLACEHOLDER icon: replace with final artwork -->
-<rect width="512" height="512" rx="112" fill="#0064E0"/>
-<path d="M256 96l136 48v112c0 88-60 138-136 164-76-26-136-76-136-164V144z" fill="#fff"/>
-<path d="M196 262l44 44 80-86" fill="none" stroke="#0064E0" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><rect x="2" y="2" width="44" height="44" rx="12" fill="#FFE14D" stroke="#0B2A6F" stroke-width="3"/><path fill="#0B2A6F" fill-rule="evenodd" d="M13 9h12.5a7.5 7.5 0 0 1 4.6 13.4A8.2 8.2 0 0 1 26.5 39H13zM20 15.5v5.7h5a2.85 2.85 0 0 0 0-5.7zM20 27v6.5h6a3.25 3.25 0 0 0 0-6.5z"/></svg>

@@ -1,0 +1,15 @@
+<div class="event">
+    <span class="pic pic--blue" aria-hidden="true"><Icon Name="clock" /></span>
+    <span class="event__body">
+        <span class="event__time">@(Event.Time is { } t ? t.ToString("h:mm tt") : "All day")</span>
+        <span class="event__title">@Event.Title</span>
+        @if (Event.Place.Length > 0)
+        {
+            <span class="event__place">@Event.Place</span>
+        }
+    </span>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public CalendarEvent Event { get; set; } = default!;
+}

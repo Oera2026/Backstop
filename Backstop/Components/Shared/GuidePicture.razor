@@ -1,0 +1,71 @@
+@* "What it should look like when done". MOCK: a real back end generates this picture; here each task has a simple drawing.
+   Drawn with theme colours so it follows light, dark and high contrast. *@
+<svg class="guidepic" viewBox="0 0 320 240" role="img" aria-label="@Label">
+    @switch (Name)
+    {
+        case "washer":
+            <rect class="gp-paper" x="70" y="14" width="180" height="214" rx="16" />
+            <line class="gp-ink" x1="70" y1="66" x2="250" y2="66" />
+            <rect class="gp-band" x="86" y="28" width="56" height="26" rx="5" />
+            <circle class="gp-mark" cx="210" cy="40" r="17" />
+            <line class="gp-ink" x1="210" y1="40" x2="198" y2="28" />
+            <line class="gp-ink" x1="172" y1="40" x2="184" y2="40" />
+            <circle class="gp-band" cx="160" cy="146" r="56" />
+            <circle class="gp-paper" cx="160" cy="146" r="38" />
+            <path class="gp-ink" d="M132 152c10-12 22 8 34-4s18 6 26-2" />
+            break;
+        case "bed":
+            <rect class="gp-paper" x="18" y="60" width="26" height="150" rx="6" />
+            <rect class="gp-band" x="44" y="120" width="258" height="56" rx="8" />
+            <rect class="gp-paper" x="58" y="92" width="74" height="32" rx="14" />
+            <path class="gp-mark" d="M150 112h146a8 8 0 0 1 8 8v40a8 8 0 0 1-8 8H150z" />
+            <line class="gp-ink" x1="150" y1="140" x2="302" y2="140" />
+            <line class="gp-ink" x1="54" y1="176" x2="54" y2="214" />
+            <line class="gp-ink" x1="294" y1="176" x2="294" y2="214" />
+            break;
+        case "form":
+            <rect class="gp-paper" x="70" y="10" width="180" height="222" rx="8" />
+            <line class="gp-ink" x1="92" y1="38" x2="200" y2="38" />
+            <rect class="gp-band" x="92" y="56" width="136" height="24" rx="4" />
+            <rect class="gp-band" x="92" y="92" width="136" height="24" rx="4" />
+            <rect class="gp-paper" x="92" y="130" width="22" height="22" rx="4" />
+            <polyline class="gp-ink" points="96 141 102 147 112 134" />
+            <line class="gp-ink" x1="124" y1="141" x2="210" y2="141" />
+            <rect class="gp-mark" x="92" y="168" width="136" height="44" rx="6" />
+            <path class="gp-ink" d="M104 196c10-16 16 10 26-4s14 8 22-2 12 6 20 0" />
+            break;
+        case "router":
+            <rect class="gp-paper" x="50" y="104" width="220" height="70" rx="14" />
+            <circle class="gp-safe" cx="90" cy="139" r="9" />
+            <circle class="gp-band" cx="122" cy="139" r="9" />
+            <circle class="gp-band" cx="154" cy="139" r="9" />
+            <line class="gp-ink" x1="110" y1="104" x2="96" y2="56" />
+            <line class="gp-ink" x1="210" y1="104" x2="224" y2="56" />
+            <path class="gp-ink" d="M270 150c30 0 30 50 0 60H200" />
+            <rect class="gp-mark" x="176" y="196" width="28" height="28" rx="6" />
+            break;
+        default:
+            <rect class="gp-band" x="40" y="70" width="240" height="150" rx="10" />
+            <path class="gp-paper" d="M40 80l120 80 120-80" />
+            <rect class="gp-paper" x="80" y="16" width="160" height="120" rx="6" />
+            <line class="gp-ink" x1="100" y1="44" x2="200" y2="44" />
+            <line class="gp-ink" x1="100" y1="70" x2="220" y2="70" />
+            <line class="gp-ink" x1="100" y1="94" x2="190" y2="94" />
+            <rect class="gp-mark" x="176" y="104" width="44" height="20" rx="4" />
+            break;
+    }
+</svg>
+
+@code {
+    [Parameter, EditorRequired] public string Name { get; set; } = "";
+    [Parameter] public string Label { get; set; } = "Guide picture";
+
+    public static string Describe(string name) => name switch
+    {
+        "washer" => "Guide picture: a washing machine with the big dial turned to 40 Cottons",
+        "bed" => "Guide picture: a made bed with the sheet tucked in and the duvet on top",
+        "form" => "Guide picture: a filled-in form with a tick and a signature in the bottom box",
+        "router" => "Guide picture: the internet box with the first light green",
+        _ => "Guide picture: a letter and its envelope",
+    };
+}

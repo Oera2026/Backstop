@@ -1,0 +1,87 @@
+@* One picture per story page. MOCK: a real back end draws a picture for the page; here each key has a simple drawing.
+   Drawn with theme colours so it follows light, dark and high contrast. *@
+<svg class="guidepic" viewBox="0 0 320 240" role="img" aria-label="@Describe(Name)">
+    @switch (Name)
+    {
+        case "door":
+            <rect class="gp-band" x="30" y="30" width="260" height="190" rx="10" />
+            <rect class="gp-paper" x="110" y="50" width="100" height="170" rx="6" />
+            <circle class="gp-mark" cx="192" cy="136" r="8" />
+            <line class="gp-ink" x1="30" y1="220" x2="290" y2="220" />
+            break;
+        case "bus":
+            <rect class="gp-mark" x="30" y="60" width="260" height="120" rx="18" />
+            <rect class="gp-paper" x="50" y="78" width="54" height="44" rx="6" />
+            <rect class="gp-paper" x="116" y="78" width="54" height="44" rx="6" />
+            <rect class="gp-paper" x="182" y="78" width="54" height="44" rx="6" />
+            <circle class="gp-paper" cx="88" cy="186" r="20" />
+            <circle class="gp-paper" cx="232" cy="186" r="20" />
+            <line class="gp-ink" x1="30" y1="140" x2="290" y2="140" />
+            break;
+        case "desk":
+            <rect class="gp-band" x="30" y="120" width="260" height="90" rx="8" />
+            <circle class="gp-paper" cx="160" cy="62" r="28" />
+            <path class="gp-paper" d="M110 120c0-32 22-44 50-44s50 12 50 44z" />
+            <rect class="gp-paper" x="60" y="100" width="50" height="22" rx="4" />
+            break;
+        case "chair":
+            <path class="gp-band" d="M110 40h100v90H110z" />
+            <rect class="gp-mark" x="90" y="130" width="140" height="28" rx="8" />
+            <line class="gp-ink" x1="104" y1="158" x2="96" y2="216" />
+            <line class="gp-ink" x1="216" y1="158" x2="224" y2="216" />
+            <circle class="gp-paper" cx="262" cy="70" r="26" />
+            <line class="gp-ink" x1="262" y1="70" x2="262" y2="54" />
+            <line class="gp-ink" x1="262" y1="70" x2="274" y2="76" />
+            break;
+        case "talk":
+            <path class="gp-band" d="M30 50h150a14 14 0 0 1 14 14v56a14 14 0 0 1-14 14H90l-34 28v-28H30a14 14 0 0 1-14-14V64a14 14 0 0 1 14-14z" />
+            <path class="gp-mark" d="M150 118h140a14 14 0 0 1 14 14v52a14 14 0 0 1-14 14h-26v26l-32-26h-82a14 14 0 0 1-14-14v-52a14 14 0 0 1 14-14z" />
+            <line class="gp-ink" x1="40" y1="82" x2="150" y2="82" />
+            <line class="gp-ink" x1="40" y1="104" x2="120" y2="104" />
+            <line class="gp-ink" x1="170" y1="150" x2="270" y2="150" />
+            <line class="gp-ink" x1="170" y1="172" x2="240" y2="172" />
+            break;
+        case "feel":
+            <circle class="gp-mark" cx="160" cy="120" r="84" />
+            <circle class="gp-ink" cx="128" cy="100" r="5" />
+            <circle class="gp-ink" cx="192" cy="100" r="5" />
+            <path class="gp-ink" d="M122 148c14 14 62 14 76 0" />
+            <path class="gp-ink" d="M110 78l20-6M210 78l-20-6" />
+            break;
+        case "calm":
+            <circle class="gp-band" cx="160" cy="120" r="96" />
+            <circle class="gp-paper" cx="160" cy="120" r="66" />
+            <circle class="gp-mark" cx="160" cy="120" r="34" />
+            <path class="gp-ink" d="M144 120c10 10 22 10 32 0" />
+            break;
+        case "shop":
+            <rect class="gp-band" x="50" y="90" width="220" height="130" rx="8" />
+            <path class="gp-mark" d="M40 90 60 40h200l20 50z" />
+            <rect class="gp-paper" x="130" y="130" width="60" height="90" rx="4" />
+            <line class="gp-ink" x1="40" y1="90" x2="280" y2="90" />
+            break;
+        default: // "home"
+            <path class="gp-band" d="M40 120 160 30l120 90v100H40z" />
+            <rect class="gp-mark" x="130" y="140" width="60" height="80" rx="4" />
+            <rect class="gp-paper" x="66" y="124" width="40" height="40" rx="4" />
+            <rect class="gp-paper" x="214" y="124" width="40" height="40" rx="4" />
+            break;
+    }
+</svg>
+
+@code {
+    [Parameter, EditorRequired] public string Name { get; set; } = "";
+
+    public static string Describe(string name) => name switch
+    {
+        "door" => "Picture: a door",
+        "bus" => "Picture: a bus",
+        "desk" => "Picture: a person behind a desk",
+        "chair" => "Picture: a chair and a clock",
+        "talk" => "Picture: two people talking",
+        "feel" => "Picture: a face with a worried look",
+        "calm" => "Picture: calm circles",
+        "shop" => "Picture: a shop",
+        _ => "Picture: a home",
+    };
+}

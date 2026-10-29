@@ -1,0 +1,90 @@
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+@* The browser camera, with choosing a photo as the fallback. The picture goes to the server only when the user asks for a guide. *@
+<div class="camera">
+    @if (_live)
+    {
+        <video @ref="_video" playsinline muted aria-label="What the camera sees"></video>
+        <div class="camera__buttons">
+            <button type="button" class="btn btn-primary" @onclick="Take"><Icon Name="camera" /> Take the picture</button>
+            <button type="button" class="btn btn-quiet" @onclick="StopCamera"><Icon Name="cross" /> Stop the camera</button>
+        </div>
+    }
+    <img @ref="_shot" alt="Your photo" hidden="@(!_hasShot || _live)" />
+    @if (!_live)
+    {
+        <div class="camera__buttons">
+            <button type="button" class="btn btn-quiet" @onclick="StartCamera"><Icon Name="camera" /> @(_hasShot ? "Take it again" : "Use the camera")</button>
+        </div>
+        <PicturePicker Id="photo" Prompt="Or drop a photo here, or tap to choose one" Camera="true" OnPicked="FromFile" />
+    }
+    <p class="form-error" role="alert">@_error</p>
+</div>
+
+@code {
+    [Parameter] public EventCallback<PicturePicker.PickedFile> OnPhoto { get; set; }
+
+    private ElementReference _video, _shot;
+    private bool _live, _starting, _hasShot;
+    private string? _error;
+
+    private void StartCamera()
+    {
+        _error = null;
+        _live = true;
+        _starting = true; // the <video> has to be on the page before the camera can use it
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_starting) return;
+        _starting = false;
+        bool ok;
+        try { ok = await JS.InvokeAsync<bool>("backstopCamera.start", _video); }
+        catch (JSException) { ok = false; }
+        if (!ok)
+        {
+            _live = false;
+            _error = "We could not open the camera. You can choose a photo instead.";
+            StateHasChanged();
+        }
+    }
+
+    private async Task Take()
+    {
+        try
+        {
+            var data = await JS.InvokeAsync<IJSStreamReference>("backstopCamera.capture", _video, _shot);
+            await using var stream = await data.OpenReadStreamAsync(10 * 1024 * 1024);
+            using var memory = new MemoryStream();
+            await stream.CopyToAsync(memory);
+            _live = false;
+            _hasShot = true;
+            await OnPhoto.InvokeAsync(new PicturePicker.PickedFile(memory.ToArray(), "camera.jpg"));
+        }
+        catch (Exception)
+        {
+            await StopCamera();
+            _error = "We could not take the picture. Please try again, or choose a photo.";
+        }
+    }
+
+    private async Task StopCamera()
+    {
+        try { await JS.InvokeVoidAsync("backstopCamera.stop", _video); } catch (Exception) { }
+        _live = false;
+    }
+
+    private async Task FromFile(PicturePicker.PickedFile file)
+    {
+        _hasShot = false;
+        await OnPhoto.InvokeAsync(file);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (!_live) return;
+        try { await JS.InvokeVoidAsync("backstopCamera.stop", _video); } catch (Exception) { /* page already gone */ }
+    }
+}

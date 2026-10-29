@@ -2,20 +2,37 @@
 
 <a class="skip-link" href="#main">Skip to the message</a>
 <header class="site-header" role="banner">
-    <a class="brand" href="/" aria-label="Backstop, go to my messages">
-        <Icon Name="shield" /> <span>Backstop</span>
+    <a class="brand" href="home" aria-label="Backstop, go to the home screen">
+        <Logo /> <span>Backstop</span>
     </a>
+    <nav aria-label="Help and settings" class="site-nav">
+        <button type="button" class="site-nav__display" aria-expanded="@(_display ? "true" : "false")" aria-controls="display-drawer"
+                @onclick="() => _display = !_display">
+            <Icon Name="type" /> <span>Text</span>
+        </button>
+        <a href="/help">Help</a>
+        <a href="/settings">Settings</a>
+    </nav>
 </header>
-<main id="main" class="page" tabindex="-1">
-    @Body
-</main>
-<footer class="site-footer">
-    <p>Backstop checks your mail before you see it.</p>
-    <p><a href="/help">Need help? What does Safe mean?</a></p>
-</footer>
+@if (_display)
+{
+    <div id="display-drawer" class="display-drawer">
+        <DisplayControls />
+    </div>
+}
+<div class="shell">
+    <AppNav />
+    <main id="main" class="page" tabindex="-1">
+        @Body
+    </main>
+</div>
 
 <div id="blazor-error-ui" data-nosnippet>
     Something went wrong.
     <a href="." class="reload">Reload</a>
     <button type="button" class="dismiss" aria-label="Dismiss"><Icon Name="cross" /></button>
 </div>
+
+@code {
+    private bool _display;
+}

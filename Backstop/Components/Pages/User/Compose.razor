@@ -5,11 +5,11 @@
 {
     case Stage.Pause:
         <PageTitle>Please wait – Backstop</PageTitle>
+        <BackLink OnClick="GoBack" Text="Change my message" />
         <section class="pause" aria-labelledby="pause-title">
             <span class="pause__icon" aria-hidden="true"><Icon Name="hand" /></span>
             <h1 id="pause-title">You are about to send something private.</h1>
             <p class="lead">Your helper will check first.</p>
-            <ReadAloudButton Text="@PauseSpeech" />
             @if (_reasons.Count > 0)
             {
                 <ul class="plain-list">
@@ -20,8 +20,8 @@
                 </ul>
             }
             <div class="actions">
-                <button type="button" class="btn btn-primary" @onclick="AskHelper"><Icon Name="shield" /> Ask my helper</button>
-                <button type="button" class="btn btn-quiet" @onclick="GoBack"><Icon Name="arrow-left" /> Go back</button>
+                <button type="button" class="btn btn-primary" @onclick="AskHelper"><Icon Name="user" /> Ask my helper</button>
+                <ReadAloudButton Text="@PauseSpeech" />
             </div>
         </section>
         break;
@@ -36,56 +36,160 @@
         </section>
         break;
 
+    case Stage.Sending:
+        <PageTitle>Sending – Backstop</PageTitle>
+        <section aria-labelledby="sending-title">
+            <h1 id="sending-title">Sending your message</h1>
+            <p class="lead" role="status">Sending in @_secs seconds.</p>
+            <span class="countdown" style="--secs:@(UndoSeconds)s" aria-hidden="true"></span>
+            <div class="actions">
+                <button type="button" class="btn btn-primary" @onclick="Undo"><Icon Name="arrow-left" /> Undo</button>
+            </div>
+        </section>
+        break;
+
     case Stage.Sent:
         <PageTitle>Message sent – Backstop</PageTitle>
         <section aria-labelledby="sent-title">
             <p><span class="badge badge--safe"><Icon Name="check" /><span>Sent</span></span></p>
             <h1 id="sent-title">Your message has been sent.</h1>
+            @if (_newPerson)
+            {
+                <p class="lead">This is the first time you have written to this person, so your helper has been told.</p>
+            }
             <p class="actions"><a class="btn btn-primary" href="/">Back to my messages</a></p>
         </section>
         break;
 
     default:
-        <PageTitle>Write a message – Backstop</PageTitle>
-        <h1>Write a message</h1>
+        <PageTitle>@(_reply is null ? "Write a message" : "Reply") – Backstop</PageTitle>
+        <BackLink Href="@(_reply is null ? "/" : $"message/{_reply.Id}")" Text="@(_reply is null ? "My messages" : "The message")" />
+        <h1>@(_reply is null ? "Write a message" : $"Reply to {_reply.FromName}")</h1>
         <form class="form" @onsubmit="Send" novalidate>
             <div class="field">
                 <label for="to">To</label>
-                <input id="to" type="email" @bind="_to" autocomplete="off" placeholder="name@example.com" />
+                @if (_locked)
+                {
+                    var person = Mail.FindContact(_to);
+                    <div class="recipient">
+                        <Avatar Contact="person" />
+                        <span class="recipient__who">
+                            <strong>@(person?.Name ?? _reply?.FromName ?? _to)</strong>
+                            @if (person is not null) { <span>@person.Relationship</span> }
+                        </span>
+                    </div>
+                    @* Read-only, so the address cannot be changed or spoiled by mistake. *@
+                    <input id="to" type="email" value="@_to" readonly class="is-locked" />
+                    @if (_reply is null)
+                    {
+                        <p class="hint"><a href="contacts">Choose someone else</a></p>
+                    }
+                }
+                else
+                {
+                    <input id="to" type="email" inputmode="email" @bind="_to" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="next" placeholder="name@example.com" />
+                }
             </div>
-            <div class="field">
-                <label for="subject">Subject</label>
-                <input id="subject" type="text" @bind="_subject" autocomplete="off" />
-            </div>
+            @if (_reply is null)
+            {
+                <div class="field">
+                    <label for="subject">Subject</label>
+                    <input id="subject" type="text" @bind="_subject" autocomplete="off" />
+                </div>
+            }
+            else
+            {
+                @* Picking an answer only fills in the message. Nothing is sent until Send. *@
+                <ChoiceGroup Legend="Quick answer" Name="quick" Value="@_quick" OnPick="PickQuick" Options="@QuickOptions" />
+            }
             <div class="field">
                 <label for="body">Message</label>
-                <textarea id="body" rows="7" @bind="_body"></textarea>
+                <textarea id="body" rows="7" @bind="_body" @bind:after="BodyEdited"></textarea>
             </div>
             <p class="form-error" role="alert">@_error</p>
             <div class="actions">
                 <button type="submit" class="btn btn-primary"><Icon Name="arrow-right" /> Send</button>
-                <a class="btn btn-quiet" href="/"><Icon Name="arrow-left" /> Go back</a>
             </div>
         </form>
         break;
 }
 
 @code {
-    private enum Stage { Form, Pause, Asked, Sent }
+    private enum Stage { Form, Pause, Asked, Sending, Sent }
+
+    private const int UndoSeconds = 5;
+
+    private static readonly (string Value, string Label)[] QuickOptions =
+        [("yes", "Yes"), ("no", "No"), ("thanks", "Thank you"), ("call", "Call me")];
+
+    private static readonly Dictionary<string, string> QuickText = new()
+    {
+        ["yes"] = "Yes.", ["no"] = "No.", ["thanks"] = "Thank you.", ["call"] = "Please call me.",
+    };
 
     private Stage _stage = Stage.Form;
-    private string _to = "", _subject = "", _body = "", _error = "";
+    private string _to = "", _subject = "", _body = "", _error = "", _quick = "";
+    private bool _newPerson, _locked;
     private IReadOnlyList<string> _reasons = [];
+    private MailMessage? _reply;
+    private int _secs;
+    private CancellationTokenSource? _cts;
+
+    [SupplyParameterFromQuery(Name = "to")] public string? ToAddress { get; set; }
+    [SupplyParameterFromQuery(Name = "subject")] public string? SubjectText { get; set; }
+    [SupplyParameterFromQuery(Name = "reply")] public string? ReplyId { get; set; }
+
+    // Contacts open this page with the person filled in. A reply takes the person and subject
+    // from the message itself, and only from a Cleared one.
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        _reply = string.IsNullOrWhiteSpace(ReplyId) ? null : Mail.GetClearedMessage(ReplyId);
+        if (_reply is not null && !NoReply.IsNoReply(_reply.FromAddress))
+        {
+            _to = _reply.FromAddress;
+            _subject = _reply.Subject.StartsWith("Re:", StringComparison.OrdinalIgnoreCase) ? _reply.Subject : "Re: " + _reply.Subject;
+            _locked = true;
+            return;
+        }
+        _reply = null;
+        if (!string.IsNullOrWhiteSpace(ToAddress))
+        {
+            _to = ToAddress.Trim();
+            _locked = true;
+        }
+        if (!string.IsNullOrWhiteSpace(SubjectText)) _subject = SubjectText;
+    }
 
     private string PauseSpeech =>
         "You are about to send something private. Your helper will check first. " + string.Join(' ', _reasons);
 
-    private void Send()
+    private void PickQuick(string value)
+    {
+        _quick = value;
+        _body = QuickText[value];
+    }
+
+    // Typing over a quick answer un-picks it, so the choice never shows something the message no longer says.
+    private void BodyEdited()
+    {
+        if (_quick.Length > 0 && _body != QuickText[_quick]) _quick = "";
+    }
+
+    private async Task Send()
     {
         _error = "";
+        // A locked address always comes from the message or the link, never from anything typed on the page.
+        if (_reply is not null) _to = _reply.FromAddress;
+        else if (_locked && !string.IsNullOrWhiteSpace(ToAddress)) _to = ToAddress.Trim();
         if (string.IsNullOrWhiteSpace(_to) || !_to.Contains('@'))
         {
             _error = "Please type who this is for, like name@example.com.";
+            return;
+        }
+        if (NoReply.IsNoReply(_to))
+        {
+            _error = "That is a no-reply address. Nobody reads messages sent to it, so we cannot send this.";
             return;
         }
         if (string.IsNullOrWhiteSpace(_body))
@@ -103,12 +207,65 @@
             return;
         }
 
-        Mail.Send(_to, _subject, _body);
+        await StartSending();
+    }
+
+    // The message waits a few seconds so a wrong tap can be undone. Leaving the page sends it, as the user asked.
+    private async Task StartSending()
+    {
+        _stage = Stage.Sending;
+        _secs = UndoSeconds;
+        _cts = new CancellationTokenSource();
+        var token = _cts.Token;
+        try
+        {
+            while (_secs > 0)
+            {
+                await Task.Delay(1000, token);
+                _secs--;
+                StateHasChanged();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        Commit();
+    }
+
+    private void Commit()
+    {
+        _cts = null;
+        var result = Mail.Send(_to, _subject, _body);
+        if (result.Refused is not null)
+        {
+            _error = result.Refused;
+            _stage = Stage.Form;
+            return;
+        }
+        _newPerson = result.NewRecipient;
         _stage = Stage.Sent;
+    }
+
+    private void Undo()
+    {
+        _cts?.Cancel();
+        _cts = null;
+        _stage = Stage.Form;
     }
 
     // MOCK: the held outgoing message is not queued anywhere yet. Nothing is sent.
     private void AskHelper() => _stage = Stage.Asked;
 
     private void GoBack() => _stage = Stage.Form;
+
+    public override void Dispose()
+    {
+        if (_stage == Stage.Sending)
+        {
+            _cts?.Cancel();
+            Commit();
+        }
+        base.Dispose();
+    }
 }

@@ -30,6 +30,15 @@ Backstop holds every incoming email until it is checked. The user never sees mai
 - Responsive down to 360px. PWA manifest in `wwwroot/manifest.webmanifest`.
 - Helper previews are text only and links are defanged (`hxxp://example[.]com`, see `Defang`). Never render a clickable link from message content.
 
+## No self-explaining interface text (strict)
+Never add captions that explain, justify or reassure about how the interface works. They read as tacky and cheap.
+- Banned examples: "This address is locked so it cannot be changed by mistake", "Links are switched off to keep you safe", "Your helper checks everything for you", a padlock or shield icon placed beside such a sentence.
+- Make the control behave correctly and let its look say it. A locked address is a greyed, read-only box; it needs no sentence.
+- Do not use lock or shield icons as decoration or reassurance. Icons name an action or a state, nothing more.
+- Interface text is only for the user's task: labels, the next step, and the result of what they did ("Done. The photo is saved.").
+- Allowed: an error that stops the user and says how to fix it, and one short hint that tells the user what to type or choose ("Leave this empty if it lasts all day.").
+- Before adding any sentence to a screen, ask "does this help them do the next thing?" If not, leave it out.
+
 ## Layout
 `Components/{Layout,Pages,Shared,Helper,Demo}`, `Models/`, `Services/`, `wwwroot/css/`.
 Routes: `/` user, `/helper` helper, `/demo` demo panel (split screen uses iframes of `/` and `/helper`).
@@ -37,3 +46,35 @@ Routes: `/` user, `/helper` helper, `/demo` demo panel (split screen uses iframe
 ## Working rules
 - Commit in small, meaningful commits.
 - After changes, run the app and check all three views and all 7 scenarios in `/demo`.
+
+<!-- ASTRYX:START -->
+Astryx v0.7.4 · 173 components
+CLI: run every command as `npx astryx <cmd>` (shown below as `astryx ...`).
+
+SETUP (once, in app entry e.g. main.tsx) — without these, components render unstyled:
+  import "@astryxdesign/core/reset.css";
+  import "@astryxdesign/core/astryx.css";
+
+WORKFLOW — start every page from a template, never from scratch:
+1. `astryx build "<idea>"` — names the template to scaffold from and the parts it lacks.
+2. `astryx template <name> <path>` — scaffold it; keep its frame, gap and padding; replace the content.
+3. `astryx template <Block>` for parts it lacks; `astryx component <Name>` to read props before using one.
+Changing an existing page? Keep it: skip step 2 and add blocks/components inside its sections.
+Before you deliver a build, run `astryx doctor --built <dir>`; don't deliver it if it fails.
+
+RULES:
+- No <div> — components handle all layout and spacing.
+- Read `astryx docs layout` before changing a template's frame.
+- Dense data = rows (Table, List/Item), not Card-wrapped lists. Badge = counts only.
+- Style with component props first, then tokens (var(--color-*|--spacing-*|--radius-*)). No raw hex/px. No StyleX/Tailwind compiler here — don't use xstyle/utility classes directly. Some templates use StyleX and need a compiler plugin; see `astryx docs styling-overview`.
+- Palettes and custom colors go through the theme, never :root overrides. Run `astryx theme add <slug>` to import; `theme eject <slug>` only forks source. See `astryx docs theme`.
+- SELF-CHECK: re-read the file; replace any raw <div>/<span>, imported .css/@apply, or hardcoded #hex/px with the component or a token.
+
+`astryx help` lists every command. Key ones beyond the workflow:
+  search "<query>"   find any component / hook / doc / template
+  discover <words>   integrations you could add
+  docs <topic>       getting-started, principles, tokens, theme … (`astryx docs` lists all)
+  docs cli           commands and API reference
+  docs authoring     build an integration package, and every field it holds
+  upgrade --from <old version> --apply   run after a dependency bump
+<!-- ASTRYX:END -->

@@ -5,40 +5,50 @@
 
 <h1>My messages</h1>
 
-<p class="actions">
-    <a class="btn btn-primary" href="compose"><Icon Name="pen" /> Write a message</a>
-</p>
+<div class="home">
+    <div class="home__side">
+        <p class="actions">
+            <a class="btn btn-primary" href="compose"><Icon Name="pen" /> Write a message</a>
+        </p>
 
-@* The user is only ever told a NUMBER of held messages: no sender, no subject. *@
-@if (Mail.HeldCount > 0)
-{
-    <div class="banner banner--check" role="status">
-        <Icon Name="hourglass" />
-        <p>@(Mail.HeldCount == 1 ? "1 message is being checked by your helper." : $"{Mail.HeldCount} messages are being checked by your helper.")</p>
+        <nav class="tiles" aria-label="Go to">
+            <a class="tile" href="contacts"><span class="pic" aria-hidden="true"><Icon Name="people" /></span><span>Contacts</span></a>
+            <a class="tile" href="sent"><span class="pic" aria-hidden="true"><Icon Name="send" /></span><span>Sent</span></a>
+            <a class="tile" href="calendar"><span class="pic" aria-hidden="true"><Icon Name="calendar" /></span><span>Calendar</span></a>
+            <a class="tile" href="search"><span class="pic" aria-hidden="true"><Icon Name="search" /></span><span>Search</span></a>
+        </nav>
     </div>
-}
 
-@{ var inbox = Mail.GetInbox(); }
-@if (inbox.Count == 0)
-{
-    <p class="empty">You have no safe messages yet.</p>
-}
-else
-{
-    <ul class="rows" aria-label="Messages that are safe to read">
-        @foreach (var m in inbox)
+    <div class="home__list">
+        @* Privacy rule still holds: the user only ever sees Cleared mail (GetInbox). Held mail is simply not listed. *@
+        @{ var inbox = Mail.GetInbox(); }
+        @if (inbox.Count == 0)
         {
-            <li>
-                <a class="row" href="message/@m.Id">
-                    <span class="pic pic--safe" aria-hidden="true"><Icon Name="mail" /></span>
-                    <span class="row__main">
-                        <span class="row__from">@m.FromName</span>
-                        <span class="row__subject">@m.Subject</span>
-                        <span class="row__preview">@Defang.ForUser(m.Preview)</span>
-                    </span>
-                    <StatusBadge State="MessageState.Cleared" />
-                </a>
-            </li>
+            <div class="emptystate">
+                <span class="pic pic--blue" aria-hidden="true"><Icon Name="mail" /></span>
+                <div>
+                    <p class="emptystate__title">No messages yet</p>
+                    <p>New messages will show here.</p>
+                </div>
+            </div>
         }
-    </ul>
-}
+        else
+        {
+            <ul class="rows" aria-label="Your messages">
+                @foreach (var m in inbox)
+                {
+                    <li>
+                        <a class="row" href="message/@m.Id">
+                            <span class="pic pic--blue" aria-hidden="true"><Icon Name="mail" /></span>
+                            <span class="row__main">
+                                <span class="row__from">@m.FromName</span>
+                                <span class="row__subject">@m.Subject</span>
+                                <span class="row__preview">@Defang.ForUser(m.Preview)</span>
+                            </span>
+                        </a>
+                    </li>
+                }
+            </ul>
+        }
+    </div>
+</div>

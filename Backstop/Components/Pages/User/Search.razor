@@ -1,0 +1,78 @@
+@page "/search"
+@inherits LiveComponentBase
+
+<PageTitle>Search – Backstop</PageTitle>
+
+<BackLink />
+<h1>Search</h1>
+<SearchBox Value="@Q" />
+
+@if (!string.IsNullOrWhiteSpace(Q))
+{
+    var r = Mail.Search(Q);
+    @if (r.Total == 0)
+    {
+        <p class="empty">Nothing found for "@Q". Try a different word.</p>
+    }
+    else
+    {
+        @if (r.Messages.Count > 0)
+        {
+            <h2>Messages you got</h2>
+            <ul class="rows" aria-label="Messages you got">
+                @foreach (var m in r.Messages)
+                {
+                    <li>
+                        <a class="row" href="message/@m.Id">
+                            <span class="pic pic--blue" aria-hidden="true"><Icon Name="mail" /></span>
+                            <span class="row__main">
+                                <span class="row__from">@m.FromName</span>
+                                <span class="row__subject">@m.Subject</span>
+                            </span>
+                        </a>
+                    </li>
+                }
+            </ul>
+        }
+        @if (r.Sent.Count > 0)
+        {
+            <h2>Messages you sent</h2>
+            <ul class="rows" aria-label="Messages you sent">
+                @foreach (var s in r.Sent)
+                {
+                    <li>
+                        <a class="row" href="sent/@s.Id">
+                            <span class="pic pic--blue" aria-hidden="true"><Icon Name="send" /></span>
+                            <span class="row__main">
+                                <span class="row__from">To @(string.IsNullOrEmpty(s.ToName) ? s.ToAddress : s.ToName)</span>
+                                <span class="row__subject">@s.Subject</span>
+                            </span>
+                        </a>
+                    </li>
+                }
+            </ul>
+        }
+        @if (r.Contacts.Count > 0)
+        {
+            <h2>People</h2>
+            <ul class="rows" aria-label="People">
+                @foreach (var c in r.Contacts)
+                {
+                    <li>
+                        <a class="row" href="compose?to=@Uri.EscapeDataString(c.Address)">
+                            <Avatar Contact="c" />
+                            <span class="row__main">
+                                <span class="row__from">@c.Name</span>
+                                <span class="row__subject">@c.Relationship</span>
+                            </span>
+                        </a>
+                    </li>
+                }
+            </ul>
+        }
+    }
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "q")] public string? Q { get; set; }
+}

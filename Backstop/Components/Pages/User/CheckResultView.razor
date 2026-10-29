@@ -1,0 +1,141 @@
+@page "/check/{Id}"
+@inherits ModeComponentBase
+
+<BackLink Href="check" Text="Check something else" />
+
+@if (_loading)
+{
+    <PageTitle>Checking – Backstop</PageTitle>
+    <h1 class="sr-note">Check</h1>
+    <LoadingState Text="Getting your result…" />
+}
+else if (_problem is not null)
+{
+    <PageTitle>Check – Backstop</PageTitle>
+    <h1>Check</h1>
+    <ErrorState Message="@_problem" OnRetry="Load" />
+}
+else if (_r is null)
+{
+    <PageTitle>Not found – Backstop</PageTitle>
+    <h1>We cannot find that check</h1>
+    <p>It may have been deleted.</p>
+    <p class="actions"><a class="btn btn-primary" href="check"><Icon Name="inspect" /> Check a message</a></p>
+}
+else if (_r.Status == ReviewStatus.Held)
+{
+    @* Held: like held mail, the words stay hidden until the trusted person has looked. *@
+    <PageTitle>Being checked – Backstop</PageTitle>
+    <p><StatusBadge State="MessageState.Held" /></p>
+    <h1>We've asked @Helper to check this.</h1>
+    <p class="lead">You'll see it once it's cleared.</p>
+    @if (_r.CallRequested)
+    {
+        <p class="call-note"><Icon Name="phone" /> <span>@Helper will call you about it.</span></p>
+    }
+    <p class="actions"><a class="btn btn-primary" href="home"><Icon Name="home" /> Back to home</a></p>
+}
+else if (_r.Status == ReviewStatus.Released)
+{
+    <PageTitle>Safe – Backstop</PageTitle>
+    <p><StatusBadge State="MessageState.Cleared" /></p>
+    <h1>@Helper says this is safe.</h1>
+    <MarkedText Text="@_r.DisplayText" />
+    <div class="actions">
+        <a class="btn btn-primary" href="explain?check=@_r.Id"><Icon Name="book" /> Explain this to me</a>
+    </div>
+}
+else if (_r.Status == ReviewStatus.Blocked)
+{
+    <PageTitle>Don't reply – Backstop</PageTitle>
+    <p><StatusBadge State="MessageState.Blocked" /></p>
+    <h1>@Helper says please don't reply to this.</h1>
+    <div class="actions">
+        <button type="button" class="btn btn-primary" @onclick="Delete" disabled="@_working"><Icon Name="trash" /> Delete it</button>
+    </div>
+}
+else
+{
+    <PageTitle>@VerdictCard.WordFor(_r.Verdict) – Backstop</PageTitle>
+    <VerdictCard Verdict="_r.Verdict" Reason="@_r.Reason" />
+
+    @if (_r.Flags.Count > 0)
+    {
+        <h2>Why we think this</h2>
+        <SignList Flags="_r.Flags" />
+    }
+
+    @if (_r.Thread is { Count: > 0 })
+    {
+        <h2>How the conversation changed</h2>
+        <RiskThread Thread="_r.Thread" Flags="_r.Flags" />
+    }
+    else
+    {
+        <h2>@(_r.Kind == CheckKind.Picture ? "The words in your picture" : "Your message")</h2>
+        <MarkedText Text="@_r.DisplayText" Highlights="_r.Highlights" Flags="_r.Flags" />
+    }
+
+    @if (_actionProblem is not null)
+    {
+        <ErrorState Message="@_actionProblem" />
+    }
+    <div class="actions">
+        <button type="button" class="btn btn-primary" @onclick="Ask" disabled="@_working"><Icon Name="user" /> @(_working ? "Asking…" : $"Ask {Helper} to look")</button>
+        <a class="btn btn-quiet" href="explain?check=@_r.Id"><Icon Name="book" /> Explain this to me</a>
+    </div>
+    <div class="actions actions--quiet">
+        <button type="button" class="btn btn-text" @onclick="Delete" disabled="@_working"><Icon Name="trash" /> Delete it</button>
+    </div>
+}
+
+@code {
+    [Parameter] public string Id { get; set; } = "";
+
+    private CheckResult? _r;
+    private bool _loading = true, _working;
+    private string? _problem, _actionProblem;
+
+    protected override Task OnParametersSetAsync() => Load();
+
+    // When the trusted person decides, this page changes on its own.
+    protected override async Task OnApiChangedAsync()
+    {
+        if (_r is null) return;
+        _r = await Api.GetCheckAsync(Id) ?? _r;
+    }
+
+    private async Task Load()
+    {
+        _loading = true;
+        _problem = null;
+        try { _r = await Api.GetCheckAsync(Id); }
+        catch (BackstopApiException ex) { _problem = ex.Message; }
+        _loading = false;
+    }
+
+    private async Task Ask()
+    {
+        _working = true;
+        _actionProblem = null;
+        try { _r = await Api.AskTrustedPersonAsync(Id); }
+        catch (BackstopApiException ex) { _actionProblem = ex.Message; }
+        _working = false;
+    }
+
+    private async Task Delete()
+    {
+        _working = true;
+        _actionProblem = null;
+        try
+        {
+            await Api.DeleteCheckAsync(Id);
+            Nav.NavigateTo("check?deleted=true");
+        }
+        catch (BackstopApiException ex)
+        {
+            _actionProblem = ex.Message;
+            _working = false;
+        }
+    }
+}

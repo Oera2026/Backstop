@@ -1,0 +1,144 @@
+@page "/calendar"
+@inherits LiveComponentBase
+
+<PageTitle>My calendar – Backstop</PageTitle>
+
+<BackLink />
+<h1>My calendar</h1>
+<p class="lead">Today is @Today.ToString("dddd d MMMM").</p>
+
+<ChoiceGroup Legend="Show" Name="view" Value="@_view" OnPick="SetView"
+             Options="@(new[] { ("soon", "Coming up"), ("month", "Whole month") })" />
+
+@if (_view == "soon")
+{
+    var groups = Mail.GetEvents()
+        .Where(e => e.Date >= Today && e.Date <= Today.AddDays(14))
+        .GroupBy(e => e.Date)
+        .ToList();
+    @if (groups.Count == 0)
+    {
+        <p class="empty">Nothing is planned for the next two weeks.</p>
+    }
+    @foreach (var g in groups)
+    {
+        <h2>@DayName(g.Key)</h2>
+        <ul class="events">
+            @foreach (var e in g)
+            {
+                <li><EventCard Event="e" /></li>
+            }
+        </ul>
+    }
+}
+else
+{
+    <div class="monthbar">
+        <button type="button" class="btn btn-quiet" @onclick="PreviousMonth"><Icon Name="arrow-left" /> Last month</button>
+        <h2 class="monthbar__title" aria-live="polite">@_shown.ToString("MMMM yyyy")</h2>
+        <button type="button" class="btn btn-quiet" @onclick="NextMonth">Next month <Icon Name="arrow-right" /></button>
+    </div>
+
+    <table class="month">
+        <caption class="sr-note">@_shown.ToString("MMMM yyyy"). Choose a day to see what is planned.</caption>
+        <thead>
+            <tr>
+                @foreach (var (d, full) in new[] { ("Mon", "Monday"), ("Tue", "Tuesday"), ("Wed", "Wednesday"), ("Thu", "Thursday"), ("Fri", "Friday"), ("Sat", "Saturday"), ("Sun", "Sunday") })
+                {
+                    <th scope="col" aria-label="@full"><span class="wd-full" aria-hidden="true">@d</span><span class="wd-short" aria-hidden="true">@d[..2]</span></th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var week in Weeks())
+            {
+                <tr>
+                    @foreach (var day in week)
+                    {
+                        <td>
+                            @if (day is { } d)
+                            {
+                                var n = Mail.GetEvents().Count(e => e.Date == d);
+                                <button type="button"
+                                        class="day @(d == _selected ? "day--on" : "") @(d == Today ? "day--today" : "") @(n > 0 ? "day--has" : "")"
+                                        aria-pressed="@(d == _selected ? "true" : "false")"
+                                        aria-label="@DayLabel(d, n)"
+                                        @onclick="@(() => _selected = d)">
+                                    @d.Day
+                                </button>
+                            }
+                        </td>
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <h2>@DayName(_selected)</h2>
+    var chosen = Mail.GetEvents().Where(e => e.Date == _selected).ToList();
+    @if (chosen.Count == 0)
+    {
+        <p class="empty">Nothing is planned.</p>
+    }
+    else
+    {
+        <ul class="events">
+            @foreach (var e in chosen)
+            {
+                <li><EventCard Event="e" /></li>
+            }
+        </ul>
+    }
+}
+
+<div class="actions">
+    <a class="btn btn-primary" href="calendar/new?date=@AddDate"><Icon Name="plus" /> Add something</a></div>
+
+@code {
+    // "Today" is the reader's day, not the server's.
+    private DateOnly Today => Clock.Today;
+
+    private string _view = "soon";
+    private DateOnly _shown;
+    private DateOnly _selected;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        _shown = new(Today.Year, Today.Month, 1);
+        _selected = Today;
+    }
+
+    private string AddDate => (_view == "month" ? _selected : Today).ToString("yyyy-MM-dd");
+
+    private void SetView(string v) => _view = v;
+
+    private void PreviousMonth() => MoveTo(_shown.AddMonths(-1));
+    private void NextMonth() => MoveTo(_shown.AddMonths(1));
+
+    private void MoveTo(DateOnly month)
+    {
+        _shown = month;
+        // Keep a sensible day chosen: today if it is in this month, otherwise the 1st.
+        _selected = month.Year == Today.Year && month.Month == Today.Month ? Today : month;
+    }
+
+    private string DayName(DateOnly d) =>
+        d == Today ? $"Today, {d:dddd d MMMM}"
+        : d == Today.AddDays(1) ? $"Tomorrow, {d:dddd d MMMM}"
+        : d.ToString("dddd d MMMM");
+
+    private string DayLabel(DateOnly d, int n) =>
+        d.ToString("dddd d MMMM") + (d == Today ? ", today" : "") + (n == 0 ? "" : n == 1 ? ", 1 thing planned" : $", {n} things planned");
+
+    /// <summary>The month as rows of 7 cells, Monday first. Empty cells are null.</summary>
+    private IEnumerable<DateOnly?[]> Weeks()
+    {
+        var offset = ((int)_shown.DayOfWeek + 6) % 7;
+        var cells = new List<DateOnly?>();
+        for (var i = 0; i < offset; i++) cells.Add(null);
+        for (var d = 1; d <= DateTime.DaysInMonth(_shown.Year, _shown.Month); d++) cells.Add(new DateOnly(_shown.Year, _shown.Month, d));
+        while (cells.Count % 7 != 0) cells.Add(null);
+        for (var i = 0; i < cells.Count; i += 7) yield return cells.Skip(i).Take(7).ToArray();
+    }
+}

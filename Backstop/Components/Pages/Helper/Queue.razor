@@ -9,8 +9,33 @@
 @{
     var queue = Guardian.GetQueue();
     var decided = Guardian.GetDecided();
+    var notices = Guardian.GetNotices();
 }
 
+@* FYI only: the user wrote to someone for the first time. Nothing to approve, just "Got it". *@
+@if (notices.Count > 0)
+{
+    <h2>New people</h2>
+    <ul class="rows" aria-label="Someone new was written to">
+        @foreach (var n in notices)
+        {
+            <li>
+                <div class="row row--static row--notice">
+                    <span class="pic pic--blue" aria-hidden="true"><Icon Name="user" /></span>
+                    <span class="row__main">
+                        <span class="row__from">Wrote to someone new</span>
+                        <span class="row__subject"><code>@n.Address</code></span>
+                        <span class="row__preview">First time. Subject: @n.Subject</span>
+                        <span class="row__time">@Clock.When(n.At)</span>
+                    </span>
+                    <button type="button" class="btn btn-quiet" @onclick="@(() => Guardian.DismissNotice(n.Id))"><Icon Name="check" /> Got it</button>
+                </div>
+            </li>
+        }
+    </ul>
+}
+
+<h2>From the inbox</h2>
 @if (queue.Count == 0)
 {
     <div class="banner banner--safe" role="status">
@@ -33,13 +58,18 @@ else
                     </span>
                     <span class="row__side">
                         <StatusBadge State="m.State" ForHelper="true" />
-                        <span class="row__time">@m.ReceivedAt.ToString("h:mm tt")</span>
+                        <span class="row__time">@Clock.When(m.ReceivedAt)</span>
                     </span>
                 </a>
             </li>
         }
     </ul>
 }
+
+@* Things the user asked about from Check (see Components/Helper/CheckQueue). *@
+<CheckQueue />
+
+<StoryQueue />
 
 @if (decided.Count > 0)
 {
@@ -63,3 +93,6 @@ else
         }
     </ul>
 }
+
+<SharedMemories />
+<ActivityLog />

@@ -5,7 +5,7 @@ window.backstop = {
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
     u.lang = document.documentElement.lang || 'en-GB';
-    u.rate = 0.9;
+    u.rate = window.backstopSettings ? window.backstopSettings.speechRate() : 0.9;
     window.speechSynthesis.speak(u);
     return true;
   },

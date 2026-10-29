@@ -19,8 +19,26 @@ public interface IMailService
 
     OutgoingCheck CheckOutgoing(string to, string subject, string body);
 
-    /// <summary>MOCK: pretends to send. Nothing leaves the app.</summary>
-    void Send(string to, string subject, string body);
+    IReadOnlyList<Contact> GetContacts();
+    Contact? GetContact(string id);
+    Contact? FindContact(string address);
+
+    ContactPhoto? GetContactPhoto(string id);
+
+    /// <summary>Saves a profile picture. Returns false (and saves nothing) unless the bytes really are a PNG, JPEG, WebP or GIF.</summary>
+    bool SetContactPhoto(string id, byte[] bytes);
+    void RemoveContactPhoto(string id);
+    IReadOnlyList<SentMessage> GetSent();
+    SentMessage? GetSent(string id);
+
+    /// <summary>Searches Cleared mail, sent mail and contacts. Held and blocked mail is never searched.</summary>
+    SearchResults Search(string query);
+
+    IReadOnlyList<CalendarEvent> GetEvents();
+    void AddEvent(string title, DateOnly date, TimeOnly? time, string place);
+
+    /// <summary>MOCK: pretends to send. Nothing leaves the app. Refuses no-reply addresses and tells the helper about first-time recipients.</summary>
+    SendResult Send(string to, string subject, string body);
 
     // --- Demo support ---
     IReadOnlyList<Scenario> Scenarios { get; }
@@ -49,4 +67,8 @@ public interface IGuardianService
     void Approve(string id);
     void Block(string id);
     void CallFirst(string id);
+
+    /// <summary>FYI notices the helper has not dismissed (for example: the user wrote to someone new).</summary>
+    IReadOnlyList<HelperNotice> GetNotices();
+    void DismissNotice(string id);
 }

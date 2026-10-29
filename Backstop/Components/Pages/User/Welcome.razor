@@ -1,0 +1,86 @@
+@page "/welcome"
+@layout WelcomeLayout
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+
+<PageTitle>Welcome – Backstop</PageTitle>
+
+<p class="progress" role="status">
+    <span class="progress__dots" aria-hidden="true">
+        @for (var i = 1; i <= Steps; i++)
+        {
+            <span class="progress__dot @(i <= _step ? "progress__dot--on" : "")"></span>
+        }
+    </span>
+    <span>Step @_step of @Steps</span>
+</p>
+
+@switch (_step)
+{
+    case 1:
+        <h1>Welcome to Backstop</h1>
+        <p class="lead">How big should the words be?</p>
+        <ChoiceGroup Legend="Size of the words" HideLegend="true" Name="w-size" Value="@_s["size"]" OnPick="@(v => Pick("size", v))"
+                     Options="@(new[] { ("normal", "Normal"), ("large", "Large"), ("xlarge", "Extra large") })" />
+        <div class="actions">
+            <button type="button" class="btn btn-primary" @onclick="Next">Next <Icon Name="arrow-right" /></button>
+            <button type="button" class="btn btn-text" @onclick="Finish">Skip</button>
+        </div>
+        break;
+
+    case 2:
+        <BackLink OnClick="Back" Text="Back" />
+        <h1>Which colours are easiest?</h1>
+        <ChoiceGroup Legend="Colours" HideLegend="true" Name="w-contrast" Value="@_s["contrast"]" OnPick="@(v => Pick("contrast", v))"
+                     Options="@(new[] { ("standard", "Standard"), ("high", "High contrast") })" />
+        <div class="actions">
+            <button type="button" class="btn btn-primary" @onclick="Next">Next <Icon Name="arrow-right" /></button>
+            <button type="button" class="btn btn-text" @onclick="Finish">Skip</button>
+        </div>
+        break;
+
+    default:
+        <h1>You are ready</h1>
+        <p class="lead">What would you like to do first?</p>
+        <div class="actions">
+            <button type="button" class="btn btn-primary" @onclick="@(() => Done("/"))"><Icon Name="mail" /> Read my messages</button>
+            <button type="button" class="btn btn-quiet" @onclick="@(() => Done("compose"))"><Icon Name="pen" /> Write a message</button>
+        </div>
+        break;
+}
+
+@code {
+    private const int Steps = 3;
+
+    private int _step = 1;
+    private Dictionary<string, string> _s = new() { ["size"] = "normal", ["contrast"] = "standard" };
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try
+        {
+            var saved = await JS.InvokeAsync<Dictionary<string, string>>("backstopSettings.get");
+            _s = new Dictionary<string, string>(saved);
+            StateHasChanged();
+        }
+        catch (Exception) { /* the screens work without saved settings */ }
+    }
+
+    private async Task Pick(string key, string value)
+    {
+        _s[key] = value;
+        try { await JS.InvokeAsync<object>("backstopSettings.set", key, value); } catch (Exception) { }
+    }
+
+    private void Next() => _step = Math.Min(Steps, _step + 1);
+    private void Back() => _step = Math.Max(1, _step - 1);
+
+    private Task Finish() => Done("/");
+
+    private async Task Done(string to)
+    {
+        try { await JS.InvokeVoidAsync("backstopSettings.markWelcomed"); } catch (Exception) { }
+        Nav.NavigateTo(to);
+    }
+}

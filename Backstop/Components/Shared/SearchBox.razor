@@ -1,0 +1,13 @@
+@* A plain GET form, so it works on every page and needs no script. *@
+<form method="get" action="/search" role="search" class="searchbar">
+    <label for="@Id">Search my messages and people</label>
+    <div class="searchbar__row">
+        <input id="@Id" type="search" name="q" value="@Value" autocomplete="off" enterkeyhint="search" placeholder="A name or a word" />
+        <button type="submit" class="btn btn-primary"><Icon Name="search" /> Search</button>
+    </div>
+</form>
+
+@code {
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public string Id { get; set; } = "q";
+}

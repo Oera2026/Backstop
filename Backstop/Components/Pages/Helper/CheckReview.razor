@@ -1,0 +1,151 @@
+@page "/helper/check/{Id}"
+@layout HelperLayout
+@inherits ModeComponentBase
+
+<BackLink Href="helper" Text="Back to the queue" />
+
+@if (_loading)
+{
+    <PageTitle>Check – Backstop Helper</PageTitle>
+    <h1 class="sr-note">Check</h1>
+    <LoadingState Text="Getting it…" />
+}
+else if (_problem is not null && _item is null && _result is null)
+{
+    <PageTitle>Check – Backstop Helper</PageTitle>
+    <h1>Check this</h1>
+    <ErrorState Message="@_problem" OnRetry="Load" />
+}
+else if (_result is not null)
+{
+    <PageTitle>Done – Backstop Helper</PageTitle>
+    <div class="banner @(_result == ReviewDecision.Block ? "banner--block" : _result == ReviewDecision.Release ? "banner--safe" : "banner--check")" role="status">
+        <Icon Name="@(_result == ReviewDecision.Block ? "cross" : _result == ReviewDecision.Release ? "check" : "phone")" />
+        <h1 class="banner__h">@DoneText</h1>
+    </div>
+    <p class="actions"><a class="btn btn-primary" href="helper"><Icon Name="arrow-left" /> Back to the queue</a></p>
+}
+else if (_item is null)
+{
+    <PageTitle>Not found – Backstop Helper</PageTitle>
+    <h1>This has already been decided</h1>
+    <p class="actions"><a class="btn btn-primary" href="helper"><Icon Name="arrow-left" /> Back to the queue</a></p>
+}
+else
+{
+    <PageTitle>Check: @_item.Title – Backstop Helper</PageTitle>
+    <article class="evidence" aria-labelledby="ev-title">
+        <p class="evidence__status"><StatusBadge State="MessageState.Held" ForHelper="true" /></p>
+        <h1 id="ev-title">@_item.Title</h1>
+        <VerdictCard Verdict="_item.Verdict" Reason="@_item.Reasoning" Level="2" />
+
+        @if (_item.Flags.Count > 0)
+        {
+            <section class="card" aria-labelledby="ev-flags">
+                <h2 id="ev-flags">What looked wrong</h2>
+                <SignList Flags="_item.Flags" />
+            </section>
+        }
+
+        @if (_check?.Thread is { Count: > 0 } thread)
+        {
+            <details class="card fold" open>
+                <summary>The conversation, with the risk at each message</summary>
+                <RiskThread Thread="thread" Flags="_item.Flags" />
+            </details>
+        }
+        <details class="card fold">
+            <summary>Read it (text only, links made safe)</summary>
+            <pre class="preview">@_item.Preview</pre>
+        </details>
+
+        <div class="actionbar" role="group" aria-label="Your decision">
+            @if (_problem is not null)
+            {
+                <ErrorState Message="@_problem" />
+            }
+            @if (_confirming)
+            {
+                <p class="actionbar__msg" role="alert"><Icon Name="alert" /> <span>We think this is risky. Release it anyway?</span></p>
+                <div class="actions">
+                    <button type="button" class="btn btn-primary" @onclick="() => _confirming = false"><Icon Name="arrow-left" /> No, go back</button>
+                    <button type="button" class="btn btn-quiet" @onclick="() => Decide(ReviewDecision.Release)" disabled="@_working"><Icon Name="check" /> Yes, release it</button>
+                </div>
+            }
+            else
+            {
+                <div class="actions actions--helper">
+                    <button type="button" class="btn @(_item.Verdict == Verdict.DontReply ? "btn-block" : "btn-quiet btn-danger")" @onclick="() => Decide(ReviewDecision.Block)" disabled="@_working">
+                        <Icon Name="cross" /> Block
+                    </button>
+                    <button type="button" class="btn btn-quiet" @onclick="Release" disabled="@_working"><Icon Name="check" /> Safe – release</button>
+                    <button type="button" class="btn btn-text" @onclick="() => Decide(ReviewDecision.CallFirst)" disabled="@_working"><Icon Name="phone" /> Call them first</button>
+                </div>
+            }
+            <p class="call-note" role="status">
+                @if (_item.CallRequested)
+                {
+                    <Icon Name="phone" /><span>You will call @UserName before you decide.</span>
+                }
+            </p>
+        </div>
+    </article>
+}
+
+@code {
+    [Parameter] public string Id { get; set; } = "";
+
+    private ReviewItem? _item;
+    private CheckResult? _check;
+    private ReviewDecision? _result;
+    private bool _loading = true, _working, _confirming;
+    private string? _problem;
+
+    protected override Task OnParametersSetAsync() => Load();
+
+    private async Task Load()
+    {
+        _loading = true;
+        _problem = null;
+        try
+        {
+            _item = await Api.GetReviewItemAsync(Id);
+            _check = await Api.GetCheckAsync(Id);
+        }
+        catch (BackstopApiException ex) { _problem = ex.Message; }
+        _loading = false;
+    }
+
+    private string DoneText => _result switch
+    {
+        ReviewDecision.Release => $"Done. {UserName} can see it now.",
+        ReviewDecision.Block => $"Done. You blocked it. {UserName} will see that you said not to reply.",
+        _ => $"Done. It stays held until you have called {UserName}.",
+    };
+
+    // Releasing something we think is a scam needs a second "yes".
+    private Task Release()
+    {
+        if (_item!.Verdict == Verdict.DontReply)
+        {
+            _confirming = true;
+            return Task.CompletedTask;
+        }
+        return Decide(ReviewDecision.Release);
+    }
+
+    private async Task Decide(ReviewDecision decision)
+    {
+        _working = true;
+        _problem = null;
+        try
+        {
+            await Api.ResolveReviewItemAsync(Id, decision);
+            if (decision == ReviewDecision.CallFirst) _item = await Api.GetReviewItemAsync(Id);
+            else _result = decision;
+            _confirming = false;
+        }
+        catch (BackstopApiException ex) { _problem = ex.Message; }
+        _working = false;
+    }
+}

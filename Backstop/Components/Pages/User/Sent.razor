@@ -1,0 +1,37 @@
+@page "/sent"
+@inherits LiveComponentBase
+
+<PageTitle>Sent messages – Backstop</PageTitle>
+
+<BackLink />
+<h1>Sent messages</h1>
+
+@{ var sent = Mail.GetSent(); }
+@if (sent.Count == 0)
+{
+    <div class="emptystate">
+        <span class="pic pic--blue" aria-hidden="true"><Icon Name="send" /></span>
+        <div>
+            <p class="emptystate__title">Nothing sent yet</p>
+            <p><a href="compose">Write your first message</a></p>
+        </div>
+    </div>
+}
+else
+{
+    <ul class="rows" aria-label="Messages you sent">
+        @foreach (var s in sent)
+        {
+            <li>
+                <a class="row" href="sent/@s.Id">
+                    <span class="pic pic--blue" aria-hidden="true"><Icon Name="send" /></span>
+                    <span class="row__main">
+                        <span class="row__from">To @(string.IsNullOrEmpty(s.ToName) ? s.ToAddress : s.ToName)</span>
+                        <span class="row__subject">@s.Subject</span>
+                        <span class="row__preview">@Clock.When(s.SentAt)</span>
+                    </span>
+                </a>
+            </li>
+        }
+    </ul>
+}

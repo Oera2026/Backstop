@@ -1,8 +1,11 @@
 /* "Easy Read" theme. Change colours here only.
    Deep navy ink on white, pale blue bands, one marker yellow used as a highlighter.
    State colours (green, orange, red) always travel with an icon and a word.
-   Every text pair below is at least 7:1 (the lowest is 5.6:1 on its tint). */
+   Every text pair below is at least 7:1 (the lowest is 5.6:1 on its tint).
+   Dark mode swaps the same tokens (see data-scheme below), so no other file needs a dark rule. */
 :root {
+  color-scheme: light;
+
   --bg: #FFFFFF;
   --band: #E2EAFF;
   --surface: #F0F4FF;
@@ -11,6 +14,9 @@
   --navy: #0B2A6F;
   --navy-hover: #061B4D;
   --on-navy: #FFFFFF;
+
+  --header: #0B2A6F;
+  --on-header: #FFFFFF;
 
   --text: #0B1B44;
   --text-2: #31406B;
@@ -21,6 +27,9 @@
   --on-accent: #FFFFFF;
 
   --marker: #FFE14D;
+  --on-marker: #0B1B44;
+
+  --logo-ink: #0B2A6F;
 
   --safe: #0A6B3A;
   --safe-soft: #D3F0DF;
@@ -38,4 +47,69 @@
   --focus-halo: #FFE14D;
 
   --font: "Atkinson Hyperlegible Next", "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Settings: High contrast darkens secondary text, state colours and rules, and thickens lines. */
+:root[data-contrast="high"] {
+  --text: #000000;
+  --text-2: #0B1B44;
+  --rule: #4A5F9F;
+  --band: #D2DEFF;
+  --navy: #061B4D;
+  --header: #061B4D;
+  --accent: #061B4D;
+  --safe: #064D29;
+  --check: #5E2B00;
+  --block: #7D0C17;
+  --line: 4px;
+}
+
+/* Settings: Dark. Ink and fills turn pale blue, the page turns deep navy, yellow stays yellow.
+   js/settings.js sets data-scheme to "dark" for Dark, and for Match my device when the device is dark. */
+:root[data-scheme="dark"] {
+  color-scheme: dark;
+
+  --bg: #0B1230;
+  --band: #1B2757;
+  --surface: #131C42;
+  --rule: #3A4C8F;
+
+  --navy: #B7C8FF;
+  --navy-hover: #DCE5FF;
+  --on-navy: #0B1230;
+
+  --header: #131C42;
+  --on-header: #FFFFFF;
+
+  --text: #EEF2FF;
+  --text-2: #B9C4EC;
+
+  --accent: #B7C8FF;
+  --accent-hover: #DCE5FF;
+  --accent-soft: #1B2757;
+  --on-accent: #0B1230;
+
+  --safe: #62D99A;
+  --safe-soft: #0F3A25;
+  --check: #FFB866;
+  --check-soft: #3E2A0B;
+  --block: #FF8590;
+  --block-hover: #FFA7AF;
+  --block-soft: #4A1319;
+
+  --focus: #FFFFFF;
+  --focus-halo: #FFE14D;
+}
+
+:root[data-scheme="dark"][data-contrast="high"] {
+  --text: #FFFFFF;
+  --text-2: #EEF2FF;
+  --rule: #8FA6EE;
+  --band: #26357A;
+  --navy: #DCE5FF;
+  --header: #0B1230;
+  --accent: #DCE5FF;
+  --safe: #8BEBB8;
+  --check: #FFCE94;
+  --block: #FFB0B7;
 }

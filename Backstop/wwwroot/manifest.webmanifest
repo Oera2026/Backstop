@@ -1,7 +1,7 @@
 {
   "name": "Backstop",
   "short_name": "Backstop",
-  "description": "A safe email client. Every message is checked before you see it.",
+  "description": "A simple, easy-to-read email app.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

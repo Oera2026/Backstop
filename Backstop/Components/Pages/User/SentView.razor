@@ -1,0 +1,34 @@
+@page "/sent/{Id}"
+@inherits LiveComponentBase
+
+@{ var s = Mail.GetSent(Id); }
+
+<BackLink Href="sent" Text="Sent messages" />
+
+@if (s is null)
+{
+    <PageTitle>Not found – Backstop</PageTitle>
+    <h1>We cannot find that message</h1>
+}
+else
+{
+    <PageTitle>@s.Subject – Backstop</PageTitle>
+    <article class="reading" aria-labelledby="subject">
+        <h1 id="subject">@s.Subject</h1>
+        <p class="reading__from">To <strong>@(string.IsNullOrEmpty(s.ToName) ? s.ToAddress : s.ToName)</strong> (@s.ToAddress)<br />@Clock.Long(s.SentAt)</p>
+        <div class="reading__body">
+            @foreach (var line in s.Body.Split('\n'))
+            {
+                @if (line.Length == 0) { continue; }
+                <p>@line</p>
+            }
+        </div>
+    </article>
+    <div class="actions">
+        <ReadAloudButton Primary="true" Text="@($"Message to {s.ToName}. {s.Subject}. {s.Body}")" />
+    </div>
+}
+
+@code {
+    [Parameter] public string Id { get; set; } = "";
+}

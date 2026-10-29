@@ -1,0 +1,152 @@
+@page "/check"
+@inherits ModeComponentBase
+
+<PageTitle>Check – Backstop</PageTitle>
+
+<h1>Check a message</h1>
+
+@if (Deleted)
+{
+    <p class="done-note" role="status"><Icon Name="check" /> Done. It is deleted.</p>
+}
+
+@if (_busy)
+{
+    <LoadingState Text="@(_kind == "conversation" ? "Reading the conversation…" : "Checking it…")" />
+}
+else
+{
+    @if (_problem is not null)
+    {
+        <ErrorState Message="@_problem" OnRetry="Run" />
+    }
+    <form class="form" @onsubmit="Run" novalidate>
+        <ChoiceGroup Legend="What do you want to check?" Name="kind" Value="@_kind" OnPick="Pick"
+                     Options="@(new[] { ("message", "One message"), ("conversation", "A whole conversation"), ("picture", "A picture or screenshot") })" />
+
+        @if (_kind == "picture")
+        {
+            <PicturePicker Id="check-picture" Prompt="Drop a screenshot or photo here, or tap to choose one" OnPicked="f => _picture = f" />
+        }
+        else
+        {
+            <div class="field">
+                <label for="check-text">@(_kind == "conversation" ? "Paste the whole conversation" : "Paste the message")</label>
+                <textarea id="check-text" rows="@(_kind == "conversation" ? 10 : 6)" @bind="_text"></textarea>
+                @if (_kind == "conversation")
+                {
+                    <p class="hint">Put each message on its own line, like: Daniel: Hello</p>
+                }
+            </div>
+        }
+        <p class="form-error" role="alert">@_error</p>
+        <div class="actions">
+            <button type="submit" class="btn btn-primary"><Icon Name="inspect" /> Check it</button>
+        </div>
+    </form>
+}
+
+@if (_asked is { Count: > 0 })
+{
+    <h2>You asked @Helper about</h2>
+    <ul class="asked">
+        @foreach (var c in _asked)
+        {
+            <li>
+                <a class="row" href="check/@c.Id">
+                    <span class="pic pic--blue" aria-hidden="true"><Icon Name="@(c.Kind == CheckKind.Conversation ? "chat" : "mail")" /></span>
+                    <span class="row__main">
+                        <span class="row__from">@(c.Kind == CheckKind.Conversation ? "A conversation" : c.Kind == CheckKind.Picture ? "A picture" : "A message")</span>
+                        <span class="row__time">@Clock.When(c.CheckedAt)</span>
+                    </span>
+                    <StatusBadge State="@StateFor(c.Status)" />
+                </a>
+            </li>
+        }
+    </ul>
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "example")] public string? Example { get; set; }
+    [SupplyParameterFromQuery(Name = "explain")] public string? FromExplain { get; set; }
+    [SupplyParameterFromQuery(Name = "deleted")] public bool Deleted { get; set; }
+
+    private string _kind = "message", _text = "";
+    private string? _error, _problem;
+    private PicturePicker.PickedFile? _picture;
+    private bool _busy;
+    private IReadOnlyList<CheckResult>? _asked;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Example is not null && Services.Api.Fixtures.CheckFixtures.Examples.TryGetValue(Example, out var ex))
+        {
+            _kind = ex.Kind == CheckKind.Conversation ? "conversation" : "message";
+            _text = ex.Text;
+        }
+        // "Is this safe?" from Explain brings its words here.
+        if (FromExplain is not null)
+        {
+            try
+            {
+                if (await Api.GetExplanationAsync(FromExplain) is { } e) _text = e.OriginalText;
+            }
+            catch (BackstopApiException) { /* they can paste it instead */ }
+        }
+        await LoadAsked();
+    }
+
+    protected override Task OnApiChangedAsync() => LoadAsked();
+
+    private async Task LoadAsked()
+    {
+        try { _asked = await Api.GetAskedChecksAsync(); }
+        catch (BackstopApiException) { _asked = null; } // the list is extra; the form still works
+    }
+
+    private void Pick(string kind)
+    {
+        _kind = kind;
+        _error = null;
+    }
+
+    private async Task Run()
+    {
+        _error = null;
+        _problem = null;
+        if (_kind == "picture" ? _picture is null : string.IsNullOrWhiteSpace(_text))
+        {
+            _error = _kind switch
+            {
+                "picture" => "Please choose a picture first.",
+                "conversation" => "Please paste the conversation first.",
+                _ => "Please paste the message first.",
+            };
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            var result = _kind switch
+            {
+                "conversation" => await Api.GetConversationAnalysisAsync(_text),
+                "picture" => await Api.CheckContentAsync(new CheckRequest(CheckKind.Picture, null, _picture!.Bytes, _picture.Name)),
+                _ => await Api.CheckContentAsync(new CheckRequest(CheckKind.Message, _text)),
+            };
+            Nav.NavigateTo($"check/{result.Id}");
+        }
+        catch (BackstopApiException ex)
+        {
+            _problem = ex.Message;
+            _busy = false;
+        }
+    }
+
+    public static MessageState StateFor(ReviewStatus s) => s switch
+    {
+        ReviewStatus.Released => MessageState.Cleared,
+        ReviewStatus.Blocked => MessageState.Blocked,
+        _ => MessageState.Held,
+    };
+}

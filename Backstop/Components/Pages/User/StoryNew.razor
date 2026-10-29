@@ -1,0 +1,90 @@
+@page "/stories/new"
+@inherits ModeComponentBase
+
+<PageTitle>Make a story – Backstop</PageTitle>
+
+<BackLink Href="stories" Text="My stories" />
+<h1>What is coming up?</h1>
+
+@if (_busy)
+{
+    <LoadingState Text="Writing your story…" />
+}
+else
+{
+    @if (_problem is not null)
+    {
+        <ErrorState Message="@_problem" OnRetry="Make" />
+    }
+    <form class="form" @onsubmit="Make" novalidate>
+        <div class="field">
+            <label for="story-what">Tell me what is going to happen</label>
+            <textarea id="story-what" rows="4" @bind="_situation" placeholder="For example: I am going to the dentist"></textarea>
+        </div>
+        <ul class="chips" aria-label="Ideas">
+            @foreach (var idea in Ideas)
+            {
+                <li><button type="button" class="chip" @onclick="() => _situation = idea">@idea</button></li>
+            }
+        </ul>
+        <div class="field">
+            <label for="story-when">When is it?</label>
+            <input id="story-when" type="text" @bind="_when" autocomplete="off" placeholder="For example: Thursday at 10" />
+        </div>
+        <p class="form-error" role="alert">@_error</p>
+        <div class="actions">
+            <button type="submit" class="btn btn-primary"><Icon Name="story" /> Make my story</button>
+        </div>
+    </form>
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "example")] public string? Example { get; set; }
+
+    private static readonly string[] Ideas =
+    [
+        "I am going to the dentist",
+        "I am catching the bus",
+        "I am seeing my friends",
+        "I am going to the shop",
+    ];
+
+    private string _situation = "", _when = "";
+    private bool _busy;
+    private string? _error, _problem;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        _situation = Example switch
+        {
+            "dentist" => Ideas[0],
+            "bus" => Ideas[1],
+            "money" => "I have to go to the bank about my money",
+            _ => "",
+        };
+        if (Example == "dentist") _when = "Thursday at 10";
+    }
+
+    private async Task Make()
+    {
+        _error = null;
+        _problem = null;
+        if (string.IsNullOrWhiteSpace(_situation))
+        {
+            _error = "Please say what is coming up.";
+            return;
+        }
+        _busy = true;
+        try
+        {
+            var story = await Api.MakeStoryAsync(new StoryRequest(_situation, _when));
+            Nav.NavigateTo($"stories/{story.Id}");
+        }
+        catch (BackstopApiException ex)
+        {
+            _problem = ex.Message;
+            _busy = false;
+        }
+    }
+}

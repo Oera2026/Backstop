@@ -1,0 +1,56 @@
+@inherits ModeComponentBase
+
+<h2>Shared with you</h2>
+@if (_cards is null && _problem is null)
+{
+    <LoadingState Text="Getting shared memories…" />
+}
+else if (_problem is not null)
+{
+    <ErrorState Message="@_problem" OnRetry="Load" />
+}
+else if (_cards!.Count == 0)
+{
+    <p class="empty">@UserName has not shared any memories with you.</p>
+}
+else
+{
+    <ul class="memories">
+        @foreach (var c in _cards)
+        {
+            <li>
+                <details class="memory memory--shared">
+                    <summary>
+                        <span class="memory__thumb" aria-hidden="true"><MemoryThumb Card="c" Decorative="true" /></span>
+                        <span class="memory__words">
+                            <span class="memory__title">@c.Title</span>
+                            <span class="memory__date">@c.Date.ToString("d MMMM yyyy")</span>
+                            <span>@c.Summary</span>
+                        </span>
+                    </summary>
+                    <ol>
+                        @foreach (var s in c.Steps)
+                        {
+                            <li>@s</li>
+                        }
+                    </ol>
+                </details>
+            </li>
+        }
+    </ul>
+}
+
+@code {
+    private IReadOnlyList<MemoryCard>? _cards;
+    private string? _problem;
+
+    protected override Task OnInitializedAsync() => Load();
+    protected override Task OnApiChangedAsync() => Load();
+
+    private async Task Load()
+    {
+        _problem = null;
+        try { _cards = await Api.GetSharedMemoriesAsync(); }
+        catch (BackstopApiException ex) { _problem = ex.Message; }
+    }
+}

@@ -1,0 +1,56 @@
+@page "/calendar/new"
+@inherits LiveComponentBase
+
+<PageTitle>Add to calendar – Backstop</PageTitle>
+
+<BackLink Href="calendar" Text="My calendar" />
+<h1>Add something</h1>
+
+<form class="form" @onsubmit="Save" novalidate>
+    <div class="field">
+        <label for="what">What is it?</label>
+        <input id="what" type="text" @bind="_title" autocomplete="off" placeholder="For example: Hair appointment" />
+    </div>
+    <div class="field">
+        <label for="day">Which day?</label>
+        <input id="day" type="date" @bind="_date" />
+    </div>
+    <div class="field">
+        <label for="time">What time?</label>
+        <input id="time" type="time" @bind="_time" />
+        <p class="hint">Leave this empty if it lasts all day.</p>
+    </div>
+    <div class="field">
+        <label for="place">Where? (you can skip this)</label>
+        <input id="place" type="text" @bind="_place" autocomplete="off" />
+    </div>
+    <p class="form-error" role="alert">@_error</p>
+    <div class="actions">
+        <button type="submit" class="btn btn-primary"><Icon Name="check" /> Save</button>    </div>
+</form>
+
+@code {
+    [SupplyParameterFromQuery(Name = "date")] public string? DateText { get; set; }
+
+    private string _title = "", _place = "", _error = "";
+    private DateOnly _date;
+    private TimeOnly? _time;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        _date = DateOnly.TryParse(DateText, out var d) ? d : Clock.Today;
+    }
+
+    private void Save()
+    {
+        _error = "";
+        if (string.IsNullOrWhiteSpace(_title))
+        {
+            _error = "Please say what it is.";
+            return;
+        }
+        Mail.AddEvent(_title, _date, _time, _place);
+        Nav.NavigateTo("calendar");
+    }
+}

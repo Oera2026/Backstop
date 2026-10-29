@@ -1,0 +1,99 @@
+@page "/show-me"
+@inherits ModeComponentBase
+
+<PageTitle>Show me – Backstop</PageTitle>
+
+<h1>Show me how</h1>
+
+@if (_busy)
+{
+    <LoadingState Text="Making your guide. This takes a few seconds…" />
+}
+else if (_noGuide)
+{
+    <div class="emptystate">
+        <span class="pic pic--blue" aria-hidden="true"><Icon Name="camera" /></span>
+        <div>
+            <p class="emptystate__title">We don't have a guide for that yet</p>
+            <p>Try one of these:</p>
+        </div>
+    </div>
+    <ul class="chips">
+        @foreach (var s in Services.Api.Fixtures.GuideFixtures.Suggestions)
+        {
+            <li><button type="button" class="chip" @onclick="() => TryGoal(s)">@s</button></li>
+        }
+    </ul>
+    <p class="actions"><button type="button" class="btn btn-quiet" @onclick="() => _noGuide = false"><Icon Name="pen" /> Change what I asked</button></p>
+}
+else
+{
+    @if (_problem is not null)
+    {
+        <ErrorState Message="@_problem" OnRetry="Run" />
+    }
+    <form class="form" @onsubmit="Run" novalidate>
+        <div class="field">
+            <label for="goal">What do you want to do?</label>
+            <input id="goal" type="text" @bind="_goal" autocomplete="off" placeholder="For example: Set the washing machine" />
+        </div>
+        <fieldset class="field photo-field">
+            <legend>Your photo (you can skip this)</legend>
+            <CameraCapture OnPhoto="p => _photo = p" />
+        </fieldset>
+        <p class="form-error" role="alert">@_error</p>
+        <div class="actions">
+            <button type="submit" class="btn btn-primary"><Icon Name="arrow-right" /> Show me how</button>
+        </div>
+    </form>
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "goal")] public string? GoalText { get; set; }
+
+    private string _goal = "";
+    private PicturePicker.PickedFile? _photo;
+    private bool _busy, _noGuide;
+    private string? _error, _problem;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        if (!string.IsNullOrWhiteSpace(GoalText)) _goal = GoalText;
+    }
+
+    private async Task TryGoal(string goal)
+    {
+        _goal = goal;
+        _noGuide = false;
+        await Run();
+    }
+
+    private async Task Run()
+    {
+        _error = null;
+        _problem = null;
+        if (string.IsNullOrWhiteSpace(_goal))
+        {
+            _error = "Please say what you want to do.";
+            return;
+        }
+        _busy = true;
+        try
+        {
+            var guide = await Api.GenerateGuideAsync(new GuideRequest(_goal, _photo?.Bytes, _photo?.Name));
+            if (guide is null)
+            {
+                _noGuide = true;
+                _busy = false;
+                return;
+            }
+            Nav.NavigateTo($"show-me/{guide.Id}");
+        }
+        catch (BackstopApiException ex)
+        {
+            _problem = ex.Message;
+            _busy = false;
+        }
+    }
+}

@@ -1,0 +1,27 @@
+@* The original words, with hard words underlined. Tapping one shows its meaning right after it. *@
+<div class="original">@foreach (var s in Segments()){if (s.Index is not { } i){@s.Text}else{<button type="button" class="term" aria-expanded="@(_open == i ? "true" : "false")" @onclick="() => Toggle(i)">@s.Text</button>@if (_open == i){<span class="term__meaning" role="note">@s.Text: @Words[i].Meaning</span>}}}</div>
+
+@code {
+    [Parameter, EditorRequired] public string Text { get; set; } = "";
+    [Parameter] public IReadOnlyList<HardWord> Words { get; set; } = [];
+
+    private int? _open;
+
+    private void Toggle(int i) => _open = _open == i ? null : i;
+
+    protected override void OnParametersSet() => _open = null;
+
+    private IEnumerable<(string Text, int? Index)> Segments()
+    {
+        var pos = 0;
+        for (var i = 0; i < Words.Count; i++)
+        {
+            var w = Words[i];
+            if (w.Start < pos || w.Start + w.Length > Text.Length) continue;
+            if (w.Start > pos) yield return (Text[pos..w.Start], null);
+            yield return (Text.Substring(w.Start, w.Length), i);
+            pos = w.Start + w.Length;
+        }
+        if (pos < Text.Length) yield return (Text[pos..], null);
+    }
+}

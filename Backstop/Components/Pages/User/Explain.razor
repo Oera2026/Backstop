@@ -1,0 +1,89 @@
+@page "/explain"
+@inherits ModeComponentBase
+
+<PageTitle>Explain – Backstop</PageTitle>
+
+<h1>Explain something</h1>
+
+@if (_busy)
+{
+    <LoadingState Text="Making it easy to read…" />
+}
+else
+{
+    @if (_problem is not null)
+    {
+        <ErrorState Message="@_problem" OnRetry="Run" />
+    }
+    <form class="form" @onsubmit="Run" novalidate>
+        <ChoiceGroup Legend="What do you have?" Name="source" Value="@_source" OnPick="v => { _source = v; _error = null; }"
+                     Options="@(new[] { ("text", "Words to paste"), ("file", "A photo or PDF of a letter") })" />
+        @if (_source == "file")
+        {
+            <PicturePicker Id="explain-file" AcceptsPdf="true" Prompt="Drop a photo or PDF here, or tap to choose one" OnPicked="f => _file = f" />
+        }
+        else
+        {
+            <div class="field">
+                <label for="explain-text">@(_fromCheck ? "The message from Check" : "Paste the words here")</label>
+                <textarea id="explain-text" rows="8" @bind="_text"></textarea>
+            </div>
+        }
+        <p class="form-error" role="alert">@_error</p>
+        <div class="actions">
+            <button type="submit" class="btn btn-primary"><Icon Name="book" /> Explain it</button>
+        </div>
+    </form>
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "check")] public string? FromCheckId { get; set; }
+    [SupplyParameterFromQuery(Name = "example")] public string? Example { get; set; }
+
+    private string _source = "text", _text = "";
+    private PicturePicker.PickedFile? _file;
+    private bool _busy, _fromCheck;
+    private string? _error, _problem;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Example == "letter") _text = Services.Api.Fixtures.ExplainFixtures.CouncilLetter;
+        if (FromCheckId is null) return;
+        // "Explain this to me" from Check: use those words, and go straight to the explanation.
+        try
+        {
+            if (await Api.GetCheckAsync(FromCheckId) is { } c)
+            {
+                _text = c.DisplayText;
+                _fromCheck = true;
+                await Run();
+            }
+        }
+        catch (BackstopApiException) { /* they can paste it instead */ }
+    }
+
+    private async Task Run()
+    {
+        _error = null;
+        _problem = null;
+        if (_source == "file" ? _file is null : string.IsNullOrWhiteSpace(_text))
+        {
+            _error = _source == "file" ? "Please choose a photo or PDF first." : "Please paste the words first.";
+            return;
+        }
+        _busy = true;
+        try
+        {
+            var request = _source == "file"
+                ? new ExplainRequest(null, _file!.Bytes, _file.Name, ReadingLevel.Simple, ExplainFormat.Summary)
+                : new ExplainRequest(_text, null, null, ReadingLevel.Simple, ExplainFormat.Summary);
+            var e = await Api.ExplainContentAsync(request);
+            Nav.NavigateTo($"explain/{e.Id}");
+        }
+        catch (BackstopApiException ex)
+        {
+            _problem = ex.Message;
+            _busy = false;
+        }
+    }
+}

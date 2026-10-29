@@ -1,0 +1,83 @@
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+@inject IBackstopApi Api
+
+@* Device settings, shared by the user's and the helper's Settings pages. Done goes back to whichever side opened it. *@
+<div class="settings-head">
+    <h1>Settings</h1>
+    <a class="btn btn-primary" href="@DoneHref"><Icon Name="check" /> Done</a>
+</div>
+
+<div class="settings">
+    <ChoiceGroup Legend="Size of the words" Glyph="type" Name="size" Value="@_s["size"]" OnPick="@(v => Set("size", v))"
+                 Options="@(new[] { ("normal", "Normal"), ("large", "Large"), ("xlarge", "Extra large") })" />
+
+    <ChoiceGroup Legend="Light or dark" Glyph="@(_s["theme"] == "dark" ? "moon" : "sun")" Name="theme" Value="@_s["theme"]" OnPick="@(v => Set("theme", v))"
+                 Options="@(new[] { ("light", "Light"), ("dark", "Dark"), ("auto", "Like my device") })" />
+
+    <ChoiceGroup Legend="Contrast" Glyph="contrast" Name="contrast" Value="@_s["contrast"]" OnPick="@(v => Set("contrast", v))"
+                 Options="@(new[] { ("standard", "Standard"), ("high", "High") })" />
+
+    <ChoiceGroup Legend="Space between lines" Glyph="lines" Name="spacing" Value="@_s["spacing"]" OnPick="@(v => Set("spacing", v))"
+                 Options="@(new[] { ("normal", "Normal"), ("roomy", "Roomy") })" />
+
+    <ChoiceGroup Legend="Movement" Glyph="motion" Name="motion" Value="@_s["motion"]" OnPick="@(v => Set("motion", v))"
+                 Options="@(new[] { ("normal", "Normal"), ("calm", "None") })" />
+
+    <ChoiceGroup Legend="Voice speed" Glyph="speaker" Name="rate" Value="@_s["rate"]" OnPick="@(v => Set("rate", v))"
+                 Options="@(new[] { ("slow", "Slow"), ("normal", "Normal"), ("fast", "Fast") })" />
+
+    @* MOCK: switches between the two views for the demo. A real app puts the trusted person view behind their own sign-in. *@
+    <ChoiceGroup Legend="Whose view" Glyph="people" Name="view" Value="@View" OnPick="SwitchView"
+                 Options="@(new[] { ("me", "My view"), ("helper", $"Trusted person view ({Api.Household.TrustedPersonName})") })" />
+</div>
+
+<div class="actions actions--quiet">
+    <button type="button" class="btn btn-quiet" @onclick="Reset"><Icon Name="refresh" /> Put everything back</button>
+    @if (ShowWelcome)
+    {
+        <a class="btn btn-text" href="welcome">Show the welcome again</a>
+    }
+</div>
+
+@code {
+    [Parameter] public string DoneHref { get; set; } = "/";
+
+    /// <summary>The welcome screens are for the user only.</summary>
+    [Parameter] public bool ShowWelcome { get; set; }
+
+    /// <summary>"me" on the user's Settings, "helper" on the trusted person's.</summary>
+    [Parameter] public string View { get; set; } = "me";
+
+    private void SwitchView(string view)
+    {
+        if (view != View) Nav.NavigateTo(view == "helper" ? "/helper" : "/home");
+    }
+
+    private Dictionary<string, string> _s = new()
+    {
+        ["size"] = "normal", ["theme"] = "light", ["contrast"] = "standard", ["spacing"] = "normal", ["motion"] = "normal", ["rate"] = "normal",
+    };
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try
+        {
+            _s = await JS.InvokeAsync<Dictionary<string, string>>("backstopSettings.get");
+            StateHasChanged();
+        }
+        catch (Exception) { /* settings are a convenience; the page works without them */ }
+    }
+
+    private async Task Set(string key, string value)
+    {
+        _s[key] = value;
+        try { await JS.InvokeAsync<object>("backstopSettings.set", key, value); } catch (Exception) { }
+    }
+
+    private async Task Reset()
+    {
+        try { _s = await JS.InvokeAsync<Dictionary<string, string>>("backstopSettings.reset"); } catch (Exception) { }
+    }
+}

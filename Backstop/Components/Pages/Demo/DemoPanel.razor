@@ -1,6 +1,8 @@
 @page "/demo"
 @layout DemoLayout
 @inherits LiveComponentBase
+@inject IBackstopApi Api
+@inject MockApiOptions ApiOptions
 
 <PageTitle>Demo panel – Backstop</PageTitle>
 
@@ -42,6 +44,29 @@
             <StatusBadge State="_result.State" ForHelper="true" />
             <p>@OutcomeText</p>
         }
+    </div>
+</section>
+
+<section class="card" aria-labelledby="modes-title">
+    <h2 id="modes-title">Check, Show me, Explain and Remember</h2>
+    <p>Open an example in the user view:</p>
+    <ul class="chips">
+        <li><a class="chip" href="check?example=giftcard">Check: gift card scam</a></li>
+        <li><a class="chip" href="check?example=friend">Check: "friend" conversation</a></li>
+        <li><a class="chip" href="check?example=parcel">Check: parcel link</a></li>
+        <li><a class="chip" href="check?example=safe">Check: safe message</a></li>
+        <li><a class="chip" href="explain?example=letter">Explain: council letter</a></li>
+        <li><a class="chip" href="show-me?goal=Set%20the%20washing%20machine">Show me: washing machine</a></li>
+        <li><a class="chip" href="show-me?goal=Make%20the%20bed">Show me: make the bed</a></li>
+        <li><a class="chip" href="show-me?goal=Fill%20in%20the%20council%20form">Show me: fill in a form</a></li>
+        <li><a class="chip" href="remember">Remember</a></li>
+    </ul>
+    <div class="field field--check">
+        <input id="api-fail" type="checkbox" checked="@ApiOptions.FailRequests" @onchange="e => ApiOptions.FailRequests = (bool)e.Value!" />
+        <label for="api-fail">Make these modes fail (shows each screen's error state)</label>
+    </div>
+    <div class="actions">
+        <button type="button" class="btn btn-quiet" @onclick="Api.ClearMemories"><Icon Name="trash" /> Empty Remember</button>
     </div>
 </section>
 
@@ -105,6 +130,8 @@
     private void ResetDemo()
     {
         Mail.Reset();
+        Api.ResetDemo();
+        ApiOptions.FailRequests = false;
         _result = null;
         _tiers = Fresh();
     }

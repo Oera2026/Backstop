@@ -82,8 +82,9 @@
             {
                 <p class="actionbar__msg" role="status">
                     <Icon Name="hourglass" />
-                    <span>@(_pending == "Blocked" ? "Blocking" : "Approving") in @_secs seconds. Nothing has happened yet.</span>
+                    <span>@(_pending == "Blocked" ? "Blocking" : "Approving") in @_secs seconds.</span>
                 </p>
+                <span class="countdown" style="--secs:@(UndoSeconds)s" aria-hidden="true"></span>
                 <div class="actions">
                     <button type="button" class="btn btn-primary" @onclick="Undo"><Icon Name="arrow-left" /> Undo</button>
                 </div>
@@ -92,7 +93,7 @@
             {
                 <p class="actionbar__msg" role="alert">
                     <Icon Name="alert" />
-                    <span>We think this is risky. Approve it anyway? The user will see it.</span>
+                    <span>@ConfirmText</span>
                 </p>
                 <div class="actions">
                     <button type="button" class="btn btn-primary" @onclick="CancelConfirm"><Icon Name="arrow-left" /> No, go back</button>
@@ -101,8 +102,9 @@
             }
             else
             {
+                @* Block only stands out when the checker is very sure. When it is not sure, both choices weigh the same. *@
                 <div class="actions actions--helper">
-                    <button type="button" class="btn btn-block" @onclick="@(() => Start("Blocked"))">
+                    <button type="button" class="btn @(Message.Confidence == Confidence.High ? "btn-block" : "btn-quiet btn-danger")" @onclick="@(() => Start("Blocked"))">
                         <Icon Name="cross" /> Block
                     </button>
                     <button type="button" class="btn btn-quiet" @onclick="AskConfirm">
@@ -116,7 +118,7 @@
             <p class="call-note" role="status">
                 @if (Message.CallRequested)
                 {
-                    <Icon Name="phone" /><span>You will call @Message.FromName before you decide. The message stays held and the user cannot see it.</span>
+                    <Icon Name="phone" /><span>You will call @Message.FromName before you decide.</span>
                 }
             </p>
         </div>
@@ -161,9 +163,13 @@
     private string DecisionText => (Message.State, Message.HelperDecision) switch
     {
         (MessageState.Blocked, null) => "The checker blocked this automatically. The user never saw it.",
-        (MessageState.Blocked, _) => "Done. You blocked this message. The user will never see it. Thank you for keeping them safe.",
+        (MessageState.Blocked, _) => "Done. You blocked this message. The user will never see it.",
         _ => "Done. You approved this message. It is now in the user's inbox.",
     };
+
+    private string ConfirmText => Message.Confidence == Confidence.Low
+        ? "Approve this message? The user will see it."
+        : "We think this is risky. Approve it anyway? The user will see it.";
 
     private void AskConfirm() => _confirming = true;
     private void CancelConfirm() => _confirming = false;

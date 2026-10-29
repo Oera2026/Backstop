@@ -1,0 +1,53 @@
+@inherits ModeComponentBase
+
+@* Held items the user sent from Check. Inbox items are listed by the queue page itself. *@
+<h2>From Check</h2>
+@if (_items is null && _problem is null)
+{
+    <LoadingState Text="Getting things to check…" />
+}
+else if (_problem is not null)
+{
+    <ErrorState Message="@_problem" OnRetry="Load" />
+}
+else if (_items!.Count == 0)
+{
+    <p class="empty">@UserName has not asked you about anything from Check.</p>
+}
+else
+{
+    <ul class="rows" aria-label="Held items from Check">
+        @foreach (var i in _items)
+        {
+            <li>
+                <a class="row" href="helper/check/@i.Id">
+                    <span class="pic pic--check" aria-hidden="true"><Icon Name="@(i.Title.StartsWith("A chat") ? "chat" : "inspect")" /></span>
+                    <span class="row__main">
+                        <span class="row__from">@i.Title</span>
+                        <span class="row__subject">@VerdictCard.WordFor(i.Verdict)@(i.Flags.Count > 0 ? $": {i.Flags[0].Title.ToLowerInvariant()}" : "")</span>
+                        <span class="row__preview">@i.Preview</span>
+                    </span>
+                    <span class="row__side">
+                        <StatusBadge State="MessageState.Held" ForHelper="true" />
+                        <span class="row__time">@Clock.When(i.At)</span>
+                    </span>
+                </a>
+            </li>
+        }
+    </ul>
+}
+
+@code {
+    private IReadOnlyList<ReviewItem>? _items;
+    private string? _problem;
+
+    protected override Task OnInitializedAsync() => Load();
+    protected override Task OnApiChangedAsync() => Load();
+
+    private async Task Load()
+    {
+        _problem = null;
+        try { _items = (await Api.GetReviewQueueAsync()).Where(i => i.Source == ReviewSource.Check).ToList(); }
+        catch (BackstopApiException ex) { _problem = ex.Message; }
+    }
+}

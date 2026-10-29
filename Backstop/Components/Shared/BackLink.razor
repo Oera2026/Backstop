@@ -1,0 +1,17 @@
+@* The way back sits at the top of the page as a link, so it is never one of the screen's two buttons. *@
+@if (OnClick.HasDelegate)
+{
+    <button type="button" class="backlink" @onclick="OnClick"><Icon Name="arrow-left" /> @Text</button>
+}
+else
+{
+    <a class="backlink" href="@Href"><Icon Name="arrow-left" /> @Text</a>
+}
+
+@code {
+    [Parameter] public string Href { get; set; } = "/";
+    [Parameter] public string Text { get; set; } = "My messages";
+
+    /// <summary>Set this to go back a step on the same page (for example the welcome screens) instead of following a link.</summary>
+    [Parameter] public EventCallback OnClick { get; set; }
+}

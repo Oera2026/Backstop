@@ -1,0 +1,150 @@
+@page "/remember/{Id}"
+@inherits ModeComponentBase
+
+<BackLink Href="remember" Text="Remember" />
+
+@if (_loading)
+{
+    <PageTitle>Remember – Backstop</PageTitle>
+    <h1 class="sr-note">Remember</h1>
+    <LoadingState Text="Getting this memory…" />
+}
+else if (_problem is not null && _card is null)
+{
+    <PageTitle>Remember – Backstop</PageTitle>
+    <h1>Remember</h1>
+    <ErrorState Message="@_problem" OnRetry="Load" />
+}
+else if (_card is null)
+{
+    <PageTitle>Not found – Backstop</PageTitle>
+    <h1>@(_deleted ? "Done. The memory is deleted." : "We cannot find that memory")</h1>
+    <p class="actions"><a class="btn btn-primary" href="remember"><Icon Name="bookmark" /> Back to Remember</a></p>
+}
+else if (_confirmDelete)
+{
+    <PageTitle>Delete @_card.Title – Backstop</PageTitle>
+    <h1>Delete "@_card.Title"?</h1>
+    @if (_problem is not null)
+    {
+        <ErrorState Message="@_problem" />
+    }
+    <div class="actions">
+        <button type="button" class="btn btn-primary" @onclick="() => _confirmDelete = false"><Icon Name="arrow-left" /> No, keep it</button>
+        <button type="button" class="btn btn-quiet btn-danger" @onclick="Delete" disabled="@_working"><Icon Name="trash" /> Yes, delete it</button>
+    </div>
+}
+else
+{
+    <PageTitle>@_card.Title – Backstop</PageTitle>
+    @if (_renaming)
+    {
+        <h1 class="sr-note">@_card.Title</h1>
+        <form class="rename" @onsubmit="Rename" novalidate>
+            <div class="field">
+                <label for="title">Name</label>
+                <input id="title" type="text" @bind="_title" autocomplete="off" />
+            </div>
+            <button type="submit" class="btn btn-primary" disabled="@_working"><Icon Name="check" /> Save</button>
+            <button type="button" class="btn btn-quiet" @onclick="() => _renaming = false">Cancel</button>
+        </form>
+    }
+    else
+    {
+        <h1>@_card.Title</h1>
+    }
+    <p class="memory__date">@_card.Date.ToString("dddd d MMMM yyyy") · @(_card.Source == MemorySource.ShowMe ? "From Show me" : "From Explain")</p>
+    <p class="memory__tags">
+        @foreach (var t in _card.Tags)
+        {
+            <span class="tag">@t</span>
+        }
+        @if (_card.Shared)
+        {
+            <span class="tag"><Icon Name="share" /> Shared with @Helper</span>
+        }
+    </p>
+    <p class="lead">@_card.Summary</p>
+    <div class="memory-pic"><MemoryThumb Card="_card" /></div>
+
+    <h2>The steps</h2>
+    <ol class="steps">
+        @foreach (var s in _card.Steps)
+        {
+            <li><span class="tick tick--plain"><span>@s</span></span></li>
+        }
+    </ol>
+
+    <p class="done-note" role="status">@_done</p>
+    @if (_problem is not null)
+    {
+        <ErrorState Message="@_problem" />
+    }
+    <div class="actions">
+        <button type="button" class="btn btn-primary" @onclick="ToggleShare" disabled="@_working">
+            <Icon Name="share" /> @(_card.Shared ? $"Stop sharing with {Helper}" : $"Share with {Helper}")
+        </button>
+        <button type="button" class="btn btn-quiet" @onclick="StartRename"><Icon Name="pen" /> Edit title</button>
+    </div>
+    <div class="actions actions--quiet">
+        <button type="button" class="btn btn-text" @onclick="() => _confirmDelete = true"><Icon Name="trash" /> Delete</button>
+    </div>
+}
+
+@code {
+    [Parameter] public string Id { get; set; } = "";
+
+    private MemoryCard? _card;
+    private bool _loading = true, _working, _renaming, _confirmDelete, _deleted;
+    private string? _problem, _done;
+    private string _title = "";
+
+    protected override Task OnParametersSetAsync() => Load();
+
+    private async Task Load()
+    {
+        _loading = true;
+        _problem = null;
+        try { _card = await Api.GetMemoryCardAsync(Id); }
+        catch (BackstopApiException ex) { _problem = ex.Message; }
+        _loading = false;
+    }
+
+    private void StartRename()
+    {
+        _title = _card!.Title;
+        _renaming = true;
+        _done = null;
+    }
+
+    private async Task Rename() => await Do(async () =>
+    {
+        _card = await Api.RenameMemoryAsync(Id, _title);
+        _renaming = false;
+        _done = "Done. The name is changed.";
+    });
+
+    private async Task ToggleShare() => await Do(async () =>
+    {
+        _card = await Api.ShareMemoryAsync(Id, !_card!.Shared);
+        _done = _card.Shared ? $"Done. {Helper} can see this now." : $"Done. {Helper} can no longer see this.";
+    });
+
+    private async Task Delete() => await Do(async () =>
+    {
+        await Api.DeleteMemoryAsync(Id);
+        _card = null;
+        _confirmDelete = false;
+        _deleted = true;
+    });
+
+    private async Task Do(Func<Task> action)
+    {
+        _working = true;
+        _problem = null;
+        _done = null;
+        try { await action(); }
+        catch (BackstopApiException ex) { _problem = ex.Message; }
+        _working = false;
+    }
+}

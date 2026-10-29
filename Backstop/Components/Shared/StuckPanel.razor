@@ -1,0 +1,38 @@
+@* "I'm stuck": offers to tell the trusted person, and says when it is done. *@
+@if (Open)
+{
+    <section class="stuck" aria-labelledby="stuck-title">
+        @if (Sent)
+        {
+            <h2 id="stuck-title" class="sr-note">Help is on the way</h2>
+            <p class="done-note" role="status"><Icon Name="check" /> Done. @Helper knows you are stuck@(Step > 0 ? $" on step {Step}" : "").</p>
+            <div class="actions">
+                <button type="button" class="btn btn-quiet" @onclick="OnClose">Close</button>
+            </div>
+        }
+        else
+        {
+            <h2 id="stuck-title">Ask @Helper for help?</h2>
+            @if (Problem is not null)
+            {
+                <ErrorState Message="@Problem" />
+            }
+            <div class="actions">
+                <button type="button" class="btn btn-primary" @onclick="OnAsk" disabled="@Busy"><Icon Name="user" /> @(Busy ? "Asking…" : $"Ask {Helper}")</button>
+                <button type="button" class="btn btn-quiet" @onclick="OnClose">Not now</button>
+            </div>
+        }
+    </section>
+}
+
+@code {
+    [Parameter] public bool Open { get; set; }
+    /// <summary>The step the user is on, or 0 when they are looking at all the steps.</summary>
+    [Parameter] public int Step { get; set; }
+    [Parameter] public string Helper { get; set; } = "";
+    [Parameter] public bool Sent { get; set; }
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public string? Problem { get; set; }
+    [Parameter] public EventCallback OnAsk { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+}

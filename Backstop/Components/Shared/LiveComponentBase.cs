@@ -13,6 +13,9 @@ public abstract class LiveComponentBase : ComponentBase, IDisposable
     [Inject] protected IGuardianService Guardian { get; set; } = default!;
     [Inject] protected NavigationManager Nav { get; set; } = default!;
 
+    /// <summary>Dates and times in the reader's own time zone (cascaded from Routes).</summary>
+    [CascadingParameter] protected UserClock Clock { get; set; } = UserClock.Server;
+
     protected override void OnInitialized() => Mail.Changed += OnStoreChanged;
 
     private void OnStoreChanged()

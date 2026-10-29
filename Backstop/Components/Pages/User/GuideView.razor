@@ -1,0 +1,206 @@
+@page "/show-me/{Id}"
+@inherits ModeComponentBase
+
+<BackLink Href="show-me" Text="Show me something else" />
+
+@if (_loading)
+{
+    <PageTitle>Show me – Backstop</PageTitle>
+    <h1 class="sr-note">Show me</h1>
+    <LoadingState Text="Getting your guide…" />
+}
+else if (_problem is not null)
+{
+    <PageTitle>Show me – Backstop</PageTitle>
+    <h1>Show me</h1>
+    <ErrorState Message="@_problem" OnRetry="Load" />
+}
+else if (_g is null)
+{
+    <PageTitle>Not found – Backstop</PageTitle>
+    <h1>We cannot find that guide</h1>
+    <p class="actions"><a class="btn btn-primary" href="show-me"><Icon Name="camera" /> Start again</a></p>
+}
+else
+{
+    <PageTitle>@_g.Title – Backstop</PageTitle>
+    @if (_g.NeedsCare is { } care)
+    {
+        <div class="care" role="note">
+            <Icon Name="hand" />
+            <p><strong>Take care: @care.Topic.ToLowerInvariant().</strong> @care.Text Ask @Helper to check with you before you start.</p>
+        </div>
+    }
+
+    @switch (_view)
+    {
+        case View.Steps:
+            <h1>@_g.Title</h1>
+            <div class="stepview" aria-labelledby="step-count">
+                <p id="step-count" class="stepview__count">Step @(_at + 1) of @_g.Steps.Count</p>
+                <div class="stepview__bar" role="progressbar" aria-label="How far you are" aria-valuemin="0" aria-valuemax="@_g.Steps.Count" aria-valuenow="@(_at + 1)">
+                    <span style="width:@((_at + 1) * 100 / _g.Steps.Count)%"></span>
+                </div>
+                <p class="stepview__text" aria-live="polite">@_g.Steps[_at]</p>
+                <label class="tick tick--single">
+                    <span>Done</span>
+                    <input type="checkbox" checked="@_done[_at]" @onchange="e => _done[_at] = (bool)e.Value!" />
+                </label>
+            </div>
+            @if (_at > 0)
+            {
+                <BackLink OnClick="() => _at--" Text="Back a step" />
+            }
+            <div class="actions">
+                <button type="button" class="btn btn-primary" @onclick="Next"><Icon Name="arrow-right" /> @(_at == _g.Steps.Count - 1 ? "Finish" : "Next")</button>
+                <button type="button" class="btn btn-quiet" @onclick="() => _stuck = true"><Icon Name="question" /> I'm stuck</button>
+            </div>
+            <StuckPanel Open="_stuck" Step="_at + 1" Helper="@Helper" OnAsk="AskForHelp" OnClose="() => _stuck = false" Sent="_helpSent" Problem="@_helpProblem" Busy="_helpBusy" />
+            <p><button type="button" class="backlink" @onclick="() => _view = View.Overview"><Icon Name="list" /> See all the steps</button></p>
+            break;
+
+        case View.Finished:
+            <p><span class="badge badge--safe"><Icon Name="check" /><span>All done</span></span></p>
+            <h1>Well done. All @_g.Steps.Count steps are done.</h1>
+            <p class="done-note" role="status">@if (_saved is not null){<Icon Name="check" /><span>Saved to Remember. <a href="remember/@_saved.Id">Open it</a></span>}</p>
+            @if (_saveProblem is not null)
+            {
+                <ErrorState Message="@_saveProblem" OnRetry="Save" />
+            }
+            <div class="actions">
+                @if (_saved is null)
+                {
+                    <button type="button" class="btn btn-primary" @onclick="Save" disabled="@_saving"><Icon Name="bookmark" /> @(_saving ? "Saving…" : "Save this to my memory")</button>
+                }
+                <a class="btn btn-quiet" href="home"><Icon Name="home" /> Back to home</a>
+            </div>
+            break;
+
+        default:
+            <h1>@_g.Title</h1>
+            <div class="figures">
+                @if (_g.PhotoUrl is not null)
+                {
+                    <figure class="figure">
+                        <figcaption>Your photo</figcaption>
+                        <div class="figure__frame">
+                            <img src="@_g.PhotoUrl" alt="The photo you took" />
+                            @if (_g.Highlight is { } h)
+                            {
+                                <span class="lookhere" style="left:@P(h.X)%;top:@P(h.Y)%;width:@P(h.Width)%;height:@P(h.Height)%" role="img" aria-label="Look here: @h.Label">
+                                    <span aria-hidden="true">@h.Label</span>
+                                </span>
+                            }
+                        </div>
+                    </figure>
+                }
+                <figure class="figure">
+                    <figcaption><span class="figure__label">Guide picture – a guide only</span></figcaption>
+                    <div class="figure__frame">
+                        <GuidePicture Name="@_g.Picture" Label="@GuidePicture.Describe(_g.Picture)" />
+                    </div>
+                </figure>
+            </div>
+
+            <h2>The steps</h2>
+            <ol class="steps">
+                @for (var i = 0; i < _g.Steps.Count; i++)
+                {
+                    var n = i;
+                    <li>
+                        <label class="tick">
+                            <span>@_g.Steps[n]</span>
+                            <input type="checkbox" checked="@_done[n]" @onchange="e => _done[n] = (bool)e.Value!" aria-label="Done: step @(n + 1)" />
+                        </label>
+                    </li>
+                }
+            </ol>
+
+            <p class="done-note" role="status">@if (_saved is not null){<Icon Name="check" /><span>Saved to Remember. <a href="remember/@_saved.Id">Open it</a></span>}</p>
+            @if (_saveProblem is not null)
+            {
+                <ErrorState Message="@_saveProblem" OnRetry="Save" />
+            }
+            <div class="actions">
+                <button type="button" class="btn btn-primary" @onclick="StartSteps"><Icon Name="arrow-right" /> Step by step</button>
+                @if (_saved is null)
+                {
+                    <button type="button" class="btn btn-quiet" @onclick="Save" disabled="@_saving"><Icon Name="bookmark" /> @(_saving ? "Saving…" : "Save this to my memory")</button>
+                }
+            </div>
+            <div class="actions actions--quiet">
+                <button type="button" class="btn btn-text" @onclick="() => _stuck = true"><Icon Name="question" /> I'm stuck</button>
+            </div>
+            <StuckPanel Open="_stuck" Step="0" Helper="@Helper" OnAsk="AskForHelp" OnClose="() => _stuck = false" Sent="_helpSent" Problem="@_helpProblem" Busy="_helpBusy" />
+            break;
+    }
+}
+
+@code {
+    private enum View { Overview, Steps, Finished }
+
+    [Parameter] public string Id { get; set; } = "";
+
+    private Guide? _g;
+    private bool[] _done = [];
+    private View _view = View.Overview;
+    private int _at;
+    private bool _loading = true, _saving, _stuck, _helpSent, _helpBusy;
+    private string? _problem, _saveProblem, _helpProblem;
+    private MemoryCard? _saved;
+
+    protected override Task OnParametersSetAsync() => Load();
+
+    private async Task Load()
+    {
+        _loading = true;
+        _problem = null;
+        try
+        {
+            _g = await Api.GetGuideAsync(Id);
+            _done = new bool[_g?.Steps.Count ?? 0];
+        }
+        catch (BackstopApiException ex) { _problem = ex.Message; }
+        _loading = false;
+    }
+
+    private static string P(double v) => v.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    private void StartSteps()
+    {
+        // Start at the first step not yet ticked.
+        _at = Math.Max(0, Array.IndexOf(_done, false));
+        _view = View.Steps;
+        _stuck = false;
+    }
+
+    private void Next()
+    {
+        _done[_at] = true;
+        _stuck = false;
+        if (_at < _g!.Steps.Count - 1) _at++;
+        else _view = View.Finished;
+    }
+
+    private async Task Save()
+    {
+        _saving = true;
+        _saveProblem = null;
+        try { _saved = await Api.SaveGuideToMemoryAsync(Id); }
+        catch (BackstopApiException ex) { _saveProblem = ex.Message; }
+        _saving = false;
+    }
+
+    private async Task AskForHelp()
+    {
+        _helpBusy = true;
+        _helpProblem = null;
+        try
+        {
+            await Api.AskForHelpAsync(Id, _view == View.Steps ? _at + 1 : Math.Max(1, Array.IndexOf(_done, false) + 1));
+            _helpSent = true;
+        }
+        catch (BackstopApiException ex) { _helpProblem = ex.Message; }
+        _helpBusy = false;
+    }
+}

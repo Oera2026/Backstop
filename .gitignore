@@ -12,3 +12,4 @@ appsettings.*.local.json
 secrets.json
 launchSettings.local.json
 graphify-out/
+bin-preview/

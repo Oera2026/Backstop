@@ -1,0 +1,17 @@
+@inherits LayoutComponentBase
+
+<a class="skip-link" href="#main">Skip to the page</a>
+<header class="site-header" role="banner">
+    <span class="brand">
+        <Logo /> <span>Backstop</span>
+    </span>
+</header>
+<main id="main" class="page" tabindex="-1">
+    @Body
+</main>
+
+<div id="blazor-error-ui" data-nosnippet>
+    Something went wrong.
+    <a href="." class="reload">Reload</a>
+    <button type="button" class="dismiss" aria-label="Dismiss"><Icon Name="cross" /></button>
+</div>

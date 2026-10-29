@@ -1,0 +1,48 @@
+@inject IJSRuntime JS
+
+@* Text size (A / A+ / A++) and high contrast, saved on this device by js/settings.js. *@
+<div class="display" role="group" aria-label="Text size and contrast">
+    <div class="display__sizes" role="group" aria-label="Text size">
+        @foreach (var (value, label, name) in Sizes)
+        {
+            <button type="button" class="display__size display__size--@value" aria-pressed="@(_size == value ? "true" : "false")"
+                    aria-label="@name" @onclick="() => SetSize(value)">@label</button>
+        }
+    </div>
+    <button type="button" class="display__contrast" aria-pressed="@(_contrast ? "true" : "false")" @onclick="ToggleContrast">
+        <Icon Name="contrast" /> <span>High contrast</span>
+    </button>
+</div>
+
+@code {
+    private static readonly (string Value, string Label, string Name)[] Sizes =
+        [("normal", "A", "Normal text"), ("large", "A+", "Large text"), ("xlarge", "A++", "Extra large text")];
+
+    private string _size = "normal";
+    private bool _contrast;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try
+        {
+            var s = await JS.InvokeAsync<Dictionary<string, string>>("backstopSettings.get");
+            _size = s.GetValueOrDefault("size", "normal");
+            _contrast = s.GetValueOrDefault("contrast") == "high";
+            StateHasChanged();
+        }
+        catch (Exception) { /* the controls still work; they start at the defaults */ }
+    }
+
+    private async Task SetSize(string value)
+    {
+        _size = value;
+        try { await JS.InvokeAsync<object>("backstopSettings.set", "size", value); } catch (Exception) { }
+    }
+
+    private async Task ToggleContrast()
+    {
+        _contrast = !_contrast;
+        try { await JS.InvokeAsync<object>("backstopSettings.set", "contrast", _contrast ? "high" : "standard"); } catch (Exception) { }
+    }
+}

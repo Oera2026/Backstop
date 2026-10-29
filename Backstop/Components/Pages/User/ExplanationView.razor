@@ -1,0 +1,222 @@
+@page "/explain/{Id}"
+@inherits ModeComponentBase
+
+<BackLink Href="explain" Text="Explain something else" />
+
+@if (_e is null && _loading)
+{
+    <PageTitle>Explain – Backstop</PageTitle>
+    <h1 class="sr-note">Explain</h1>
+    <LoadingState Text="Getting it ready…" />
+}
+else if (_e is null && _problem is not null)
+{
+    <PageTitle>Explain – Backstop</PageTitle>
+    <h1>Explain</h1>
+    <ErrorState Message="@_problem" OnRetry="Load" />
+}
+else if (_e is null)
+{
+    <PageTitle>Not found – Backstop</PageTitle>
+    <h1>We cannot find that page</h1>
+    <p class="actions"><a class="btn btn-primary" href="explain"><Icon Name="book" /> Explain something</a></p>
+}
+else
+{
+    <PageTitle>@_e.Title – Backstop</PageTitle>
+    <h1>@_e.Title</h1>
+
+    <div class="controls">
+        <ChoiceGroup Legend="How simple?" Name="level" Value="@_e.Level.ToString()" OnPick="SetLevel"
+                     Options="@(new[] { (nameof(ReadingLevel.VerySimple), "Very simple"), (nameof(ReadingLevel.Simple), "Simple"), (nameof(ReadingLevel.Standard), "Standard") })" />
+        <ChoiceGroup Legend="Show it as" Name="format" Value="@_e.Format.ToString()" OnPick="SetFormat"
+                     Options="@(new[] { (nameof(ExplainFormat.Summary), "Short summary"), (nameof(ExplainFormat.Steps), "Step by step"), (nameof(ExplainFormat.Questions), "Questions and answers") })" />
+    </div>
+    <p class="actions actions--quiet">
+        <ReadAloudButton Text="@Speech" />
+        <a class="btn btn-text" href="check?explain=@_e.Id"><Icon Name="inspect" /> Is this safe?</a>
+    </p>
+
+    @if (_loading)
+    {
+        <LoadingState Text="Changing it…" />
+    }
+    else
+    {
+        @if (_problem is not null)
+        {
+            <ErrorState Message="@_problem" OnRetry="Reexplain" />
+        }
+        <section class="overview" aria-labelledby="overview-h">
+            <h2 id="overview-h">What this is and what you need to do</h2>
+            <p>@_e.Overview</p>
+            @if (_e.Deadline is not null)
+            {
+                <span class="deadline"><Icon Name="clock" /> @_e.Deadline</span>
+            }
+        </section>
+
+        <ul class="chunks">
+            @foreach (var c in _e.Chunks)
+            {
+                <li class="chunk">
+                    <h3>@c.Heading</h3>
+                    <p>@c.Body</p>
+                </li>
+            }
+        </ul>
+
+        @if (_e.Actions.Count > 0)
+        {
+            <h2>Action needed</h2>
+            <ol class="steps">
+                @for (var i = 0; i < _e.Actions.Count; i++)
+                {
+                    var n = i;
+                    <li>
+                        <label class="tick">
+                            <span>@_e.Actions[n]</span>
+                            <input type="checkbox" checked="@_ticked.Contains(n)" @onchange="e => Tick(n, (bool)e.Value!)" aria-label="Done: @_e.Actions[n]" />
+                        </label>
+                    </li>
+                }
+            </ol>
+        }
+
+        <h2>The words in full</h2>
+        @if (_e.HardWords.Count > 0)
+        {
+            <p class="hint">Tap an underlined word to see what it means.</p>
+        }
+        <HardWordText Text="@_e.OriginalText" Words="_e.HardWords" />
+    }
+
+    @if (_chatOpen)
+    {
+        <section class="chat" aria-labelledby="chat-h">
+            <h2 id="chat-h">Ask a question about this</h2>
+            @if (_chat.Count > 0)
+            {
+                <ul class="chat__log" aria-live="polite">
+                    @foreach (var a in _chat)
+                    {
+                        <li class="bubble bubble--q">@a.Question</li>
+                        <li class="bubble bubble--a">@a.Answer</li>
+                    }
+                </ul>
+            }
+            @if (_asking)
+            {
+                <LoadingState Text="Thinking…" />
+            }
+            @if (_chatProblem is not null)
+            {
+                <ErrorState Message="@_chatProblem" />
+            }
+            <form class="askrow" @onsubmit="Ask" novalidate>
+                <label for="question" class="sr-note">Your question</label>
+                <input id="question" type="text" @bind="_question" autocomplete="off" placeholder="For example: When do I need to reply?" />
+                <button type="submit" class="btn btn-primary" disabled="@_asking"><Icon Name="send" /> Ask</button>
+            </form>
+        </section>
+    }
+
+    <p class="done-note" role="status">@if (_saved is not null){<Icon Name="check" /><span>Saved to Remember. <a href="remember/@_saved.Id">Open it</a></span>}</p>
+    @if (_saveProblem is not null)
+    {
+        <ErrorState Message="@_saveProblem" OnRetry="Save" />
+    }
+    <div class="actions">
+        @if (!_chatOpen)
+        {
+            <button type="button" class="btn btn-primary" @onclick="() => _chatOpen = true"><Icon Name="question" /> Ask a question about this</button>
+        }
+        @if (_saved is null)
+        {
+            <button type="button" class="btn btn-quiet" @onclick="Save" disabled="@_saving"><Icon Name="bookmark" /> @(_saving ? "Saving…" : "Save to my memory")</button>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public string Id { get; set; } = "";
+
+    private Explanation? _e;
+    private bool _loading = true, _saving, _chatOpen, _asking;
+    private string? _problem, _saveProblem, _chatProblem;
+    private string _question = "";
+    private readonly List<ChatAnswer> _chat = [];
+    private readonly HashSet<int> _ticked = [];
+    private MemoryCard? _saved;
+    private ReadingLevel _level;
+    private ExplainFormat _format;
+
+    // A new explanation replaces the address too; it is already on screen, so it is not fetched again.
+    protected override Task OnParametersSetAsync() => _e?.Id == Id ? Task.CompletedTask : Load();
+
+    private async Task Load()
+    {
+        _loading = true;
+        _problem = null;
+        try { _e = await Api.GetExplanationAsync(Id); }
+        catch (BackstopApiException ex) { _problem = ex.Message; }
+        _loading = false;
+    }
+
+    private string Speech => _e is null ? "" :
+        $"{_e.Title}. {_e.Overview} {(_e.Deadline is null ? "" : _e.Deadline + ".")} " +
+        string.Join(" ", _e.Chunks.Select(c => $"{c.Heading}. {c.Body}"));
+
+    private Task SetLevel(string v) { _level = Enum.Parse<ReadingLevel>(v); _format = _e!.Format; return Reexplain(); }
+    private Task SetFormat(string v) { _format = Enum.Parse<ExplainFormat>(v); _level = _e!.Level; return Reexplain(); }
+
+    // Changing how simple, or how it is shown, asks for a new explanation of the same words.
+    private async Task Reexplain()
+    {
+        if (_e is null) return;
+        _loading = true;
+        _problem = null;
+        try
+        {
+            var next = await Api.ExplainContentAsync(new ExplainRequest(_e.OriginalText, null, null, _level, _format));
+            _e = next;
+            _saved = null;
+            _ticked.Clear();
+            Nav.NavigateTo($"explain/{next.Id}", replace: true);
+        }
+        catch (BackstopApiException ex) { _problem = ex.Message; }
+        _loading = false;
+    }
+
+    private void Tick(int n, bool on)
+    {
+        if (on) _ticked.Add(n); else _ticked.Remove(n);
+    }
+
+    private async Task Ask()
+    {
+        _chatProblem = null;
+        if (string.IsNullOrWhiteSpace(_question))
+        {
+            _chatProblem = "Please type your question first.";
+            return;
+        }
+        _asking = true;
+        try
+        {
+            _chat.Add(await Api.AskAboutAsync(_e!.Id, _question));
+            _question = "";
+        }
+        catch (BackstopApiException ex) { _chatProblem = ex.Message; }
+        _asking = false;
+    }
+
+    private async Task Save()
+    {
+        _saving = true;
+        _saveProblem = null;
+        try { _saved = await Api.SaveExplanationToMemoryAsync(_e!.Id); }
+        catch (BackstopApiException ex) { _saveProblem = ex.Message; }
+        _saving = false;
+    }
+}

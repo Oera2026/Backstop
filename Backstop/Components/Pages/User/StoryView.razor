@@ -1,0 +1,111 @@
+@page "/stories/{Id}"
+@inherits ModeComponentBase
+
+<BackLink Href="stories" Text="My stories" />
+
+@if (_loading)
+{
+    <PageTitle>Story – Backstop</PageTitle>
+    <h1 class="sr-note">Story</h1>
+    <LoadingState Text="Getting your story…" />
+}
+else if (_problem is not null)
+{
+    <PageTitle>Story – Backstop</PageTitle>
+    <h1>Story</h1>
+    <ErrorState Message="@_problem" OnRetry="() => Load()" />
+}
+else if (_story is null)
+{
+    <PageTitle>Not found – Backstop</PageTitle>
+    <h1>We cannot find that story</h1>
+    <p class="actions"><a class="btn btn-primary" href="stories"><Icon Name="story" /> My stories</a></p>
+}
+else if (_story.Status == StoryStatus.Held)
+{
+    @* Held: no title and no words, the same as held mail. *@
+    <PageTitle>Your story – Backstop</PageTitle>
+    <h1>Your story</h1>
+    <p><StatusBadge State="MessageState.Held" /></p>
+    <p class="lead">@Helper is checking this for you.</p>
+    <p class="actions"><a class="btn btn-quiet" href="stories"><Icon Name="arrow-left" /> My stories</a></p>
+}
+else if (_finished)
+{
+    <PageTitle>@_story.Title – Backstop</PageTitle>
+    <p><span class="badge badge--safe"><Icon Name="check" /><span>All read</span></span></p>
+    <h1>You have read the whole story.</h1>
+    <div class="actions">
+        <a class="btn btn-primary" href="stories"><Icon Name="story" /> My stories</a>
+        <button type="button" class="btn btn-quiet" @onclick="Again"><Icon Name="refresh" /> Read it again</button>
+    </div>
+}
+else
+{
+    var pg = _story.Pages[_at];
+    <PageTitle>@_story.Title – Backstop</PageTitle>
+    <h1>@_story.Title</h1>
+    @if (_story.When is not null)
+    {
+        <p class="lead"><Icon Name="calendar" /> @_story.When</p>
+    }
+
+    <div class="stepview" aria-labelledby="page-count">
+        <p id="page-count" class="stepview__count">Page @(_at + 1) of @_story.Pages.Count</p>
+        <div class="stepview__bar" role="progressbar" aria-label="How far you are" aria-valuemin="0" aria-valuemax="@_story.Pages.Count" aria-valuenow="@(_at + 1)">
+            <span style="width:@((_at + 1) * 100 / _story.Pages.Count)%"></span>
+        </div>
+        <figure class="storyfig">
+            <div class="figure__frame"><StoryPicture Name="@pg.Picture" /></div>
+        </figure>
+        <h2 class="storypage__h">@pg.Heading</h2>
+        <p class="stepview__text" aria-live="polite">@pg.Text</p>
+    </div>
+
+    @if (_at > 0)
+    {
+        <BackLink OnClick="() => _at--" Text="Back a page" />
+    }
+    <div class="actions">
+        <button type="button" class="btn btn-primary" @onclick="Next"><Icon Name="arrow-right" /> @(_at == _story.Pages.Count - 1 ? "Finish" : "Next page")</button>
+        <ReadAloudButton Text="@($"{pg.Heading}. {pg.Text}")" />
+    </div>
+}
+
+@code {
+    [Parameter] public string Id { get; set; } = "";
+
+    private Story? _story;
+    private int _at;
+    private bool _loading = true, _finished;
+    private string? _problem;
+
+    protected override Task OnParametersSetAsync() => Load();
+
+    // When the trusted person releases a held story, this reloads and the pages appear.
+    protected override async Task OnApiChangedAsync()
+    {
+        if (_story?.Status == StoryStatus.Held) await Load(quiet: true);
+    }
+
+    private async Task Load(bool quiet = false)
+    {
+        if (!quiet) _loading = true;
+        _problem = null;
+        try { _story = await Api.GetStoryAsync(Id); }
+        catch (BackstopApiException ex) { _problem = ex.Message; }
+        _loading = false;
+    }
+
+    private void Next()
+    {
+        if (_at < _story!.Pages.Count - 1) _at++;
+        else _finished = true;
+    }
+
+    private void Again()
+    {
+        _at = 0;
+        _finished = false;
+    }
+}

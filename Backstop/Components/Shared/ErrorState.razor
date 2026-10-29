@@ -1,0 +1,16 @@
+@* Calm, not alarming: amber, the reason, and a way to try again. *@
+<div class="banner banner--check problem" role="alert">
+    <Icon Name="alert" />
+    <div>
+        <p>@Message</p>
+        @if (OnRetry.HasDelegate)
+        {
+            <button type="button" class="btn btn-quiet" @onclick="OnRetry"><Icon Name="refresh" /> Try again</button>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Message { get; set; } = "";
+    [Parameter] public EventCallback OnRetry { get; set; }
+}

@@ -1,0 +1,19 @@
+@* "Why we think this": numbered so each sign matches the numbered marks in the text. *@
+<ol class="signs">
+    @for (var i = 0; i < Flags.Count; i++)
+    {
+        var f = Flags[i];
+        <li class="sign">
+            <span class="sign__n" aria-hidden="true">@(i + 1)</span>
+            <span class="flag__icon" aria-hidden="true"><Icon Name="@f.Icon" /></span>
+            <span>
+                <strong>@f.Title</strong>
+                <span class="flag__text">@f.Explanation</span>
+            </span>
+        </li>
+    }
+</ol>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<RiskFlag> Flags { get; set; } = [];
+}

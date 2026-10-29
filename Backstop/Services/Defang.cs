@@ -14,7 +14,7 @@ public static partial class Defang
 
     /// <summary>Plain wording, for the user. Links are removed rather than shown in a confusing form.</summary>
     public static string ForUser(string text) =>
-        UrlPattern().Replace(text, "[link removed for safety]");
+        UrlPattern().Replace(text, "[link removed]");
 
     public static string Url(string url) => ForHelper(url);
 }

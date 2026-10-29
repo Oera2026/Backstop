@@ -2,32 +2,36 @@
 
 <PageTitle>Help – Backstop</PageTitle>
 
-<h1>How Backstop works</h1>
-<p class="lead">Backstop checks every message before you see it. Here is what the words mean.</p>
+<BackLink />
+<h1>Help</h1>
+<p class="lead">Here is how to do the main things.</p>
 <ReadAloudButton Text="@Speech" />
 
-<section aria-labelledby="h-safe">
-    <h2 id="h-safe">What does Safe mean?</h2>
-    <p><StatusBadge State="MessageState.Cleared" /></p>
-    <p>We checked this message. It is fine to open and read.</p>
+<section aria-labelledby="h-read">
+    <h2 id="h-read">How do I read a message?</h2>
+    <p>Go to My messages. Tap the message you want. Tap Read this to me if you want to hear it.</p>
 </section>
 
-<section aria-labelledby="h-checking">
-    <h2 id="h-checking">Why is my helper checking something?</h2>
-    <p><StatusBadge State="MessageState.Held" /></p>
-    <p>Your helper is a person you trust. They look at messages that might be a trick. You do not need to do anything. The message appears here when it is safe.</p>
+<section aria-labelledby="h-write">
+    <h2 id="h-write">How do I write a message?</h2>
+    <p>Tap Write a message. Fill in who it is for and what you want to say. Then tap Send.</p>
 </section>
 
-<section aria-labelledby="h-blocked">
-    <h2 id="h-blocked">What if a message never comes?</h2>
-    <p>Sometimes your helper decides a message is not safe. You will not see it. That is on purpose. It keeps you safe.</p>
+<section aria-labelledby="h-big">
+    <h2 id="h-big">How do I make the words bigger?</h2>
+    <p>Open Settings at the top of the page. You can change the size of the words, the colours and more.</p>
+    <p class="actions"><a class="btn btn-primary" href="/settings"><Icon Name="arrow-right" /> Open Settings</a></p>
 </section>
 
-<p class="actions"><a class="btn btn-primary" href="/"><Icon Name="arrow-left" /> Back to my messages</a></p>
+<section aria-labelledby="h-stuck">
+    <h2 id="h-stuck">What if I am stuck?</h2>
+    <p>Ask your helper. They are the person you chose to look after your email.</p>
+</section>
 
 @code {
     private const string Speech =
-        "Backstop checks every message before you see it. Safe means we checked this message and it is fine to read. " +
-        "Your helper is a person you trust. They look at messages that might be a trick. You do not need to do anything. " +
-        "Sometimes your helper decides a message is not safe. You will not see it. That keeps you safe.";
+        "Here is how to do the main things. To read a message, go to My messages and tap the message you want. " +
+        "To write a message, tap Write a message, fill it in, then tap Send. " +
+        "To make the words bigger, open Settings at the top of the page. " +
+        "If you are stuck, ask your helper.";
 }

@@ -24,26 +24,23 @@ public sealed class MockGuardianService(MailStore store) : IGuardianService
         return m is { State: MessageState.Held or MessageState.Blocked or MessageState.Cleared } ? m : null;
     }
 
+    public IReadOnlyList<HelperNotice> GetNotices() => store.OpenNotices();
+    public void DismissNotice(string id) => store.DismissNotice(id);
+
     // Only a Held message can be decided. Blocked is final.
     public void Approve(string id) => Decide(id, MessageState.Cleared, "Approved");
     public void Block(string id) => Decide(id, MessageState.Blocked, "Blocked");
 
-    public void CallFirst(string id)
-    {
-        var m = store.Find(id);
-        if (m is { State: MessageState.Held }) store.Update(() => m.CallRequested = true);
-    }
+    public void CallFirst(string id) =>
+        store.TryChange(id, m => m.State == MessageState.Held, m => m.CallRequested = true);
 
-    private void Decide(string id, MessageState to, string decision)
-    {
-        var m = store.Find(id);
-        if (m is not { State: MessageState.Held }) return;
-        store.Update(() =>
+    // The Held check and the change are one step, so a second decision on the same message does nothing.
+    private void Decide(string id, MessageState to, string decision) =>
+        store.TryChange(id, m => m.State == MessageState.Held, m =>
         {
             m.State = to;
             m.HelperDecision = decision;
             m.CallRequested = false;
             m.ReceivedAt = DateTimeOffset.Now; // lands at the top of the inbox when approved
         });
-    }
 }

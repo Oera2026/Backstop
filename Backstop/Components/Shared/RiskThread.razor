@@ -1,0 +1,36 @@
+@* A conversation, oldest first, with how worrying it is at each message. The risk is a word and a bar as well as a colour. *@
+<ol class="thread" aria-label="The conversation, oldest first">
+    @foreach (var m in Thread)
+    {
+        <li class="thread__msg @(m.FromUser ? "thread__msg--me" : "")">
+            <span class="thread__who">@(m.FromUser ? $"You ({m.Sender})" : m.Sender)</span>
+            <MarkedText Text="@m.Text" Highlights="m.Highlights" Flags="Flags" CssClass="thread__text" />
+            @if (!m.FromUser)
+            {
+                <span class="risk risk--@m.Level.ToString().ToLowerInvariant()">
+                    <span class="risk__word"><Icon Name="@IconFor(m.Level)" /> @WordFor(m.Level)</span>
+                    <span class="risk__bar" role="img" aria-label="Risk so far: @m.Risk out of 100"><span style="width:@(Math.Max(4, m.Risk))%"></span></span>
+                </span>
+            }
+        </li>
+    }
+</ol>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<ThreadMessage> Thread { get; set; } = [];
+    [Parameter] public IReadOnlyList<RiskFlag> Flags { get; set; } = [];
+
+    private static string WordFor(RiskLevel level) => level switch
+    {
+        RiskLevel.Calm => "Calm",
+        RiskLevel.Rising => "Getting worrying",
+        _ => "Worrying",
+    };
+
+    private static string IconFor(RiskLevel level) => level switch
+    {
+        RiskLevel.Calm => "check",
+        RiskLevel.Rising => "alert",
+        _ => "hand",
+    };
+}

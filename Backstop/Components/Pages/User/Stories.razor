@@ -1,0 +1,70 @@
+@page "/stories"
+@inherits ModeComponentBase
+
+<PageTitle>Stories – Backstop</PageTitle>
+
+<h1>Stories</h1>
+
+<p class="actions"><a class="btn btn-primary" href="stories/new"><Icon Name="plus" /> Make a new story</a></p>
+
+@if (_stories is null && _problem is null)
+{
+    <LoadingState Text="Getting your stories…" />
+}
+else if (_problem is not null)
+{
+    <ErrorState Message="@_problem" OnRetry="Load" />
+}
+else if (_stories!.Count == 0)
+{
+    <div class="emptystate">
+        <span class="pic pic--blue" aria-hidden="true"><Icon Name="story" /></span>
+        <p class="emptystate__title">No stories yet</p>
+    </div>
+}
+else
+{
+    <h2>Your stories</h2>
+    <ul class="rows" aria-label="Your stories">
+        @foreach (var s in _stories)
+        {
+            <li>
+                <a class="row" href="stories/@s.Id">
+                    <span class="pic @(s.Status == StoryStatus.Held ? "pic--check" : "pic--blue")" aria-hidden="true"><Icon Name="@(s.Status == StoryStatus.Held ? "hourglass" : "story")" /></span>
+                    <span class="row__main">
+                        <span class="row__from">@s.Title</span>
+                        @if (s.When is not null)
+                        {
+                            <span class="row__subject">@s.When</span>
+                        }
+                    </span>
+                    <span class="row__side">
+                        @if (s.Status == StoryStatus.Held)
+                        {
+                            <StatusBadge State="MessageState.Held" />
+                        }
+                        <span class="row__time">@Clock.When(s.MadeAt)</span>
+                    </span>
+                </a>
+            </li>
+        }
+    </ul>
+}
+
+<h2>Make sense of something that happened</h2>
+<p class="actions"><a class="btn btn-quiet" href="make-sense"><Icon Name="chat" /> Make sense of it</a></p>
+
+@code {
+    private IReadOnlyList<Story>? _stories;
+    private string? _problem;
+
+    protected override Task OnInitializedAsync() => Load();
+    protected override Task OnApiChangedAsync() => Load();
+
+    private async Task Load()
+    {
+        _problem = null;
+        try { _stories = await Api.GetStoriesAsync(); }
+        catch (BackstopApiException ex) { _problem = ex.Message; }
+    }
+}

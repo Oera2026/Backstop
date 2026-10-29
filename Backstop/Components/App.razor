@@ -3,26 +3,33 @@
 
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#0B2A6F" />
-    <meta name="description" content="Backstop holds every email until it is checked, so you only see mail that is safe." />
+    <meta name="description" content="Backstop is a simple, easy-to-read email app." />
     <base href="/" />
+    <script src="@Assets["js/settings.js"]"></script>
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="icon" type="image/svg+xml" href="icons/icon.svg" />
     <link rel="apple-touch-icon" href="icons/icon-192.png" />
     <ResourcePreloader />
     <link rel="stylesheet" href="@Assets["css/theme.css"]" />
     <link rel="stylesheet" href="@Assets["css/app.css"]" />
+    <link rel="stylesheet" href="@Assets["css/modes.css"]" />
     <link rel="stylesheet" href="@Assets["Backstop.styles.css"]" />
     <ImportMap />
     <HeadOutlet @rendermode="InteractiveServer" />
 </head>
 
 <body>
-    <Routes @rendermode="InteractiveServer" />
+    <Routes @rendermode="InteractiveServer" TimeZone="@HttpContext?.Request.Cookies["backstop.tz"]" />
     <ReconnectModal />
     <script src="@Assets["js/backstop.js"]"></script>
+    <script src="@Assets["js/camera.js"]"></script>
     <script src="@Assets["_framework/blazor.web.js"]"></script>
 </body>
 
 </html>
+
+@code {
+    [CascadingParameter] private HttpContext? HttpContext { get; set; }
+}

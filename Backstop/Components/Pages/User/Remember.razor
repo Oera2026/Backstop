@@ -1,0 +1,170 @@
+@page "/remember"
+@inherits ModeComponentBase
+
+<PageTitle>Remember – Backstop</PageTitle>
+
+<h1>Remember</h1>
+
+<section class="askbox" aria-labelledby="ask-label">
+    <form @onsubmit="() => Ask(_question)" novalidate>
+        <label id="ask-label" for="ask">Ask me how you did something before</label>
+        <div class="askrow">
+            <input id="ask" type="text" @bind="_question" autocomplete="off" placeholder="For example: How did I reset the internet?" />
+            <button type="submit" class="btn btn-primary" disabled="@_asking"><Icon Name="search" /> Ask</button>
+        </div>
+    </form>
+    <ul class="chips" aria-label="Questions you could ask">
+        @foreach (var q in Api.SuggestedMemoryQuestions)
+        {
+            <li><button type="button" class="chip" @onclick="() => Ask(q)">@q</button></li>
+        }
+    </ul>
+    <p class="form-error" role="alert">@_askError</p>
+</section>
+
+<div aria-live="polite">
+    @if (_asking)
+    {
+        <LoadingState Text="Looking through your memory…" />
+    }
+    else if (_askProblem is not null)
+    {
+        <ErrorState Message="@_askProblem" OnRetry="() => Ask(_lastQuestion)" />
+    }
+    else if (_answer is not null)
+    {
+        <section class="answer" aria-labelledby="answer-h">
+            <h2 id="answer-h" class="sr-note">Answer to: @_answer.Question</h2>
+            <p>@_answer.Answer</p>
+            @foreach (var c in _answer.Cards)
+            {
+                <h3>@c.Title</h3>
+                <div class="memory-pic"><MemoryThumb Card="c" /></div>
+                <ol>
+                    @foreach (var s in c.Steps)
+                    {
+                        <li>@s</li>
+                    }
+                </ol>
+                <p><a href="remember/@c.Id">Open "@c.Title"</a></p>
+            }
+        </section>
+    }
+</div>
+
+<h2>Your memories</h2>
+<div class="field">
+    <label for="find">Find a memory</label>
+    <input id="find" type="search" value="@_search" @oninput="Search" autocomplete="off" placeholder="A word, like washing" />
+</div>
+
+@if (_cards is null && _problem is null)
+{
+    <LoadingState Text="Getting your memories…" />
+}
+else if (_problem is not null)
+{
+    <ErrorState Message="@_problem" OnRetry="Load" />
+}
+else if (_cards!.Count == 0 && string.IsNullOrWhiteSpace(_search))
+{
+    <div class="emptystate">
+        <span class="pic pic--blue" aria-hidden="true"><Icon Name="bookmark" /></span>
+        <div>
+            <p class="emptystate__title">Nothing saved yet</p>
+            <p>On a Show me or Explain page, tap "Save to my memory". It will show here.</p>
+        </div>
+    </div>
+}
+else if (_cards.Count == 0)
+{
+    <p class="empty">Nothing found for "@_search". Try a different word.</p>
+}
+else
+{
+    <ul class="memories">
+        @foreach (var c in _cards)
+        {
+            <li>
+                <a class="memory" href="remember/@c.Id">
+                    <span class="memory__thumb" aria-hidden="true"><MemoryThumb Card="c" Decorative="true" /></span>
+                    <span class="memory__words">
+                        <span class="memory__title">@c.Title</span>
+                        <span class="memory__date">@c.Date.ToString("d MMMM yyyy")</span>
+                        <span>@c.Summary</span>
+                        <span class="memory__tags">
+                            @foreach (var t in c.Tags)
+                            {
+                                <span class="tag">@t</span>
+                            }
+                            @if (c.Shared)
+                            {
+                                <span class="tag"><Icon Name="share" /> Shared with @Helper</span>
+                            }
+                        </span>
+                    </span>
+                </a>
+            </li>
+        }
+    </ul>
+}
+
+@code {
+    private IReadOnlyList<MemoryCard>? _cards;
+    private MemoryAnswer? _answer;
+    private string _question = "", _lastQuestion = "", _search = "";
+    private string? _problem, _askProblem, _askError;
+    private bool _asking;
+    private CancellationTokenSource? _searchCts;
+
+    protected override Task OnInitializedAsync() => Load();
+
+    protected override Task OnApiChangedAsync() => Load();
+
+    private async Task Load()
+    {
+        _problem = null;
+        try { _cards = await Api.GetMemoryCardsAsync(_search); }
+        catch (BackstopApiException ex) { _problem = ex.Message; }
+    }
+
+    // Searching as you type: only the latest search counts.
+    private async Task Search(ChangeEventArgs e)
+    {
+        _search = e.Value?.ToString() ?? "";
+        _searchCts?.Cancel();
+        _searchCts = new CancellationTokenSource();
+        var token = _searchCts.Token;
+        try
+        {
+            await Task.Delay(250, token);
+            var cards = await Api.GetMemoryCardsAsync(_search, token);
+            if (!token.IsCancellationRequested) { _cards = cards; _problem = null; }
+        }
+        catch (OperationCanceledException) { }
+        catch (BackstopApiException ex) { _problem = ex.Message; }
+    }
+
+    private async Task Ask(string question)
+    {
+        _askError = null;
+        _askProblem = null;
+        if (string.IsNullOrWhiteSpace(question))
+        {
+            _askError = "Please type your question first.";
+            return;
+        }
+        _question = question;
+        _lastQuestion = question;
+        _asking = true;
+        try { _answer = await Api.AskMemoryAsync(question); }
+        catch (BackstopApiException ex) { _askProblem = ex.Message; }
+        _asking = false;
+    }
+
+    public override void Dispose()
+    {
+        _searchCts?.Cancel();
+        base.Dispose();
+    }
+}

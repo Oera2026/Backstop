@@ -1,0 +1,33 @@
+@* The answer from Check: icon + word + colour, never colour alone, and one plain sentence. *@
+<div class="verdict verdict--@Kind">
+    <Icon Name="@IconName" />
+    <div>
+        @if (Level == 1)
+        {
+            <h1>@Word</h1>
+        }
+        else
+        {
+            <h2>@Word</h2>
+        }
+        <p>@Reason</p>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public Verdict Verdict { get; set; }
+    [Parameter, EditorRequired] public string Reason { get; set; } = "";
+    /// <summary>Heading level for the verdict word: 1 on the result page, 2 inside other pages.</summary>
+    [Parameter] public int Level { get; set; } = 1;
+
+    public static string WordFor(Verdict v) => v switch
+    {
+        Verdict.LooksSafe => "Looks safe",
+        Verdict.BeCareful => "Be careful",
+        _ => "Don't reply",
+    };
+
+    private string Word => WordFor(Verdict);
+    private string Kind => Verdict switch { Verdict.LooksSafe => "safe", Verdict.BeCareful => "careful", _ => "stop" };
+    private string IconName => Verdict switch { Verdict.LooksSafe => "check", Verdict.BeCareful => "alert", _ => "hand" };
+}

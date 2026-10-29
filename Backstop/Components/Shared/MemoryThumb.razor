@@ -1,0 +1,15 @@
+@* A memory's picture: the user's own photo when there is one, otherwise its drawing. *@
+@if (Card.PhotoUrl is not null)
+{
+    <img src="@Card.PhotoUrl" alt="@(Decorative ? "" : $"Your photo for {Card.Title}")" />
+}
+else
+{
+    <GuidePicture Name="@Card.Picture" Label="@GuidePicture.Describe(Card.Picture)" />
+}
+
+@code {
+    [Parameter, EditorRequired] public MemoryCard Card { get; set; } = default!;
+    /// <summary>True in lists, where the title next to it already says what it is.</summary>
+    [Parameter] public bool Decorative { get; set; }
+}

@@ -1,0 +1,121 @@
+@page "/make-sense"
+@inherits ModeComponentBase
+
+<PageTitle>Make sense of it – Backstop</PageTitle>
+
+<BackLink Href="stories" Text="Stories" />
+<h1>What happened?</h1>
+
+@if (_busy)
+{
+    <LoadingState Text="Thinking about it…" />
+}
+else if (_result is null)
+{
+    @if (_problem is not null)
+    {
+        <ErrorState Message="@_problem" OnRetry="Run" />
+    }
+    <form class="form" @onsubmit="Run" novalidate>
+        <div class="field">
+            <label for="sense-what">Tell me, in your own words</label>
+            <textarea id="sense-what" rows="5" @bind="_text" placeholder="For example: My friend has not replied to my message"></textarea>
+        </div>
+        <ul class="chips" aria-label="Ideas">
+            @foreach (var idea in Ideas)
+            {
+                <li><button type="button" class="chip" @onclick="() => _text = idea">@idea</button></li>
+            }
+        </ul>
+        <p class="form-error" role="alert">@_error</p>
+        <div class="actions">
+            <button type="submit" class="btn btn-primary"><Icon Name="chat" /> Help me understand</button>
+        </div>
+    </form>
+}
+else
+{
+    @if (_result.TalkToSomeone is { } talk)
+    {
+        <div class="care" role="note">
+            <Icon Name="heart" />
+            <p>@talk</p>
+        </div>
+    }
+    <section class="sense" aria-labelledby="sense-h">
+        <h2 id="sense-h">What probably happened</h2>
+        <p class="lead">@_result.Summary</p>
+
+        <h2>It could be</h2>
+        <ul class="possibilities">
+            @foreach (var p in _result.Possibilities)
+            {
+                <li class="possibility">
+                    <span class="possibility__word">@p.Likelihood</span>
+                    <span>@p.Text</span>
+                </li>
+            }
+        </ul>
+
+        <h2>What you can do</h2>
+        <ol class="steps steps--plain">
+            @foreach (var s in _result.WhatYouCanDo)
+            {
+                <li>@s</li>
+            }
+        </ol>
+
+        <h2>You could say</h2>
+        <ul class="sayings">
+            @foreach (var s in _result.YouCouldSay)
+            {
+                <li class="saying">@s</li>
+            }
+        </ul>
+    </section>
+
+    <div class="actions">
+        <ReadAloudButton Primary="true" Text="@ReadOut" />
+        <button type="button" class="btn btn-quiet" @onclick="Again"><Icon Name="refresh" /> Ask about something else</button>
+    </div>
+}
+
+@code {
+    private static readonly string[] Ideas =
+    [
+        "My friend has not replied to my message",
+        "Someone said we should catch up sometime",
+        "My plans were cancelled",
+        "Someone laughed at what I said",
+    ];
+
+    private string _text = "";
+    private SituationExplanation? _result;
+    private bool _busy;
+    private string? _error, _problem;
+
+    private string ReadOut => _result is null ? "" :
+        $"{_result.Summary} It could be: {string.Join(" ", _result.Possibilities.Select(p => p.Likelihood + ". " + p.Text))} " +
+        $"What you can do: {string.Join(" ", _result.WhatYouCanDo)}";
+
+    private async Task Run()
+    {
+        _error = null;
+        _problem = null;
+        if (string.IsNullOrWhiteSpace(_text))
+        {
+            _error = "Please tell me what happened first.";
+            return;
+        }
+        _busy = true;
+        try { _result = await Api.MakeSenseOfAsync(_text); }
+        catch (BackstopApiException ex) { _problem = ex.Message; }
+        _busy = false;
+    }
+
+    private void Again()
+    {
+        _result = null;
+        _text = "";
+    }
+}

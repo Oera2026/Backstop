@@ -1,0 +1,24 @@
+@* The text with each warning sign marked: yellow marker, an underline and the sign's number. Plain text only, never a link. *@
+<div class="@CssClass">@foreach (var s in Segments()){if (s.Number is null){@s.Text}else{<mark class="hl">@s.Text<sup aria-hidden="true">@s.Number</sup></mark><span class="sr-note"> (warning sign @s.Number: @s.Title)</span>}}</div>
+
+@code {
+    [Parameter, EditorRequired] public string Text { get; set; } = "";
+    [Parameter] public IReadOnlyList<Highlight> Highlights { get; set; } = [];
+    /// <summary>The numbered signs. Marks for signs not in this list are left plain.</summary>
+    [Parameter] public IReadOnlyList<RiskFlag> Flags { get; set; } = [];
+    [Parameter] public string CssClass { get; set; } = "marked";
+
+    private IEnumerable<(string Text, int? Number, string? Title)> Segments()
+    {
+        var pos = 0;
+        foreach (var h in Highlights.OrderBy(h => h.Start))
+        {
+            var index = Flags.Select(f => f.Id).ToList().IndexOf(h.FlagId);
+            if (index < 0 || h.Start < pos || h.Start + h.Length > Text.Length) continue;
+            if (h.Start > pos) yield return (Text[pos..h.Start], null, null);
+            yield return (Text.Substring(h.Start, h.Length), index + 1, Flags[index].Title);
+            pos = h.Start + h.Length;
+        }
+        if (pos < Text.Length) yield return (Text[pos..], null, null);
+    }
+}
