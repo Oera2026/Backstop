@@ -1,10 +1,11 @@
 using System.Text.RegularExpressions;
 using Backstop.Models;
+using Backstop.Services.Api;
 
 namespace Backstop.Services;
 
-/// <summary>MOCK user-side service. Every "check" below is hardcoded demo logic.</summary>
-public sealed partial class MockMailService(MailStore store) : IMailService
+/// <summary>MOCK user-side service with live Meta AI Dev API checking where available.</summary>
+public sealed partial class MockMailService(MailStore store, IMetaScamChecker? metaChecker = null) : IMailService
 {
     private const int StepDelayMs = 450; // only so the demo timeline is watchable
 
@@ -186,11 +187,35 @@ public sealed partial class MockMailService(MailStore store) : IMailService
                 onTier?.Invoke(i, new TierResult(name, 0, TierStatus.Running, "Checking…"));
                 await Task.Delay(StepDelayMs);
 
+                var result = scenario.Tiers[i];
+
+                // Tier 1 is "Small model" - inspect email body with Meta AI (text-only payload to save cost)
+                if (i == 1 && metaChecker is not null)
+                {
+                    try
+                    {
+                        var aiResult = await metaChecker.CheckScamAsync($"{scenario.Subject}\n\n{scenario.Body}", null, null);
+                        if (!aiResult.Success)
+                        {
+                            throw new InvalidOperationException("Meta AI check failed or timed out: " + (aiResult.FailureNote ?? "Unknown error"));
+                        }
+
+                        if (aiResult.Verdict == Verdict.DontReply)
+                        {
+                            result = new TierResult("Meta AI", 220, TierStatus.Flagged, aiResult.Reason);
+                        }
+                    }
+                    catch (Exception) when (!simulateFailure)
+                    {
+                        // Any unexpected error or timeout triggers fail-closed
+                        throw;
+                    }
+                }
+
                 // MOCK: the "Small model" is the tier we pretend crashes. Real code: any exception or timeout.
                 if (simulateFailure && i == 1)
                     throw new InvalidOperationException("Simulated checker failure");
 
-                var result = scenario.Tiers[i];
                 done.Add(result);
                 onTier?.Invoke(i, result);
             }

@@ -43,14 +43,15 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         await Wait(400, ct);
 
         string text;
+        string? imgType = null;
         if (request.Kind == CheckKind.Picture)
         {
-            if (request.Picture is null || ImageSniff.ImageType(request.Picture) is null)
+            if (request.Picture is null || (imgType = ImageSniff.ImageType(request.Picture)) is null)
                 throw new BackstopApiException("We could not read that file. Please choose a photo or a screenshot.");
-            text = CheckFixtures.PictureText; // MOCK: a real back end reads the words in the picture
+            text = CheckFixtures.PictureText; // Local fallback text
         }
         else text = request.Text ?? "";
-        if (string.IsNullOrWhiteSpace(text)) throw new BackstopApiException("Please paste the message first.");
+        if (string.IsNullOrWhiteSpace(text) && request.Picture is null) throw new BackstopApiException("Please paste the message first.");
 
         var display = Defang.ForUser(text.Trim());
 
@@ -65,7 +66,11 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
 
         if (llamaChecker is not null)
         {
-            var llamaResult = await llamaChecker.CheckScamAsync(display, ct);
+            // If checking a picture, send image bytes to the multimodal AI endpoint;
+            // Otherwise, send text only to save vision processing costs.
+            var llamaResult = request.Kind == CheckKind.Picture && request.Picture is not null
+                ? await llamaChecker.CheckScamAsync(null, request.Picture, imgType, ct)
+                : await llamaChecker.CheckScamAsync(display, null, null, ct);
             if (!llamaResult.Success)
             {
                 // Fail closed: Hold the message when AI fails, times out or outputs strangeness

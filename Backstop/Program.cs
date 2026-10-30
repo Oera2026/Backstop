@@ -32,8 +32,9 @@ builder.Configuration.AddEnvironmentVariables();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-// HTTP client for Meta's Llama AI scam checker
-builder.Services.AddHttpClient<ILlamaScamChecker, LlamaScamChecker>();
+// HTTP client for Meta AI Dev API scam checker (supports Muse models like muse-spark-1.3)
+builder.Services.AddHttpClient<ILlamaScamChecker, MetaAiScamChecker>();
+builder.Services.AddHttpClient<IMetaScamChecker, MetaAiScamChecker>();
 
 // MOCK: swap these registrations for real implementations later. No other code needs to change.
 builder.Services.AddSingleton<MailStore>();
