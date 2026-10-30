@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "backstop",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "Backstop", "--urls", "http://localhost:5106", "-p:BaseOutputPath=bin-preview/"],
+      "port": 5106
+    }
+  ]
+}
