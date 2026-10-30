@@ -16,7 +16,7 @@ public sealed class MockApiOptions
 /// trusted-person views see each other's changes live. Each call waits a little, like a real network call.
 /// Replace this class (and its registration in Program.cs) to wire the real back end.
 /// </summary>
-public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOptions options) : IBackstopApi
+public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOptions options, ILlamaScamChecker? llamaChecker = null) : IBackstopApi
 {
     private sealed record StoredCheck(CheckResult Result, string Original, DateTimeOffset? AskedAt);
 
@@ -40,7 +40,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
     public async Task<CheckResult> CheckContentAsync(CheckRequest request, CancellationToken ct = default)
     {
         if (request.Kind == CheckKind.Conversation) return await GetConversationAnalysisAsync(request.Text ?? "", ct);
-        await Wait(900, ct);
+        await Wait(400, ct);
 
         string text;
         if (request.Kind == CheckKind.Picture)
@@ -53,18 +53,67 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         if (string.IsNullOrWhiteSpace(text)) throw new BackstopApiException("Please paste the message first.");
 
         var display = Defang.ForUser(text.Trim());
-        var found = MockRiskRules.Scan(display);
-        var verdict = MockRiskRules.VerdictFor(found.Score);
-        var flags = found.Flags.Take(4).ToList();
-        var result = new CheckResult(NewId("chk"), request.Kind, verdict, MockRiskRules.ReasonFor(verdict, found.TopBecause), flags,
-            display, found.Highlights.Where(h => flags.Any(f => f.Id == h.FlagId)).ToList(), null, ReviewStatus.NotAsked, false, DateTimeOffset.Now);
-        lock (_gate) _checks[result.Id] = new(result, text.Trim(), null);
+
+        // Simple local checks as the floor:
+        var floor = MockRiskRules.Scan(display);
+        var floorVerdict = MockRiskRules.VerdictFor(floor.Score);
+        var combinedFlags = new List<RiskFlag>(floor.Flags);
+
+        Verdict finalVerdict = floorVerdict;
+        string finalReason = MockRiskRules.ReasonFor(floorVerdict, floor.TopBecause);
+        var reviewStatus = ReviewStatus.NotAsked;
+
+        if (llamaChecker is not null)
+        {
+            var llamaResult = await llamaChecker.CheckScamAsync(display, ct);
+            if (!llamaResult.Success)
+            {
+                // Fail closed: Hold the message when AI fails, times out or outputs strangeness
+                reviewStatus = ReviewStatus.Held;
+                finalVerdict = Verdict.BeCareful;
+                finalReason = llamaResult.Reason;
+                foreach (var flag in llamaResult.Flags)
+                {
+                    if (combinedFlags.All(f => f.Id != flag.Id)) combinedFlags.Add(flag);
+                }
+            }
+            else
+            {
+                // The AI can only make the result stricter than the floor rule
+                // Strictness: DontReply > BeCareful > LooksSafe
+                if (IsStricter(llamaResult.Verdict, floorVerdict))
+                {
+                    finalVerdict = llamaResult.Verdict;
+                    finalReason = llamaResult.Reason;
+                }
+                foreach (var flag in llamaResult.Flags)
+                {
+                    if (combinedFlags.All(f => f.Id != flag.Id)) combinedFlags.Add(flag);
+                }
+            }
+        }
+
+        var flags = combinedFlags.Take(4).ToList();
+        var result = new CheckResult(NewId("chk"), request.Kind, finalVerdict, finalReason, flags,
+            display, floor.Highlights.Where(h => flags.Any(f => f.Id == h.FlagId)).ToList(), null, reviewStatus, false, DateTimeOffset.Now);
+        lock (_gate) _checks[result.Id] = new(result, text.Trim(), reviewStatus == ReviewStatus.Held ? DateTimeOffset.Now : null);
         return result;
+    }
+
+    private static bool IsStricter(Verdict a, Verdict b)
+    {
+        int Rank(Verdict v) => v switch
+        {
+            Verdict.DontReply => 3,
+            Verdict.BeCareful => 2,
+            _ => 1
+        };
+        return Rank(a) > Rank(b);
     }
 
     public async Task<CheckResult> GetConversationAnalysisAsync(string conversation, CancellationToken ct = default)
     {
-        await Wait(1200, ct);
+        await Wait(600, ct);
         if (string.IsNullOrWhiteSpace(conversation)) throw new BackstopApiException("Please paste the conversation first.");
 
         var display = Defang.ForUser(conversation.Trim());
@@ -87,12 +136,46 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
             thread.Add(new(sender, fromUser, text, risk, level, found.Flags.Select(f => f.Id).ToList(), found.Highlights));
         }
 
-        var flags = seen.OrderByDescending(f => MockRiskRules.Weight(f.Id)).Take(4).ToList();
-        var verdict = MockRiskRules.VerdictFor(seen.Sum(f => MockRiskRules.Weight(f.Id)));
-        var result = new CheckResult(NewId("chk"), CheckKind.Conversation, verdict,
-            MockRiskRules.ReasonFor(verdict, MockRiskRules.BecauseFor(flags.FirstOrDefault()?.Id), startedFriendly: firstFlagged > 0),
-            flags, display, [], thread, ReviewStatus.NotAsked, false, DateTimeOffset.Now);
-        lock (_gate) _checks[result.Id] = new(result, conversation.Trim(), null);
+        var floorVerdict = MockRiskRules.VerdictFor(seen.Sum(f => MockRiskRules.Weight(f.Id)));
+        var combinedFlags = new List<RiskFlag>(seen.OrderByDescending(f => MockRiskRules.Weight(f.Id)));
+
+        Verdict finalVerdict = floorVerdict;
+        string finalReason = MockRiskRules.ReasonFor(floorVerdict, MockRiskRules.BecauseFor(combinedFlags.FirstOrDefault()?.Id), startedFriendly: firstFlagged > 0);
+        var reviewStatus = ReviewStatus.NotAsked;
+
+        if (llamaChecker is not null)
+        {
+            var llamaResult = await llamaChecker.CheckScamAsync(display, ct);
+            if (!llamaResult.Success)
+            {
+                // Fail closed
+                reviewStatus = ReviewStatus.Held;
+                finalVerdict = Verdict.BeCareful;
+                finalReason = llamaResult.Reason;
+                foreach (var flag in llamaResult.Flags)
+                {
+                    if (combinedFlags.All(f => f.Id != flag.Id)) combinedFlags.Add(flag);
+                }
+            }
+            else
+            {
+                if (IsStricter(llamaResult.Verdict, floorVerdict))
+                {
+                    finalVerdict = llamaResult.Verdict;
+                    finalReason = llamaResult.Reason;
+                }
+                foreach (var flag in llamaResult.Flags)
+                {
+                    if (combinedFlags.All(f => f.Id != flag.Id)) combinedFlags.Add(flag);
+                }
+            }
+        }
+
+        var flags = combinedFlags.Take(4).ToList();
+        var result = new CheckResult(NewId("chk"), CheckKind.Conversation, finalVerdict,
+            finalReason,
+            flags, display, [], thread, reviewStatus, false, DateTimeOffset.Now);
+        lock (_gate) _checks[result.Id] = new(result, conversation.Trim(), reviewStatus == ReviewStatus.Held ? DateTimeOffset.Now : null);
         return result;
     }
 

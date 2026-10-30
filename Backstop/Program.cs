@@ -10,17 +10,45 @@ CultureInfo.DefaultThreadCurrentUICulture = british;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Load optional .env file from root or project dir if present (never tracked in git)
+var rootEnv = Path.Combine(builder.Environment.ContentRootPath, "..", ".env");
+if (File.Exists(rootEnv))
+{
+    foreach (var line in File.ReadAllLines(rootEnv))
+    {
+        var trimmed = line.Trim();
+        if (string.IsNullOrEmpty(trimmed) || trimmed.StartsWith('#')) continue;
+        var eq = trimmed.IndexOf('=');
+        if (eq > 0)
+        {
+            var k = trimmed[..eq].Trim();
+            var v = trimmed[(eq + 1)..].Trim();
+            Environment.SetEnvironmentVariable(k, v);
+        }
+    }
+}
+builder.Configuration.AddEnvironmentVariables();
+
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+// HTTP client for Meta's Llama AI scam checker
+builder.Services.AddHttpClient<ILlamaScamChecker, LlamaScamChecker>();
 
 // MOCK: swap these registrations for real implementations later. No other code needs to change.
 builder.Services.AddSingleton<MailStore>();
 builder.Services.AddSingleton<IMailService, MockMailService>();
 builder.Services.AddSingleton<IGuardianService, MockGuardianService>();
 
-// MOCK: the Check, Show me, Explain, Remember and trusted-person modes. Swap for the real API client later.
+// The Check, Show me, Explain, Remember and trusted-person modes.
 builder.Services.AddSingleton<MockApiOptions>();
 builder.Services.AddSingleton<IBackstopApi, MockBackstopApi>();
+
+if (args.Contains("--test-llama"))
+{
+    await Backstop.Tests.LlamaScamCheckerTests.RunAllTests();
+    return;
+}
 
 var app = builder.Build();
 
