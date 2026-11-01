@@ -48,11 +48,9 @@
                 <div class="linkcheck">
                     <p><Icon Name="link" /> <code>@l.DefangedUrl</code></p>
                     <p>@l.Verdict</p>
-                    <p>
-                        @(l.Hops.Count <= 1 ? "Went straight to the page." : $"Went through {l.Hops.Count} websites:")
-                    </p>
                     @if (l.Hops.Count > 1)
                     {
+                        <p>Went through @l.Hops.Count websites:</p>
                         <ol class="hops">
                             @foreach (var h in l.Hops)
                             {

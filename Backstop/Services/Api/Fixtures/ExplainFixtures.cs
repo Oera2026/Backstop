@@ -1,3 +1,4 @@
+using System.Globalization;
 using Backstop.Models;
 
 namespace Backstop.Services.Api.Fixtures;
@@ -9,25 +10,40 @@ namespace Backstop.Services.Api.Fixtures;
 /// </summary>
 public static class ExplainFixtures
 {
-    public const string CouncilLetter =
+    private static DateOnly Today => UserClock.Server.Today;
+    private static DateOnly Due => Today.AddDays(14);
+    private static DateOnly Increase => new DateOnly(Due.Year, Due.Month, 1).AddMonths(1);
+    private static string Full(DateOnly d) => d.ToString("d MMMM yyyy", CultureInfo.InvariantCulture);
+    private static string Short(DateOnly d) => d.ToString("d MMMM", CultureInfo.InvariantCulture);
+
+    /// <summary>The letter, with dates counted from today so it never goes out of date.</summary>
+    public static string CouncilLetter =>
         "Oakfield Borough Council\nRevenues Team\n\n" +
         "Council Tax: Single Person Discount review\nReference: 4410 2297\n\n" +
-        "Dear Mrs Okafor,\n\n" +
+        $"Dear {HouseholdFixture.Household.UserName},\n\n" +
         "We are reviewing your entitlement to the Single Person Discount on your Council Tax account. " +
         "This discount reduces your bill by 25% because you are the only adult living at your home.\n\n" +
-        "Please confirm whether you still live alone by completing the enclosed declaration form and returning it to us by 14 November 2026. " +
+        $"Please confirm whether you still live alone by completing the enclosed declaration form and returning it to us by {Full(Due)}. " +
         "You can use the prepaid envelope provided.\n\n" +
-        "If we do not receive your reply by this date, the discount may be removed and your bill will increase from 1 December 2026.\n\n" +
+        $"If we do not receive your reply by this date, the discount may be removed and your bill will increase from {Full(Increase)}.\n\n" +
         "If you need help, please call us on 01632 960 123, Monday to Friday, 9am to 5pm.\n\n" +
         "Yours sincerely,\nRevenues Team";
 
-    /// <summary>Whether this text is the council letter (so the hand-written explanation is used).</summary>
-    public static bool IsCouncilLetter(string text) => text.Contains("Single Person Discount", StringComparison.OrdinalIgnoreCase);
+    /// <summary>Whether this text looks like the council letter.</summary>
+    public static bool IsCouncilLetter(string text) =>
+        text.Contains("Single Person Discount", StringComparison.OrdinalIgnoreCase)
+        && text.Contains("Oakfield Borough Council", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// The hand-written explanation is only used when nothing in the text looks wrong. A look-alike that asks for
+    /// money or secrets, or carries a link, is explained like any other text, with its warnings.
+    /// </summary>
+    public static bool UsesFixture(string text) => IsCouncilLetter(text) && MockRiskRules.Scan(text).Score == 0;
 
     private static string T => HouseholdFixture.Household.TrustedPersonName;
 
     public const string Title = "Council Tax letter";
-    public const string Deadline = "Reply by 14 November 2026";
+    public static string Deadline => $"Reply by {Full(Due)}";
 
     // Each piece of wording at Very simple, Simple and Standard.
     private sealed record L(string VerySimple, string Simple, string Standard)
@@ -40,12 +56,12 @@ public static class ExplainFixtures
         };
     }
 
-    private static readonly L Overview = new(
-        "This letter is from the council. They want to know if you still live on your own. Fill in the form and post it back by 14 November.",
-        "This letter is from Oakfield Council. You pay less Council Tax because you live on your own. They want you to say if that is still true. Fill in the form and post it back by 14 November 2026.",
-        "Oakfield Borough Council is checking your Single Person Discount, which takes 25% off your Council Tax because you live alone. Confirm your situation on the enclosed form and return it by 14 November 2026, or the discount may stop from 1 December.");
+    private static L Overview => new(
+        $"This letter is from the council. They want to know if you still live on your own. Fill in the form and post it back by {Short(Due)}.",
+        $"This letter is from Oakfield Council. You pay less Council Tax because you live on your own. They want you to say if that is still true. Fill in the form and post it back by {Full(Due)}.",
+        $"Oakfield Borough Council is checking your Single Person Discount, which takes 25% off your Council Tax because you live alone. Confirm your situation on the enclosed form and return it by {Full(Due)}, or the discount may stop from {Short(Increase)}.");
 
-    private static readonly (string Heading, L Body)[] Summary =
+    private static (string Heading, L Body)[] Summary =>
     [
         ("Who it is from", new(
             "The council. They look after bins and roads.",
@@ -61,11 +77,11 @@ public static class ExplainFixtures
             "Complete the enclosed declaration form and return it in the prepaid envelope.")),
         ("If you do nothing", new(
             "Your bill may go up in December.",
-            "If they do not hear from you by 14 November, your bill may go up from 1 December.",
-            "Without a reply by 14 November 2026, the discount may be removed and your bill will increase from 1 December 2026.")),
+            $"If they do not hear from you by {Short(Due)}, your bill may go up from {Short(Increase)}.",
+            $"Without a reply by {Full(Due)}, the discount may be removed and your bill will increase from {Full(Increase)}.")),
     ];
 
-    private static readonly (string Heading, L Body)[] Steps =
+    private static (string Heading, L Body)[] Steps =>
     [
         ("Step 1: Find the form", new(
             "Look in the envelope. Find the form.",
@@ -80,12 +96,12 @@ public static class ExplainFixtures
             "Put the form in the envelope that came with it. You do not need a stamp.",
             "Return the form in the prepaid envelope provided.")),
         ("Step 4: Do it in time", new(
-            "Post it before 14 November.",
-            "Post it so it gets there by 14 November 2026.",
-            "Make sure it arrives by 14 November 2026 to keep the discount.")),
+            $"Post it before {Short(Due)}.",
+            $"Post it so it gets there by {Full(Due)}.",
+            $"Make sure it arrives by {Full(Due)} to keep the discount.")),
     ];
 
-    private static readonly (string Heading, L Body)[] Questions =
+    private static (string Heading, L Body)[] Questions =>
     [
         ("What is this letter?", new(
             "A letter from the council about money off your bill.",
@@ -96,25 +112,25 @@ public static class ExplainFixtures
             "Yes. Fill in the form and post it back.",
             "Yes. Complete and return the enclosed declaration form.")),
         ("When by?", new(
-            "By 14 November.",
-            "By 14 November 2026.",
-            "It must arrive by 14 November 2026.")),
+            $"By {Short(Due)}.",
+            $"By {Full(Due)}.",
+            $"It must arrive by {Full(Due)}.")),
         ("What if I miss it?", new(
             "Your bill may go up.",
-            "You may lose the discount and pay more from 1 December.",
-            "The discount may be removed and your bill will increase from 1 December 2026.")),
+            $"You may lose the discount and pay more from {Short(Increase)}.",
+            $"The discount may be removed and your bill will increase from {Full(Increase)}.")),
         ("Who can help?", new(
             $"Ring the council. Or ask {T}.",
             $"You can ring the council on 01632 960 123, Monday to Friday, or ask {T}.",
             $"Call 01632 960 123, Monday to Friday, 9am to 5pm, or ask {T} to help.")),
     ];
 
-    public static IReadOnlyList<string> Actions { get; } =
+    public static IReadOnlyList<string> Actions =>
     [
         "Find the form in the envelope",
         "Tick if you still live alone",
         "Sign and date the form",
-        "Post it back by 14 November",
+        $"Post it back by {Short(Due)}",
     ];
 
     public static string OverviewAt(ReadingLevel level) => Overview.At(level);
@@ -131,11 +147,11 @@ public static class ExplainFixtures
     }
 
     /// <summary>Answers for "Ask a question about this", matched by words in the question.</summary>
-    public static IReadOnlyList<(string[] Words, string Answer)> Answers { get; } =
+    public static IReadOnlyList<(string[] Words, string Answer)> Answers =>
     [
-        (["when", "deadline", "date", "by"], "Post the form so it gets there by 14 November 2026."),
+        (["when", "deadline", "date", "by"], $"Post the form so it gets there by {Full(Due)}."),
         (["stamp", "envelope", "post"], "You do not need a stamp. Use the envelope that came with the letter."),
-        (["pay", "money", "cost", "bill", "more"], "You do not need to pay anything now. If you miss the date, your bill may go up from 1 December."),
+        (["pay", "money", "cost", "bill", "more"], $"You do not need to pay anything now. If you miss the date, your bill may go up from {Short(Increase)}."),
         (["scam", "real", "safe", "trust"], "This looks like a normal council letter. It does not ask for bank details. If you are unsure, ring the number on your last Council Tax bill."),
         (["live", "alone", "lodger", "someone"], "Tick yes only if no other adult lives with you. If someone has moved in, tick no."),
         (["help", "call", "phone", "ring"], $"You can ring the council on 01632 960 123, Monday to Friday, 9am to 5pm. Or ask {T} to help you."),
@@ -145,6 +161,7 @@ public static class ExplainFixtures
 /// <summary>Hard words and what they mean, in one line each. MOCK: a real back end finds these itself.</summary>
 public static class Glossary
 {
+    // Only words that are hard in any text. Everyday words with a hard meaning ("fine", "account") are left out.
     public static IReadOnlyDictionary<string, string> Words { get; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
     {
         ["entitlement"] = "What you have a right to get.",
@@ -159,8 +176,6 @@ public static class Glossary
         ["confirm"] = "Say that something is true.",
         ["sincerely"] = "A polite way to end a letter.",
         ["gift cards"] = "Cards with money on them for a shop. Scammers often ask for the codes.",
-        ["fine"] = "Money you have to pay as a punishment.",
         ["verify"] = "Check that something is true.",
-        ["account"] = "Your record with a bank, shop or council.",
     };
 }

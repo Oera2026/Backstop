@@ -19,6 +19,30 @@ public sealed class MailStore
 
     public event Action? Changed;
 
+    public MailStore() => HoldUnfinished();
+
+    /// <summary>
+    /// Anything still Received, Scanning or Failed is not finished and nobody can see it, so it becomes Held for a helper.
+    /// Runs when the store is created, and must run again after any load from storage.
+    /// Do not call it while a check is running: that message is Scanning on purpose.
+    /// </summary>
+    public int HoldUnfinished()
+    {
+        int n;
+        lock (_gate)
+        {
+            var open = _all.Where(m => m.State is MessageState.Received or MessageState.Scanning or MessageState.Failed).ToList();
+            foreach (var m in open)
+            {
+                m.State = MessageState.Held;
+                if (string.IsNullOrEmpty(m.Summary)) m.Summary = "The automatic check did not finish. Please look at this message with care.";
+            }
+            n = open.Count;
+        }
+        if (n > 0) Changed?.Invoke();
+        return n;
+    }
+
     public List<MailMessage> Query(Func<MailMessage, bool> where)
     {
         lock (_gate) return _all.Where(where).OrderByDescending(m => m.ReceivedAt).ToList();
@@ -224,6 +248,7 @@ public sealed class MailStore
             _notices = [];
             _heldOutgoing = [];
         }
+        HoldUnfinished();
         Changed?.Invoke();
     }
 }

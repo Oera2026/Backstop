@@ -18,9 +18,28 @@
             {
                 <option value="@s.Id">@s.Title</option>
             }
+            <option value="@Own">Write my own email</option>
         </select>
-        <p class="hint">@Current.Description</p>
+        @if (_scenarioId != Own)
+        {
+            <p class="hint">@Current!.Description</p>
+        }
     </div>
+    @if (_scenarioId == Own)
+    {
+        <div class="field">
+            <label for="own-from">From (made-up address, like sam@example.org)</label>
+            <input id="own-from" type="email" @bind="_ownFrom" disabled="@_running" autocomplete="off" />
+        </div>
+        <div class="field">
+            <label for="own-subject">Subject</label>
+            <input id="own-subject" type="text" @bind="_ownSubject" maxlength="200" disabled="@_running" autocomplete="off" />
+        </div>
+        <div class="field">
+            <label for="own-body">Message</label>
+            <textarea id="own-body" rows="5" @bind="_ownBody" maxlength="5000" disabled="@_running"></textarea>
+        </div>
+    }
     <div class="field field--check">
         <input id="fail" type="checkbox" @bind="_fail" disabled="@_running" />
         <label for="fail">Make the checker crash (shows that errors are held, never let through)</label>
@@ -96,7 +115,10 @@
     private MailMessage? _result;
     private TierResult[] _tiers = Fresh();
 
-    private Scenario Current => Mail.Scenarios.First(s => s.Id == _scenarioId);
+    private const string Own = "own";
+    private string _ownFrom = "sam@example.org", _ownSubject = "", _ownBody = "";
+
+    private Scenario? Current => Mail.Scenarios.FirstOrDefault(s => s.Id == _scenarioId);
 
     private static TierResult[] Fresh() =>
         [.. MockData.TierNames.Select(n => new TierResult(n, 0, TierStatus.Pending, "Waiting"))];
@@ -110,16 +132,20 @@
 
     private async Task Run()
     {
+        if (_scenarioId == Own && string.IsNullOrWhiteSpace(_ownBody)) return;
         _running = true;
         _result = null;
         _tiers = Fresh();
         try
         {
-            _result = await Mail.ReceiveAsync(_scenarioId, _fail, (i, r) =>
+            void OnTier(int i, TierResult r)
             {
                 _tiers[i] = r;
                 _ = InvokeAsync(StateHasChanged);
-            });
+            }
+            _result = _scenarioId == Own
+                ? await Mail.ReceiveAsync(new InboundMail(_ownFrom.Trim(), _ownFrom.Trim(), _ownSubject.Trim(), _ownBody), _fail, OnTier)
+                : await Mail.ReceiveAsync(_scenarioId, _fail, OnTier);
         }
         finally
         {

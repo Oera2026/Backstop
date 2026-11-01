@@ -16,14 +16,16 @@ public sealed partial class MockBackstopApi
     {
         // Lines first (a chat has one message per line), then sentences.
         var sentences = text.Split('\n').SelectMany(line => Sentence().Split(line)).Select(s => s.Trim()).Where(s => s.Length > 1).ToList();
-        var deadline = DeadlinePattern().Match(text) is { Success: true } d ? $"By {d.Groups[1].Value}" : null;
-        var risky = MockRiskRules.VerdictFor(MockRiskRules.Scan(text).Score) == Verdict.DontReply;
+        var deadline = DeadlinePattern().Match(text) is { Success: true } d
+            ? $"{char.ToUpperInvariant(d.Groups[1].Value[0])}{d.Groups[1].Value[1..].ToLowerInvariant()} {d.Groups[2].Value}" : null;
+        // Any warning sign at all (not only the strongest) means "check it first", the same test Ask uses.
+        var risky = MockRiskRules.VerdictFor(MockRiskRules.Scan(text).Score) != Verdict.LooksSafe;
         var actions = risky
             ? ["Check it is safe before you do anything"]
             : sentences.Where(s => ActionPattern().IsMatch(s)).Select(Shorten).Take(4).ToList();
 
         var overview = risky
-            ? "This message asks you to do something, and it has some warning signs. Check it is safe before you do anything."
+            ? "This message has some warning signs. Check it is safe before you do anything."
             : actions.Count > 0
                 ? $"This is a message for you. It asks you to: {LowerFirst(actions[0]).TrimEnd('.')}."
                 : "This is a message for you. You do not need to do anything.";
@@ -81,7 +83,8 @@ public sealed partial class MockBackstopApi
 
     [GeneratedRegex(@"(?<=[.!?])\s+")]
     private static partial Regex Sentence();
-    [GeneratedRegex(@"\bby ((?:\d{1,2}(?:st|nd|rd|th)? (?:January|February|March|April|May|June|July|August|September|October|November|December)(?: \d{4})?)|(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)|today|tomorrow)\b", RegexOptions.IgnoreCase)]
+    // "by 14 November", "before Friday", "until 5pm", "by tomorrow", "by 5 o'clock".
+    [GeneratedRegex(@"\b(by|before|until|no later than) ((?:\d{1,2}(?:st|nd|rd|th)? (?:January|February|March|April|May|June|July|August|September|October|November|December)(?: \d{4})?)|(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)|today|tomorrow|tonight|(?:\d{1,2}(?:[:.]\d{2})? ?(?:am|pm))|(?:\d{1,2} o'clock))(?!\w)", RegexOptions.IgnoreCase)]
     private static partial Regex DeadlinePattern();
     [GeneratedRegex(@"\b(please|you need to|you must|can you|could you|send|call|reply|pay|buy|fill in|book|return)\b", RegexOptions.IgnoreCase)]
     private static partial Regex ActionPattern();

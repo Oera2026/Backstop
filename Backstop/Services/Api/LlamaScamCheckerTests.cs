@@ -2,6 +2,7 @@ using System.Net;
 using Backstop.Models;
 using Backstop.Services;
 using Backstop.Services.Api;
+using Backstop.Services.Api.Fixtures;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -56,6 +57,43 @@ public class LlamaScamCheckerTests
             Assert(!res.Success, "Expected Success == false when key is missing");
             Assert(res.Verdict == Verdict.BeCareful, "Expected Verdict == BeCareful when key is missing");
             Console.WriteLine("PASS: Missing API key fails closed.");
+        }
+
+        // 1b. Every failure carries plain words plus technical detail, and never leaks the key or the message.
+        {
+            var (noKey, _) = CreateChecker(_ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)), new() { ["META_AI_KEY"] = "" });
+            var f1 = (await noKey.CheckScamAsync("SECRET-TEXT")).Failure;
+            Assert(f1 is not null && f1.Technical.Contains("NO_API_KEY") && !f1.Message.Contains("META_AI_KEY"), "No key: plain message, technical code");
+
+            var (busy, _) = CreateChecker(_ => Task.FromResult(new HttpResponseMessage((HttpStatusCode)429)));
+            var f2 = (await busy.CheckScamAsync("SECRET-TEXT")).Failure;
+            Assert(f2 is not null && f2.Technical.Contains("META_429") && f2.Message.Contains("busy"), "429 is explained plainly");
+            Assert(!f2!.Technical.Contains("SECRET-TEXT") && !f2.Technical.Contains("test-fake-key"), "Technical detail never holds the message or the key");
+
+            var (denied, _) = CreateChecker(_ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.Unauthorized)));
+            var f3 = (await denied.CheckScamAsync("Hello")).Failure;
+            Assert(f3 is not null && f3.Technical.Contains("META_401"), "401 is named in the technical detail");
+            Console.WriteLine("PASS: Failures give plain words and technical detail, with no secrets.");
+        }
+
+        // 1c. The call cap stops calls before Meta is contacted, and the window slides.
+        {
+            var sent = 0;
+            var client = new HttpClient(new DelegatingHandlerStub(_ => { sent++; return Task.FromResult(new HttpResponseMessage(HttpStatusCode.InternalServerError)); }));
+            var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["META_AI_KEY"] = "test-fake-key" }).Build();
+            var checker = new MetaAiScamChecker(client, config, NullLogger<MetaAiScamChecker>.Instance, new MetaCallGuard(1));
+            await checker.CheckScamAsync("one");
+            var second = await checker.CheckScamAsync("two");
+            Assert(sent == 1, "Second call must not reach Meta");
+            Assert(!second.Success && second.Verdict == Verdict.BeCareful && second.Failure!.Technical.Contains("LOCAL_RATE_LIMIT"), "Over the cap fails closed with a clear reason");
+
+            var clock = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+            var guard = new MetaCallGuard(2, () => clock);
+            Assert(guard.TryEnter(out _, out _) && guard.TryEnter(out _, out _), "Two calls fit");
+            Assert(!guard.TryEnter(out var wait, out _) && wait is > 0 and <= 60, "Third is refused with a wait time");
+            clock = clock.AddSeconds(61);
+            Assert(guard.TryEnter(out _, out _), "Window slides after a minute");
+            Console.WriteLine("PASS: Call cap fails closed and the window slides.");
         }
 
         // 2. HTTP Error / 500 -> Fail closed
@@ -429,6 +467,108 @@ public class LlamaScamCheckerTests
             await wantsHuman.AskAsync([], "should I stop my tablets");
             Assert((await wantsHuman.GetReviewQueueAsync()).Any(i => i.Source == ReviewSource.Check), "AI asking for a human puts it in the queue");
             Console.WriteLine("PASS: Ask Me always tells the helper when someone may need help.");
+        }
+
+        // 11. Mail pipeline: the outcome comes from the email's own text, with an AI that says "safe" every time.
+        {
+            var safeAi = new StubMeta(new MetaScamAnalysis(Verdict.LooksSafe, "Fine.", [], true));
+            var mail = new MockMailService(new MailStore(), safeAi);
+            foreach (var s in MockData.Scenarios)
+            {
+                var m = await mail.ReceiveAsync(s.Id, false);
+                Assert(m is not null && m.State == s.Expected, $"{s.Id}: expected {s.Expected} but got {m?.State}");
+                Assert(m!.Tiers.Count == 4, $"{s.Id}: all four checks ran");
+            }
+            // An email nobody wrote a scenario for: decided by its words alone.
+            var fresh = await mail.ReceiveAsync(new InboundMail("Sam Lee", "sam.lee@example.org", "Quick favour",
+                "Hi, please buy a gift card and send me the codes. Keep this between us."), false);
+            Assert(fresh!.State == MessageState.Held && fresh.Flags.Count >= 2, "A new scam email is held with its own flags");
+            var plain = await mail.ReceiveAsync(new InboundMail("Sam Lee", "sam.lee@example.org", "Tea", "See you at the cafe at three."), false);
+            Assert(plain!.State == MessageState.Cleared, "A new ordinary email is cleared");
+            // The AI must answer for anything to clear, and it can only make the result stricter.
+            var down = new MockMailService(new MailStore(), new StubMeta(new MetaScamAnalysis(Verdict.LooksSafe, "", [], false, "down")));
+            Assert((await down.ReceiveAsync("family-photos", false))!.State == MessageState.Held, "No AI answer: held, never cleared");
+            Assert((await new MockMailService(new MailStore(), null).ReceiveAsync("family-photos", false))!.State == MessageState.Held, "No checker at all: held");
+            Assert((await mail.ReceiveAsync("family-photos", true))!.State == MessageState.Held, "Simulated crash: held");
+            var worried = new MockMailService(new MailStore(), new StubMeta(new MetaScamAnalysis(Verdict.BeCareful, "Odd.", [], true)));
+            Assert((await worried.ReceiveAsync("family-photos", false))!.State == MessageState.Held, "AI worried: held");
+            Console.WriteLine("PASS: Mail pipeline decides from the message, fails closed.");
+
+            // A price plus a shortened link is held for a person, never blocked unseen.
+            var raffle = await mail.ReceiveAsync(new InboundMail("Sam Lee", "sam.lee@example.org", "Raffle", "Raffle ticket £5, https://bit.ly/xyz"), false);
+            Assert(raffle!.State == MessageState.Held, "A price and a short link is held, not blocked");
+            // Everyday words do not hold ordinary mail.
+            var dinner = await mail.ReceiveAsync(new InboundMail("Sam Lee", "sam.lee@example.org", "Dinner", "Dinner today? The code of conduct is on the door."), false);
+            Assert(dinner!.State == MessageState.Cleared, "'today' and 'the code' alone do not hold a message");
+            // A real push for money still scores high.
+            Assert(MockRiskRules.VerdictFor(MockRiskRules.Scan("Please send me £500 and tell me the code").Score) == Verdict.DontReply, "Asking for money is still strong");
+            // A failed check keeps what the local checks found.
+            var lost = await mail.ReceiveAsync(new InboundMail("Sam Lee", "sam.lee@example.org", "Help", "I am scared of him. See https://bit.ly/xyz"), true);
+            Assert(lost!.State == MessageState.Held && lost.Links.Count == 1 && lost.Flags.Any(f => f.Title.Contains("link")) && lost.Tiers[2].Status != TierStatus.Skipped,
+                "A failed check still shows the helper the links and flags");
+            // A sender whose name shows a different address is held even when the AI says safe.
+            var spoof = await mail.ReceiveAsync(new InboundMail("billing@example.net", "alerts@example.org", "Hello", "See you soon."), false);
+            Assert(spoof!.State == MessageState.Held, "Name and address that disagree: held");
+            // Unfinished messages become Held, never stay invisible.
+            var store = new MailStore();
+            store.Add(new MailMessage { Id = "stuck", FromName = "A", FromAddress = "a@example.org", Subject = "s", Body = "b", State = MessageState.Scanning });
+            Assert(store.HoldUnfinished() == 1 && store.Find("stuck")!.State == MessageState.Held, "Stuck messages are held");
+            Console.WriteLine("PASS: Mail scanning false holds, evidence on failure, sender and stuck states.");
+        }
+
+        // 12. Explain: the hand-written letter is only for a clean letter, and warnings are never hidden.
+        {
+            var api = new MockBackstopApi(new MockGuardianService(new MailStore()), new MockApiOptions(), null, null);
+            Task<Explanation> Explain(string text, ExplainFormat f = ExplainFormat.Summary) =>
+                api.ExplainContentAsync(new ExplainRequest(text, null, null, ReadingLevel.Simple, f));
+
+            var real = await Explain(ExplainFixtures.CouncilLetter);
+            Assert(real.Title == ExplainFixtures.Title, "The clean letter uses the written explanation");
+            Assert(real.Actions[^1].Contains(DateTime.Today.AddDays(14).ToString("d MMMM")), "Dates in the letter count from today");
+            Assert(!ExplainFixtures.CouncilLetter.Contains("Okafor"), "The letter is for the household's own user");
+
+            var fake = await Explain(ExplainFixtures.CouncilLetter + "\nPlease buy gift cards and send me the codes. Keep this between us.");
+            Assert(fake.Title != ExplainFixtures.Title, "A look-alike letter does not get the written explanation");
+            var ask = await api.AskAboutAsync(fake.Id, "is this a scam?");
+            Assert(!ask.Answer.Contains("normal council letter"), "No false reassurance for a look-alike");
+
+            var linked = await Explain(ExplainFixtures.CouncilLetter + "\nReply at http://bit.ly/x1");
+            Assert(linked.Title != ExplainFixtures.Title && !linked.OriginalText.Contains("bit.ly"), "A link is taken out and the letter is not trusted");
+
+            var distress = await Explain("Hello. He hurts me and I am scared of him.", ExplainFormat.Questions);
+            Assert(distress.Chunks.First(c => c.Heading == "Is it safe?").Body.Contains("warning signs") && !distress.Chunks.First(c => c.Heading == "Is it safe?").Body.StartsWith("We did not"),
+                "Mid-risk text is not called safe");
+            Assert(!distress.Overview.Contains("do not need to do anything"), "Mid-risk text does not say nothing is needed");
+
+            var fileFailed = false;
+            try { await api.ExplainContentAsync(new ExplainRequest(null, [0xFF, 0xD8, 0xFF, 0xE0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "a.jpg", ReadingLevel.Simple, ExplainFormat.Summary)); }
+            catch (BackstopApiException) { fileFailed = true; }
+            Assert(fileFailed, "A photo is not read as a made-up letter");
+
+            var fine = await Explain("I am fine. Thanks for the account of your trip.");
+            Assert(fine.HardWords.Count == 0, "Everyday words get no hard-word hint");
+            Assert((await Explain("Please call me before Friday")).Deadline == "Before Friday", "'before Friday' is a date");
+            Assert((await Explain("Please ring by 5pm")).Deadline == "By 5pm", "'by 5pm' is a date");
+            Console.WriteLine("PASS: Explain checks the words first and never hides warning signs.");
+        }
+
+        // 13. Links: bare addresses, www. and short links are found, judged by address and made harmless.
+        {
+            Assert(LinkFinder.Inspect("Tap bit.ly/abc now").Deceptive, "A bare short link is found");
+            Assert(LinkFinder.Inspect("Go to www.bit.ly/abc").Deceptive, "www. does not hide a short link");
+            Assert(LinkFinder.Inspect("Book at parcel-times.example.net/book").Links.Count == 1, "A bare address with a path is found");
+            Assert(LinkFinder.Inspect("Write to sam@example.org or see https://example.org/about").Links.Count == 1, "An email address is not a link");
+            Assert(LinkFinder.Inspect("See https://example.net/reclaim and https://example.net/downloads").Problems == 1, "Risky words match whole words only");
+            Assert(Defang.ForHelper("www.evil.example.net/a") == "www[.]evil[.]example[.]net/a", "www. links are defanged for the helper");
+            Assert(Defang.ForUser("Visit evil.example.net/pay or www.evil.example.net") == "Visit [link removed] or [link removed]", "Links are removed for the user");
+            Assert(Defang.ForHelper("priya@example.com") == "priya@example.com", "An email address is left alone");
+            var many = LinkFinder.Inspect(string.Join(" ", Enumerable.Range(0, 30).Select(i => $"https://site{i}.example.net/")));
+            Assert(many.Links.Count == LinkFinder.MaxLinks + 1 && many.Problems > 0, "Link count is capped");
+            Assert(LinkFinder.Inspect("https://example.net/" + new string('a', 400)).Links.All(l => l.DefangedUrl.Length < 260), "Link length is capped");
+            var bare = await new MockBackstopApi(new MockGuardianService(new MailStore()), new MockApiOptions(), null, null)
+                .CheckContentAsync(new CheckRequest(CheckKind.Message, "Your prize is waiting: bit.ly/win"));
+            Assert(bare.Verdict != Verdict.LooksSafe, "Check judges the address in a short link");
+            Console.WriteLine("PASS: Links are found, judged by address and defanged.");
         }
 
         Console.WriteLine("\nALL TESTS PASSED SUCCESSFULLY.");

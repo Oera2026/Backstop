@@ -48,7 +48,6 @@
         _ => "Skipped",
     };
 
-    // Latencies are fake. MOCK: real values come from the real pipeline.
     private static string Latency(TierResult t) =>
         t.Status is TierStatus.Pending or TierStatus.Running or TierStatus.Skipped ? "" : $"{t.LatencyMs} ms";
 }

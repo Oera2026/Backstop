@@ -61,14 +61,26 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
 
         // Simple local checks as the floor:
         var floor = MockRiskRules.Scan(display);
-        var floorVerdict = MockRiskRules.VerdictFor(floor.Score);
+        // The text shown has its links taken out, so the addresses are judged from the text as written.
+        var links = LinkFinder.Inspect(text);
+        var floorScore = floor.Score + (links.Problems > 0 ? 1 : 0);
+        var floorVerdict = MockRiskRules.VerdictFor(floorScore);
         var combinedFlags = new List<RiskFlag>(floor.Flags);
+        var floorBecause = floor.TopBecause;
+        if (links.Problems > 0)
+        {
+            combinedFlags.Add(links.Deceptive
+                ? new RiskFlag("link-hidden", "link", "The link hides where it goes", "The address is disguised or shortened, so you cannot tell which website it leads to.")
+                : new RiskFlag("link-odd", "link", "The link looks unusual", "The address has words or a form that real senders rarely use."));
+            if (floorBecause is null || floorBecause == MockRiskRules.BecauseFor("link"))
+                floorBecause = links.Deceptive ? "its link hides where it goes" : "its link looks unusual";
+        }
 
         // If checking a picture, send image bytes to the multimodal AI endpoint;
         // otherwise, send text only to save vision processing costs.
         var (finalVerdict, finalReason, reviewStatus, failure) = await ApplyAiAsync(
             isPicture ? c => c.CheckScamAsync(null, request.Picture, imgType, ct) : c => c.CheckScamAsync(display, null, null, ct),
-            aiRequired: isPicture, floorVerdict, MockRiskRules.ReasonFor(floorVerdict, floor.TopBecause), combinedFlags);
+            aiRequired: isPicture, floorVerdict, MockRiskRules.ReasonFor(floorVerdict, floorBecause), combinedFlags);
 
         var flags = combinedFlags.Take(4).ToList();
         var result = new CheckResult(NewId("chk"), request.Kind, finalVerdict, finalReason, flags,
@@ -274,13 +286,16 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         {
             if (ImageSniff.ImageType(request.File) is null && !ImageSniff.IsPdf(request.File))
                 throw new BackstopApiException("We could not read that file. Please choose a photo or a PDF of the letter.");
-            text = ExplainFixtures.CouncilLetter; // MOCK: a real back end reads the words in the photo or PDF
+            // MOCK: nothing here can read the words in a photo or PDF, and a made-up answer would be wrong for any real letter.
+            throw new BackstopApiException("We cannot read photos or PDFs yet. Please type or paste the words from the letter.");
         }
         if (string.IsNullOrWhiteSpace(text)) throw new BackstopApiException("Please paste the words first.");
 
-        var explanation = ExplainFixtures.IsCouncilLetter(text)
-            ? ExplainCouncilLetter(text.Trim(), request.Level, request.Format)
-            : ExplainAnything(Defang.ForUser(text.Trim()), request.Level, request.Format);
+        // Links come out first, then the words are checked. The hand-written letter is only used when they are clean.
+        var safeText = Defang.ForUser(text.Trim());
+        var explanation = ExplainFixtures.UsesFixture(safeText)
+            ? ExplainCouncilLetter(safeText, request.Level, request.Format)
+            : ExplainAnything(safeText, request.Level, request.Format);
         lock (_gate) _explanations[explanation.Id] = explanation;
         return explanation;
     }
@@ -301,7 +316,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
 
         var q = question.ToLowerInvariant();
         string answer;
-        if (ExplainFixtures.IsCouncilLetter(e.OriginalText))
+        if (ExplainFixtures.UsesFixture(e.OriginalText))
         {
             answer = ExplainFixtures.Answers.FirstOrDefault(a => a.Words.Any(w => Regex.IsMatch(q, $@"\b{w}\b"))).Answer
                 ?? $"I am not sure about that. You could ask {Helper} to look at the letter with you.";
@@ -551,6 +566,9 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
 
     private async Task Wait(int ms, CancellationToken ct)
     {
+#if !DEBUG
+        ms = Math.Min(ms, 150); // the pauses imitate a slow back end. Release keeps them short.
+#endif
         await Task.Delay(ms, ct);
         if (options.FailRequests) throw new BackstopApiException("We could not reach Backstop just now. Please try again in a moment.");
     }

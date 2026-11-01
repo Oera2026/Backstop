@@ -15,20 +15,25 @@ public static partial class MockRiskRules
     [
         new(new("money", "gift", "Asks for money or gift cards", "People you know rarely ask for money or gift cards by message."),
             Money(), 3, "it asks for money or gift cards"),
+        // A price on its own (a raffle ticket, a bill) is only worth a note. Asking for an amount is Money above.
+        new(new("amount", "gift", "Mentions an amount of money", "Check the amount is what you expect before you act on it."),
+            Amount(), 1, "it mentions an amount of money"),
         new(new("private", "user", "Asks for private details", "Bank details, PINs and passwords are best kept to yourself."),
-            Private(), 3, "it asks for private details"),
+            SensitivePatterns.Private, 3, "it asks for private details"),
         new(new("secret", "eye-off", "Asks you to keep this secret", "Being asked not to tell your family is a warning sign."),
             Secret(), 2, "it asks you to keep it a secret"),
         new(new("new-number", "phone", "Says they have a new number", "People pretending to be family often say they have a new phone."),
             NewNumber(), 2, "it says it is from a new number"),
         new(new("other-app", "chat", "Asks you to move to another app", "Moving the chat somewhere else means nobody else can see it."),
             OtherApp(), 2, "it asks you to move to another app"),
+        new(new("remote", "monitor", "Asks to control the computer", "Someone asking to take control of your computer, or to install software so they can, is a common scam."),
+            Remote(), 3, "it asks to control your computer"),
         new(new("hurry", "clock", "Pushes you to act fast", "Being rushed makes it hard to think. It is fine to wait."),
             Hurry(), 1, "it pushes you to act fast"),
         new(new("feelings", "heart", "Very loving, very quickly", "Strong feelings from someone you have not met can be a trick."),
             Feelings(), 1, "it is very loving very quickly"),
         new(new("link", "link", "Has a link in it", "Links can lead to fake websites. We have taken the link out."),
-            Link(), 1, "it has a link in it"),
+            LinkFinder.PatternOrRemoved, 1, "it has a link in it"),
         // Someone may be in danger or distress. Always goes to a human, whatever else the checks say.
         new(new("at-risk", "heart", "Your helper is being told", "Someone you trust will look at this and may check in with you."),
             AtRisk(), 2, "it sounds like someone may need help"),
@@ -107,17 +112,20 @@ public static partial class MockRiskRules
         return kept;
     }
 
-    [GeneratedRegex(@"\bgift ?cards?\b|\bvouchers?\b|\bsend (?:me )?(?:the )?(?:money|codes?)\b|\bthe codes?\b|£\s?\d[\d,]*|\bbank transfer\b|\bpay (?:you|me) back\b|\blend me\b", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"\bgift ?cards?\b|\bvouchers?\b|\bsend (?:me )?(?:the )?(?:money|codes?)\b|\b(?:read|tell|give|text) (?:me |us )?the (?:\d+[- ]?digit )?codes?\b|\bcodes? on the back\b|\b(?:send|transfer|pay|need|lend|owe)\b[^.\n]{0,30}£\s?\d|\bbank transfer\b|\bpay (?:you|me) back\b|\blend me\b", RegexOptions.IgnoreCase)]
     private static partial Regex Money();
-    [GeneratedRegex(@"\b(?:bank|card) details\b|\bpin\b(?= ?(?:number|code|is|:))|\bpassword\b|\bsort code\b|\baccount number\b|\bsecurity code\b|\bone[- ]time code\b", RegexOptions.IgnoreCase)]
-    private static partial Regex Private();
+    [GeneratedRegex(@"£\s?\d[\d,]*")]
+    private static partial Regex Amount();
     [GeneratedRegex(@"\bkeep (?:this|it) (?:between us|secret|to yourself|quiet)\b|\bdon'?t tell\b|\bdo not tell\b|\bbetween you and me\b|\bour (?:little )?secret\b", RegexOptions.IgnoreCase)]
     private static partial Regex Secret();
     [GeneratedRegex(@"\b(?:my|this is my) new (?:number|phone)\b|\bnew number\b|\bdropped my phone\b|\blost my phone\b", RegexOptions.IgnoreCase)]
     private static partial Regex NewNumber();
     [GeneratedRegex(@"\b(?:the other|another|a different) app\b|\b(?:chat|talk|message me) (?:on|in) (?:the )?\w+ (?:instead|app)\b|\bmore private\b|\bwhatsapp\b|\btelegram\b", RegexOptions.IgnoreCase)]
     private static partial Regex OtherApp();
-    [GeneratedRegex(@"\burgent(?:ly)?\b|\bright now\b|\bimmediately\b|\btoday\b|\bas soon as possible\b|\basap\b|\bhurry\b|\bstraight away\b|\bwithin \d+ hours\b", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"\banydesk\b|\bteamviewer\b|\bultraviewer\b|\bremote (?:access|control|support|desktop)\b|\byour computer has (?:a )?(?:virus|been (?:hacked|infected))\b|\bread (?:us|me) (?:the|your) \d* ?digit code\b", RegexOptions.IgnoreCase)]
+    private static partial Regex Remote();
+    // "today" and "immediately" are everyday words ("Dinner today?"), so they only count when they press for an action.
+    [GeneratedRegex(@"\burgent(?:ly)?\b|\bright now\b|\bas soon as possible\b|\basap\b|\bhurry\b|\bstraight away\b|\bwithin \d+ hours\b|\b(?:by|before) (?:the end of )?today\b|\b(?:today|immediately),? or\b|\b(?:book|reply|respond|pay|call|act|send|click|confirm|buy)\b[^.\n]{0,40}\b(?:today|immediately)\b", RegexOptions.IgnoreCase)]
     private static partial Regex Hurry();
     [GeneratedRegex(@"\bmy darling\b|\bi love you\b|\bsoul ?mate\b|\bvery special to me\b|\bknown you for years\b|\bmeant to be\b", RegexOptions.IgnoreCase)]
     private static partial Regex Feelings();
@@ -125,6 +133,4 @@ public static partial class MockRiskRules
     private static partial Regex AtRisk();
     [GeneratedRegex(@"(?!)")]
     private static partial Regex Never();
-    [GeneratedRegex(@"\[link removed\]|\bhttps?://\S+|\bwww\.\S+", RegexOptions.IgnoreCase)]
-    private static partial Regex Link();
 }

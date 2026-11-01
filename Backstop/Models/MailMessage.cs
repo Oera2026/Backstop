@@ -13,10 +13,10 @@ public enum TierStatus { Pending, Running, Passed, Flagged, Skipped, Failed }
 /// <summary>One thing that looked wrong, written for the helper in plain language.</summary>
 public sealed record Flag(string Icon, string Title, string Explanation);
 
-/// <summary>Result of the (mock) link check. All URLs are already defanged for display.</summary>
+/// <summary>Result of the link check (by address only; the link is never opened). All URLs are already defanged for display.</summary>
 public sealed record LinkCheck(string DefangedUrl, IReadOnlyList<string> Hops, string? TrackerWarning, string Verdict);
 
-/// <summary>One stage of the checking pipeline with a fake latency.</summary>
+/// <summary>One stage of the checking pipeline and how long it took.</summary>
 public sealed record TierResult(string Name, int LatencyMs, TierStatus Status, string Note);
 
 public sealed class MailMessage
@@ -42,6 +42,8 @@ public sealed class MailMessage
 
     /// <summary>"Approved" or "Blocked" when a person decided; null when the system decided.</summary>
     public string? HelperDecision { get; set; }
+
+    public InboundMail AsInbound() => new(FromName, FromAddress, Subject, Body);
 
     public string Preview
     {
