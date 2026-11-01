@@ -61,6 +61,10 @@ Set these as environment variables (locally in the untracked `.env`, in producti
 | `META_AI_KEY` | Meta Dev API key. |
 | `META_AI_ENDPOINT_URL`, `META_AI_MODEL`, `META_AI_TIMEOUT_SECONDS` | Meta endpoint (must be on `https://api.meta.ai`), model and timeout. |
 | `MetaAI__MaxCallsPerMinute` | Cap on calls to Meta per minute. Default 40. |
+| `META_AI_MAX_CALLS_PER_DAY` | Cap on calls to Meta per UTC day for the whole app. Default 1500. A restart resets the count. |
+| `META_AI_MAX_CALLS_PER_IP_PER_MINUTE` | Cap on calls to Meta per visitor per minute. Default 15. |
+| `CLIENT_IP_HEADER` | Optional. A header the host sets to the visitor address (for example `CF-Connecting-IP`). Empty uses `X-Forwarded-For`. |
+| `DEMO_RESET_SECRET` | The code needed for "Reset demo" on `/demo`. With no value, reset is switched off. |
 | `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` | Supabase project URL and service key (server only). Not used yet. |
 
 ## Docker deployment

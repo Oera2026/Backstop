@@ -41,6 +41,19 @@ internal static class MetaFailures
             $"Calls in last 60s: {used} of {limit}", $"Retry after: {retryAfterSeconds}s",
             "Setting: MetaAI:MaxCallsPerMinute (env MetaAI__MaxCallsPerMinute)."));
 
+    /// <summary>A refusal from this app's own caps. Meta was not called.</summary>
+    public static FailureInfo Limited(MetaCallGuard.Denial denial, int retryAfterSeconds, int used, MetaCallGuard guard, MetaAiOptions? o) => denial switch
+    {
+        MetaCallGuard.Denial.PerVisitor => new("You are going a little fast. " + Wait(retryAfterSeconds),
+            Detail("VISITOR_RATE_LIMIT", "This visitor's call limit was reached. Meta was not called.", o,
+                $"Calls in last 60s: {used} of {guard.VisitorLimit}", $"Retry after: {retryAfterSeconds}s",
+                "Setting: META_AI_MAX_CALLS_PER_IP_PER_MINUTE.")),
+        MetaCallGuard.Denial.PerDay => new("The checker has reached its limit for today. Please try again tomorrow.",
+            Detail("DAILY_LIMIT", "This app's daily call limit was reached. Meta was not called.", o,
+                $"Calls today: {used} of {guard.DayLimit}", "Setting: META_AI_MAX_CALLS_PER_DAY.")),
+        _ => Busy(retryAfterSeconds, used, guard.Limit, o),
+    };
+
     public static FailureInfo Status(HttpStatusCode code, int? retryAfterSeconds, MetaAiOptions? o)
     {
         var n = (int)code;

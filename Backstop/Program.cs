@@ -94,6 +94,11 @@ builder.Services.AddSingleton<IGuardianService, MockGuardianService>();
 // The Check, Show me, Explain, Remember and trusted-person modes.
 builder.Services.AddSingleton<MockApiOptions>();
 builder.Services.AddSingleton<IBackstopApi, MockBackstopApi>();
+builder.Services.AddSingleton<IDemoControl, DemoControl>();
+
+// The visitor's address, taken when a circuit opens, for the per-visitor cap on Meta calls.
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<Microsoft.AspNetCore.Components.Server.Circuits.CircuitHandler, ClientIpCircuitHandler>();
 
 if (args.Contains("--test-llama"))
 {

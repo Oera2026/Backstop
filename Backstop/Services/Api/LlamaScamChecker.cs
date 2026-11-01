@@ -116,10 +116,10 @@ public sealed class MetaAiScamChecker : ILlamaScamChecker, IMetaScamChecker
             return FailClosed("Image type is not allowed", new("We can only check photos and screenshots. Please choose a different file.", "Code: IMAGE_TYPE_NOT_ALLOWED\nWhat: Allowed types are png, jpeg, gif and webp."));
 
         // The app's own cap on calls to Meta. Over it, nothing is sent and the item is held.
-        if (_guard is not null && !_guard.TryEnter(out var waitSeconds, out var used))
+        if (_guard is not null && !_guard.TryEnter(ClientIdentity.Current, out var waitSeconds, out var used, out var denial))
         {
-            _logger.LogWarning("Meta call limit reached ({Used} of {Limit} in the last minute). Failing closed.", used, _guard.Limit);
-            return FailClosed("Local call limit reached", MetaFailures.Busy(waitSeconds, used, _guard.Limit, _options));
+            _logger.LogWarning("Meta call limit reached ({Reason}, {Used} used). Failing closed.", denial, used);
+            return FailClosed("Local call limit reached", MetaFailures.Limited(denial, waitSeconds, used, _guard, _options));
         }
 
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);

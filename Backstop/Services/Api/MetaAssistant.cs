@@ -69,10 +69,10 @@ public sealed class MetaAssistant : IAssistant
             _logger.LogError("Meta AI endpoint is not https://{Host}. Nothing was sent.", MetaAiScamChecker.AllowedHost);
             return Fail("Endpoint is not the approved Meta host", MetaFailures.BadEndpoint(_options));
         }
-        if (_guard is not null && !_guard.TryEnter(out var waitSeconds, out var used))
+        if (_guard is not null && !_guard.TryEnter(ClientIdentity.Current, out var waitSeconds, out var used, out var denial))
         {
-            _logger.LogWarning("Meta call limit reached ({Used} of {Limit} in the last minute). Ask Me cannot answer.", used, _guard.Limit);
-            return Fail("Local call limit reached", MetaFailures.Busy(waitSeconds, used, _guard.Limit, _options));
+            _logger.LogWarning("Meta call limit reached ({Reason}, {Used} used). Ask Me cannot answer.", denial, used);
+            return Fail("Local call limit reached", MetaFailures.Limited(denial, waitSeconds, used, _guard, _options));
         }
 
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);

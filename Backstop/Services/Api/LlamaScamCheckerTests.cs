@@ -549,6 +549,59 @@ public class LlamaScamCheckerTests
             Console.WriteLine("PASS: Explain uses the AI, keeps a local floor, and fails with a plain error.");
         }
 
+        // 12b. Per-visitor and daily caps, the visitor address, and the protected demo reset.
+        {
+            var clock = new DateTime(2026, 1, 1, 12, 0, 0, DateTimeKind.Utc);
+            var g = new MetaCallGuard(100, () => clock, visitorLimit: 2, dayLimit: 6);
+            Assert(g.TryEnter("a", out _, out _, out _) && g.TryEnter("a", out _, out _, out _), "A visitor gets their share");
+            Assert(!g.TryEnter("a", out var w, out _, out var d) && d == MetaCallGuard.Denial.PerVisitor && w > 0, "A third call from one visitor is refused");
+            Assert(g.TryEnter("b", out _, out _, out _), "Another visitor is not affected");
+            Assert(g.TryEnter(null, out _, out _, out _), "An unknown address is only held to the app-wide caps");
+            Assert(g.TryEnter("c", out _, out _, out _) && g.TryEnter("c", out _, out _, out _), "Calls fill the day");
+            Assert(!g.TryEnter("e", out var dw, out _, out d) && d == MetaCallGuard.Denial.PerDay && dw > 0 && dw <= 12 * 3600, "The daily cap refuses everyone, with the wait until tomorrow");
+            clock = clock.AddHours(13);
+            Assert(g.TryEnter("a", out _, out _, out _), "The day cap and the visitor window reset");
+            var refused = new MetaCallGuard(100, () => clock, visitorLimit: 1, dayLimit: 100);
+            refused.TryEnter("x", out _, out _, out _);
+            refused.TryEnter("x", out _, out _, out _);
+            Assert(refused.TryEnter("y", out _, out var used, out _) && used == 2, "A refused call is not counted");
+
+            var plain = MetaFailures.Limited(MetaCallGuard.Denial.PerVisitor, 20, 15, g, null);
+            Assert(plain.Message.Contains("20") && plain.Technical.Contains("VISITOR_RATE_LIMIT"), "Visitor refusal says how long to wait");
+            Assert(MetaFailures.Limited(MetaCallGuard.Denial.PerDay, 10, 6, g, null).Technical.Contains("DAILY_LIMIT"), "Daily refusal is named");
+
+            // Visitor address: the middleware's answer, or a named header that holds exactly one valid address.
+            var http = new Microsoft.AspNetCore.Http.DefaultHttpContext();
+            http.Connection.RemoteIpAddress = System.Net.IPAddress.Parse("203.0.113.7");
+            Assert(ClientIdentity.Resolve(http) == "203.0.113.7", "Visitor address comes from the connection");
+            http.Request.Headers["CF-Connecting-IP"] = "198.51.100.9";
+            Assert(ClientIdentity.Resolve(http, "CF-Connecting-IP") == "198.51.100.9", "A named proxy header wins when set");
+            Assert(ClientIdentity.Resolve(http) == "203.0.113.7", "...and is ignored when not named");
+            http.Request.Headers["CF-Connecting-IP"] = "1.1.1.1, 2.2.2.2";
+            Assert(ClientIdentity.Resolve(http, "CF-Connecting-IP") == "203.0.113.7", "A list or junk in that header is ignored");
+            http.Request.Headers["CF-Connecting-IP"] = "<script>";
+            Assert(ClientIdentity.Resolve(http, "CF-Connecting-IP") == "203.0.113.7", "Junk in that header is ignored");
+            Assert(ClientIdentity.Resolve(null) is null, "No request: unknown");
+
+            // Demo reset: needs the secret, off without one, and slows down guessing.
+            DemoControl Control(string? secret)
+            {
+                var cfg = new ConfigurationBuilder().AddInMemoryCollection(secret is null ? [] : new Dictionary<string, string?> { ["DEMO_RESET_SECRET"] = secret }).Build();
+                var store = new MailStore();
+                var opts = new MockApiOptions { FailRequests = true };
+                return new DemoControl(new MockMailService(store), new MockBackstopApi(new MockGuardianService(store), opts), opts, cfg, NullLogger<DemoControl>.Instance);
+            }
+            Assert(!Control(null).Reset("anything").Done && !Control(null).Reset(null).Done && !Control("").Reset("").Done, "No secret set: reset is off");
+            var c = Control("open-sesame");
+            Assert(!c.Reset(null).Done && !c.Reset("").Done && !c.Reset("open-sesam").Done && !c.Reset("OPEN-SESAME").Done, "Wrong codes do nothing");
+            Assert(c.Reset("open-sesame").Done, "The right code resets");
+            var guessed = Control("open-sesame");
+            for (var i = 0; i < 5; i++) guessed.Reset("nope");
+            var locked = guessed.Reset("open-sesame");
+            Assert(!locked.Done && locked.Problem!.Contains("Too many"), "Repeated wrong codes lock it, even for the right code");
+            Console.WriteLine("PASS: Visitor and daily caps, visitor address, and the protected demo reset.");
+        }
+
         // 13. Links: bare addresses, www. and short links are found, judged by address and made harmless.
         {
             Assert(LinkFinder.Inspect("Tap bit.ly/abc now").Deceptive, "A bare short link is found");

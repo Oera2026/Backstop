@@ -3,6 +3,7 @@
 @inherits LiveComponentBase
 @inject IBackstopApi Api
 @inject MockApiOptions ApiOptions
+@inject IDemoControl Demo
 
 <PageTitle>Demo panel – Backstop</PageTitle>
 
@@ -48,10 +49,15 @@
         <button type="button" class="btn btn-primary" @onclick="Run" disabled="@_running">
             <Icon Name="mail" /> @(_running ? "Checking…" : "Simulate incoming email")
         </button>
+        <input id="reset-code" type="password" @bind="_resetCode" autocomplete="off" aria-label="Reset code" placeholder="Reset code" disabled="@_running" />
         <button type="button" class="btn btn-quiet" @onclick="ResetDemo" disabled="@_running">
             <Icon Name="refresh" /> Reset demo
         </button>
     </div>
+    @if (_resetProblem is not null)
+    {
+        <p class="form-error" role="alert">@_resetProblem</p>
+    }
 </section>
 
 <section class="card" aria-labelledby="pipe-title">
@@ -153,11 +159,16 @@
         }
     }
 
+    private string _resetCode = "";
+    private string? _resetProblem;
+
     private void ResetDemo()
     {
-        Mail.Reset();
-        Api.ResetDemo();
-        ApiOptions.FailRequests = false;
+        var reset = Demo.Reset(_resetCode);
+        _resetCode = "";
+        _resetProblem = reset.Problem;
+        if (!reset.Done) return;
+        _fail = false;
         _result = null;
         _tiers = Fresh();
     }
