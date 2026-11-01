@@ -516,40 +516,37 @@ public class LlamaScamCheckerTests
             Console.WriteLine("PASS: Mail scanning false holds, evidence on failure, sender and stuck states.");
         }
 
-        // 12. Explain: the hand-written letter is only for a clean letter, and warnings are never hidden.
+        // 12. Explain: the AI does the explaining; local checks are a floor; failure shows a plain error, never a made-up answer.
         {
-            var api = new MockBackstopApi(new MockGuardianService(new MailStore()), new MockApiOptions(), null, null);
-            Task<Explanation> Explain(string text, ExplainFormat f = ExplainFormat.Summary) =>
-                api.ExplainContentAsync(new ExplainRequest(text, null, null, ReadingLevel.Simple, f));
+            DocumentReading Good(bool suspicious = false) => new(true, "letter", "Council letter", "A letter about your discount.", "Reply by 14 November",
+                [new("What it is", "The council asks a question.")], ["Send the form back"], [("entitlement", "the right to get something")], "", suspicious);
+            var calm = new StubExplainer(_ => Good(), _ => new(true, "By 14 November.", false));
+            var api = new MockBackstopApi(new MockGuardianService(new MailStore()), new MockApiOptions(), null, null, calm);
+            Task<Explanation> Explain(string text) => api.ExplainContentAsync(new ExplainRequest(text, null, null, ReadingLevel.Simple, ExplainFormat.Summary));
 
             var real = await Explain(ExplainFixtures.CouncilLetter);
-            Assert(real.Title == ExplainFixtures.Title, "The clean letter uses the written explanation");
-            Assert(real.Actions[^1].Contains(DateTime.Today.AddDays(14).ToString("d MMMM")), "Dates in the letter count from today");
-            Assert(!ExplainFixtures.CouncilLetter.Contains("Okafor"), "The letter is for the household's own user");
+            Assert(real.Title == "Council letter" && real.Deadline == "Reply by 14 November" && real.Actions.Count == 1, "The AI's breakdown is shown");
+            Assert(real.HardWords.Count == 1 && real.OriginalText.Contains("entitlement"), "The AI's hard words are found in the text");
+            Assert((await api.AskAboutAsync(real.Id, "When is it due?")).Answer == "By 14 November.", "Questions are answered by the AI");
 
-            var fake = await Explain(ExplainFixtures.CouncilLetter + "\nPlease buy gift cards and send me the codes. Keep this between us.");
-            Assert(fake.Title != ExplainFixtures.Title, "A look-alike letter does not get the written explanation");
-            var ask = await api.AskAboutAsync(fake.Id, "is this a scam?");
-            Assert(!ask.Answer.Contains("normal council letter"), "No false reassurance for a look-alike");
+            var warned = await Explain(ExplainFixtures.CouncilLetter + "\nPlease buy gift cards and send me the codes. Keep this between us.");
+            Assert(warned.Chunks[0].Heading == "Before you do anything", "Local warning signs are shown even when the AI saw none");
+            var flagged = await new MockBackstopApi(new MockGuardianService(new MailStore()), new MockApiOptions(), null, null, new StubExplainer(_ => Good(true), _ => new(true, "x", false)))
+                .ExplainContentAsync(new ExplainRequest("Hello there.", null, null, ReadingLevel.Simple, ExplainFormat.Summary));
+            Assert(flagged.Chunks[0].Heading == "Before you do anything", "An AI warning is shown");
 
             var linked = await Explain(ExplainFixtures.CouncilLetter + "\nReply at http://bit.ly/x1");
-            Assert(linked.Title != ExplainFixtures.Title && !linked.OriginalText.Contains("bit.ly"), "A link is taken out and the letter is not trusted");
+            Assert(!linked.OriginalText.Contains("bit.ly"), "A link is taken out before it is sent or shown");
 
-            var distress = await Explain("Hello. He hurts me and I am scared of him.", ExplainFormat.Questions);
-            Assert(distress.Chunks.First(c => c.Heading == "Is it safe?").Body.Contains("warning signs") && !distress.Chunks.First(c => c.Heading == "Is it safe?").Body.StartsWith("We did not"),
-                "Mid-risk text is not called safe");
-            Assert(!distress.Overview.Contains("do not need to do anything"), "Mid-risk text does not say nothing is needed");
-
-            var fileFailed = false;
-            try { await api.ExplainContentAsync(new ExplainRequest(null, [0xFF, 0xD8, 0xFF, 0xE0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "a.jpg", ReadingLevel.Simple, ExplainFormat.Summary)); }
-            catch (BackstopApiException) { fileFailed = true; }
-            Assert(fileFailed, "A photo is not read as a made-up letter");
-
-            var fine = await Explain("I am fine. Thanks for the account of your trip.");
-            Assert(fine.HardWords.Count == 0, "Everyday words get no hard-word hint");
-            Assert((await Explain("Please call me before Friday")).Deadline == "Before Friday", "'before Friday' is a date");
-            Assert((await Explain("Please ring by 5pm")).Deadline == "By 5pm", "'by 5pm' is a date");
-            Console.WriteLine("PASS: Explain checks the words first and never hides warning signs.");
+            async Task<bool> Throws(MockBackstopApi a, ExplainRequest r) { try { await a.ExplainContentAsync(r); return false; } catch (BackstopApiException) { return true; } }
+            var down = new MockBackstopApi(new MockGuardianService(new MailStore()), new MockApiOptions(), null, null,
+                new StubExplainer(_ => new(false, "", "", "", null, [], [], [], "", false, new FailureInfo("The checker is busy.", "x")), _ => new(false, "", false, new FailureInfo("Busy.", "x"))));
+            Assert(await Throws(down, new ExplainRequest("Some words", null, null, ReadingLevel.Simple, ExplainFormat.Summary)), "AI failure is an error, not a made-up explanation");
+            var none = new MockBackstopApi(new MockGuardianService(new MailStore()), new MockApiOptions(), null, null, null);
+            Assert(await Throws(none, new ExplainRequest("Some words", null, null, ReadingLevel.Simple, ExplainFormat.Summary)), "No AI configured is an error");
+            Assert(await Throws(api, new ExplainRequest(null, [(byte)'%', (byte)'P', (byte)'D', (byte)'F', 0, 0], "a.pdf", ReadingLevel.Simple, ExplainFormat.Summary)), "A PDF is refused");
+            Assert(await Throws(api, new ExplainRequest(null, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13], "a.exe", ReadingLevel.Simple, ExplainFormat.Summary)), "An unknown file is refused");
+            Console.WriteLine("PASS: Explain uses the AI, keeps a local floor, and fails with a plain error.");
         }
 
         // 13. Links: bare addresses, www. and short links are found, judged by address and made harmless.
@@ -577,6 +574,14 @@ public class LlamaScamCheckerTests
     private static void Assert(bool condition, string message)
     {
         if (!condition) throw new Exception("Assertion failed: " + message);
+    }
+
+    private sealed class StubExplainer(Func<string?, DocumentReading> read, Func<string, DocumentAnswer> answer) : IDocumentExplainer
+    {
+        public Task<DocumentReading> ExplainAsync(string? text, byte[]? image, string? mimeType, ReadingLevel level, ExplainFormat format, CancellationToken ct = default) =>
+            Task.FromResult(read(text));
+        public Task<DocumentAnswer> AnswerAsync(string documentText, string question, CancellationToken ct = default) =>
+            Task.FromResult(answer(question));
     }
 
     private sealed class StubAssistant(Func<string, AssistantReply> answer) : IAssistant

@@ -16,7 +16,7 @@ public sealed class MockApiOptions
 /// trusted-person views see each other's changes live. Each call waits a little, like a real network call.
 /// Replace this class (and its registration in Program.cs) to wire the real back end.
 /// </summary>
-public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOptions options, ILlamaScamChecker? llamaChecker = null, IAssistant? assistant = null) : IBackstopApi
+public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOptions options, ILlamaScamChecker? llamaChecker = null, IAssistant? assistant = null, IDocumentExplainer? documentExplainer = null) : IBackstopApi
 {
     private sealed record StoredCheck(CheckResult Result, string Original, DateTimeOffset? AskedAt);
 
@@ -30,6 +30,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
     private List<ActivityEntry> _activity = SeedActivity();
 
     private const int MaxCheckLength = 20000;
+    private const int MaxExplainImageBytes = 8 * 1024 * 1024;
 
     public event Action? Changed;
 
@@ -280,22 +281,30 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
 
     public async Task<Explanation> ExplainContentAsync(ExplainRequest request, CancellationToken ct = default)
     {
-        await Wait(1100, ct);
-        var text = request.Text;
+        string? typed = null, mime = null;
         if (request.File is not null)
         {
-            if (ImageSniff.ImageType(request.File) is null && !ImageSniff.IsPdf(request.File))
-                throw new BackstopApiException("We could not read that file. Please choose a photo or a PDF of the letter.");
-            // MOCK: nothing here can read the words in a photo or PDF, and a made-up answer would be wrong for any real letter.
-            throw new BackstopApiException("We cannot read photos or PDFs yet. Please type or paste the words from the letter.");
+            if (ImageSniff.IsPdf(request.File))
+                throw new BackstopApiException("We cannot read PDFs yet. Please take a photo of the page, or type the words.");
+            mime = ImageSniff.ImageType(request.File);
+            if (mime is null) throw new BackstopApiException("We could not read that file. Please choose a photo of the letter.");
+            if (request.File.Length > MaxExplainImageBytes) throw new BackstopApiException("That photo is too big. Please take it again.");
         }
-        if (string.IsNullOrWhiteSpace(text)) throw new BackstopApiException("Please paste the words first.");
+        else
+        {
+            if (string.IsNullOrWhiteSpace(request.Text)) throw new BackstopApiException("Please paste the words first.");
+            // Links come out first, so nothing clickable or hidden is sent on or shown.
+            typed = Defang.ForUser(request.Text.Trim());
+            if (typed.Length > MaxCheckLength) throw new BackstopApiException("That is too long to explain. Please paste a shorter part.");
+        }
 
-        // Links come out first, then the words are checked. The hand-written letter is only used when they are clean.
-        var safeText = Defang.ForUser(text.Trim());
-        var explanation = ExplainFixtures.UsesFixture(safeText)
-            ? ExplainCouncilLetter(safeText, request.Level, request.Format)
-            : ExplainAnything(safeText, request.Level, request.Format);
+        if (documentExplainer is null)
+            throw new BackstopApiException("Explain is not switched on yet. Please tell the person who looks after this app.");
+        var reading = await documentExplainer.ExplainAsync(typed, request.File, mime, request.Level, request.Format, ct);
+        if (!reading.Success)
+            throw new BackstopApiException(reading.Failure?.Message ?? "Something went wrong. Please try again in a minute.");
+
+        var explanation = BuildExplanation(reading, typed ?? Defang.ForUser(reading.Text), request.Level, request.Format);
         lock (_gate) _explanations[explanation.Id] = explanation;
         return explanation;
     }
@@ -308,29 +317,20 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
 
     public async Task<ChatAnswer> AskAboutAsync(string explanationId, string question, CancellationToken ct = default)
     {
-        await Wait(800, ct);
         if (string.IsNullOrWhiteSpace(question)) throw new BackstopApiException("Please type your question first.");
+        if (question.Length > 500) throw new BackstopApiException("That is a bit long. Please make your question shorter.");
         Explanation? e;
         lock (_gate) e = _explanations.GetValueOrDefault(explanationId);
         if (e is null) throw new BackstopApiException("We could not find that page. Please explain it again.");
+        if (documentExplainer is null)
+            throw new BackstopApiException("Questions are not switched on yet. Please tell the person who looks after this app.");
 
-        var q = question.ToLowerInvariant();
-        string answer;
-        if (ExplainFixtures.UsesFixture(e.OriginalText))
-        {
-            answer = ExplainFixtures.Answers.FirstOrDefault(a => a.Words.Any(w => Regex.IsMatch(q, $@"\b{w}\b"))).Answer
-                ?? $"I am not sure about that. You could ask {Helper} to look at the letter with you.";
-        }
-        else if (Regex.IsMatch(q, @"\b(when|date|deadline|by)\b"))
-            answer = e.Deadline is null ? "I could not find a date in it." : $"{e.Deadline}.";
-        else if (Regex.IsMatch(q, @"\b(safe|scam|real|trust)\b"))
-            answer = MockRiskRules.VerdictFor(MockRiskRules.Scan(e.OriginalText).Score) == Verdict.LooksSafe
-                ? "We did not find warning signs. You can tap \"Is this safe?\" to check it properly."
-                : "It has some warning signs. Please tap \"Is this safe?\" before you do anything.";
-        else if (Regex.IsMatch(q, @"\b(do|need|must|should)\b"))
-            answer = e.Actions.Count == 0 ? "You do not need to do anything." : "It asks you to: " + string.Join("; ", e.Actions).ToLowerInvariant() + ".";
-        else
-            answer = $"I am not sure about that. You could ask {Helper} to look at it with you.";
+        var reply = await documentExplainer.AnswerAsync(e.OriginalText, Defang.ForUser(question.Trim()), ct);
+        if (!reply.Success)
+            throw new BackstopApiException(reply.Failure?.Message ?? "Something went wrong. Please try again in a minute.");
+        var answer = reply.Text;
+        if (reply.NeedsHelper && !answer.Contains("helper", StringComparison.OrdinalIgnoreCase) && !answer.Contains(Helper, StringComparison.OrdinalIgnoreCase))
+            answer += $" {Helper} can look at it with you.";
         return new ChatAnswer(question.Trim(), answer);
     }
 

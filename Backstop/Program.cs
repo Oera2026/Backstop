@@ -68,6 +68,8 @@ builder.Services.AddSingleton<MetaCallGuard>();
 builder.Services.AddHttpClient<MetaAiScamChecker>().ConfigurePrimaryHttpMessageHandler(NoRedirectHandler).AddStandardResilienceHandler(Resilience);
 // Ask Me: the same Meta endpoint, the same rules.
 builder.Services.AddHttpClient<MetaAssistant>().ConfigurePrimaryHttpMessageHandler(NoRedirectHandler).AddStandardResilienceHandler(Resilience);
+// Explain and questions about a document: the same Meta endpoint, the same rules.
+builder.Services.AddHttpClient<MetaDocumentExplainer>().ConfigurePrimaryHttpMessageHandler(NoRedirectHandler).AddStandardResilienceHandler(Resilience);
 
 // Behind the host's load balancer: read the real client address and scheme from X-Forwarded-*.
 // The app runs as a single instance behind one proxy, so the proxy lists are cleared.
@@ -80,6 +82,7 @@ builder.Services.Configure<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>
     o.ForwardLimit = 1;
 });
 builder.Services.AddTransient<IAssistant>(sp => sp.GetRequiredService<MetaAssistant>());
+builder.Services.AddTransient<IDocumentExplainer>(sp => sp.GetRequiredService<MetaDocumentExplainer>());
 builder.Services.AddTransient<ILlamaScamChecker>(sp => sp.GetRequiredService<MetaAiScamChecker>());
 builder.Services.AddTransient<IMetaScamChecker>(sp => sp.GetRequiredService<MetaAiScamChecker>());
 
