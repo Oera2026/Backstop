@@ -44,7 +44,8 @@ public sealed partial class MockMailService(MailStore store, IMetaScamChecker? m
     // MOCK: replace with the real outgoing data-loss check.
     public OutgoingCheck CheckOutgoing(string to, string subject, string body)
     {
-        var text = $"{subject}\n{body}";
+        // Folded, so hidden characters and full-width digits cannot hide a card number.
+        var text = InputGuard.Fold($"{subject}\n{body}");
         var reasons = new List<string>();
         if (HasCardNumber(text)) reasons.Add("It looks like a card number.");
         if (HasBankCode(text)) reasons.Add("It looks like a bank code.");
@@ -92,6 +93,10 @@ public sealed partial class MockMailService(MailStore store, IMetaScamChecker? m
     {
         to = to.Trim();
 
+        // One plain address, a one-line subject, a sensible size. Anything else is refused, never tidied up and sent.
+        if (!InputGuard.IsPlainAddress(to) || !InputGuard.IsSingleLine(subject, 200) || (body?.Length ?? 0) > 20000)
+            return new SendResult(null, false, "That message could not be sent. Please check the address and the subject.");
+
         // Fail closed: never write to an address nobody reads, whatever the UI did first.
         if (NoReply.IsNoReply(to))
             return new SendResult(null, false, "That is a no-reply address. Nobody reads messages sent to it.");
@@ -113,6 +118,15 @@ public sealed partial class MockMailService(MailStore store, IMetaScamChecker? m
         // MOCK: the message is only stored in memory. Nothing is sent anywhere.
         store.AddSent(sent, notice);
         return new SendResult(sent, isNew, null);
+    }
+
+    public bool HoldOutgoing(string to, string subject, string body, IReadOnlyList<string> reasons)
+    {
+        to = to.Trim();
+        if (!InputGuard.IsPlainAddress(to) || !InputGuard.IsSingleLine(subject, 200) || (body?.Length ?? 0) > 20000) return false;
+        if (NoReply.IsNoReply(to)) return false; // fail closed: nobody reads it, so nothing is queued
+        store.HoldOutgoing(to, subject, body, reasons);
+        return true;
     }
 
     public IReadOnlyList<Contact> GetContacts() => store.Contacts().Where(c => !NoReply.IsNoReply(c.Address)).ToList();
@@ -177,6 +191,7 @@ public sealed partial class MockMailService(MailStore store, IMetaScamChecker? m
         store.Add(msg); // state Received: invisible to the user
 
         var done = new List<TierResult>();
+        MetaScamAnalysis? ai = null;
         try
         {
             store.Update(() => msg.State = MessageState.Scanning);
@@ -189,32 +204,22 @@ public sealed partial class MockMailService(MailStore store, IMetaScamChecker? m
 
                 var result = scenario.Tiers[i];
 
-                // Tier 1 is "Small model" - inspect email body with Meta AI (text-only payload to save cost)
-                if (i == 1 && metaChecker is not null)
-                {
-                    try
-                    {
-                        var aiResult = await metaChecker.CheckScamAsync($"{scenario.Subject}\n\n{scenario.Body}", null, null);
-                        if (!aiResult.Success)
-                        {
-                            throw new InvalidOperationException("Meta AI check failed or timed out: " + (aiResult.FailureNote ?? "Unknown error"));
-                        }
-
-                        if (aiResult.Verdict == Verdict.DontReply)
-                        {
-                            result = new TierResult("Meta AI", 220, TierStatus.Flagged, aiResult.Reason);
-                        }
-                    }
-                    catch (Exception) when (!simulateFailure)
-                    {
-                        // Any unexpected error or timeout triggers fail-closed
-                        throw;
-                    }
-                }
-
                 // MOCK: the "Small model" is the tier we pretend crashes. Real code: any exception or timeout.
                 if (simulateFailure && i == 1)
                     throw new InvalidOperationException("Simulated checker failure");
+
+                // Tier 1 is the "Small model": Meta AI reads the email (text only, to save cost).
+                // Any failure, timeout or odd answer throws, and the catch below holds the message.
+                if (i == 1 && metaChecker is not null)
+                {
+                    var clock = System.Diagnostics.Stopwatch.StartNew();
+                    ai = await metaChecker.CheckScamAsync($"{scenario.Subject}\n\n{scenario.Body}", null, null);
+                    if (!ai.Success)
+                        throw new InvalidOperationException("Meta AI check failed or timed out: " + (ai.FailureNote ?? "Unknown error"));
+
+                    result = new TierResult("Meta AI", (int)clock.ElapsedMilliseconds,
+                        ai.Verdict == Verdict.LooksSafe ? TierStatus.Passed : TierStatus.Flagged, ai.Reason);
+                }
 
                 done.Add(result);
                 onTier?.Invoke(i, result);
@@ -227,8 +232,26 @@ public sealed partial class MockMailService(MailStore store, IMetaScamChecker? m
                 MessageState.Blocked => MessageState.Blocked,
                 _ => MessageState.Held,
             };
+
+            // Floor rule: the AI can only make the outcome stricter. If it is worried about a message
+            // the script would clear, a helper looks first. It never clears or unblocks anything.
+            var aiWorried = ai is { Verdict: not Verdict.LooksSafe } || ai is { NeedsHuman: true } || ai is { AtRisk: true };
+            var downgraded = aiWorried && final == MessageState.Cleared;
+            if (downgraded) final = MessageState.Held;
+
             store.Update(() =>
             {
+                if (aiWorried)
+                {
+                    foreach (var f in ai!.Flags)
+                        if (msg.Flags.All(x => x.Title != f.Title))
+                            msg.Flags.Add(new Flag(f.Icon, f.Title, f.Explanation));
+                    if (downgraded)
+                    {
+                        msg.Summary = ai!.Reason;
+                        msg.Confidence = Confidence.Low;
+                    }
+                }
                 msg.Tiers = done;
                 msg.State = final;
                 msg.ReceivedAt = DateTimeOffset.Now;

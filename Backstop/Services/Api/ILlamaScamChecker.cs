@@ -7,7 +7,9 @@ public sealed record MetaScamAnalysis(
     string Reason,
     IReadOnlyList<RiskFlag> Flags,
     bool Success,
-    string? FailureNote = null
+    string? FailureNote = null,
+    bool NeedsHuman = false,
+    bool AtRisk = false
 );
 
 public interface IMetaScamChecker
@@ -26,12 +28,14 @@ public sealed record LlamaScamAnalysis(
     string Reason,
     IReadOnlyList<RiskFlag> Flags,
     bool Success,
-    string? FailureNote = null
+    string? FailureNote = null,
+    bool NeedsHuman = false,
+    bool AtRisk = false
 )
 {
     public static implicit operator LlamaScamAnalysis(MetaScamAnalysis m) =>
-        new(m.Verdict, m.Reason, m.Flags, m.Success, m.FailureNote);
+        new(m.Verdict, m.Reason, m.Flags, m.Success, m.FailureNote, m.NeedsHuman, m.AtRisk);
 
     public static implicit operator MetaScamAnalysis(LlamaScamAnalysis l) =>
-        new(l.Verdict, l.Reason, l.Flags, l.Success, l.FailureNote);
+        new(l.Verdict, l.Reason, l.Flags, l.Success, l.FailureNote, l.NeedsHuman, l.AtRisk);
 }

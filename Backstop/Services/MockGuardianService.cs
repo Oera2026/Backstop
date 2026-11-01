@@ -27,6 +27,10 @@ public sealed class MockGuardianService(MailStore store) : IGuardianService
     public IReadOnlyList<HelperNotice> GetNotices() => store.OpenNotices();
     public void DismissNotice(string id) => store.DismissNotice(id);
 
+    public IReadOnlyList<HeldOutgoing> GetHeldOutgoing() => store.OpenHeldOutgoing();
+    public void ApproveOutgoing(string id) => store.DecideOutgoing(id, release: true);
+    public void BlockOutgoing(string id) => store.DecideOutgoing(id, release: false);
+
     // Only a Held message can be decided. Blocked is final.
     public void Approve(string id) => Decide(id, MessageState.Cleared, "Approved");
     public void Block(string id) => Decide(id, MessageState.Blocked, "Blocked");

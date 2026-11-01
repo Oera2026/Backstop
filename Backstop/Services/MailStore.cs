@@ -15,6 +15,7 @@ public sealed class MailStore
     private List<SentMessage> _sent = MockData.SeedSent();
     private List<CalendarEvent> _events = MockData.SeedEvents();
     private List<HelperNotice> _notices = [];
+    private List<HeldOutgoing> _heldOutgoing = [];
 
     public event Action? Changed;
 
@@ -143,6 +144,62 @@ public sealed class MailStore
         Changed?.Invoke();
     }
 
+    /// <summary>Put a private-looking outgoing message on hold for the helper. Nothing is sent.</summary>
+    public HeldOutgoing HoldOutgoing(string to, string subject, string body, IReadOnlyList<string> reasons)
+    {
+        var held = new HeldOutgoing
+        {
+            Id = Guid.NewGuid().ToString("N")[..8],
+            ToAddress = to.Trim(),
+            Subject = string.IsNullOrWhiteSpace(subject) ? "(no subject)" : subject.Trim(),
+            Body = body,
+            Reasons = reasons,
+        };
+        lock (_gate) _heldOutgoing.Add(held);
+        Changed?.Invoke();
+        return held;
+    }
+
+    public IReadOnlyList<HeldOutgoing> OpenHeldOutgoing()
+    {
+        lock (_gate) return _heldOutgoing.Where(h => h.Decision is null).OrderByDescending(h => h.At).ToList();
+    }
+
+    /// <summary>
+    /// Decide one waiting message. The check and the change are one step, so a second decision does nothing.
+    /// Only an approval sends. A no-reply address is never sent to, whatever the helper chose.
+    /// </summary>
+    public bool DecideOutgoing(string id, bool release)
+    {
+        lock (_gate)
+        {
+            var h = _heldOutgoing.FirstOrDefault(x => x.Id == id);
+            if (h is null || h.Decision is not null) return false;
+            if (!release || NoReply.IsNoReply(h.ToAddress))
+            {
+                h.Decision = "Blocked";
+            }
+            else
+            {
+                var isNew = !IsKnownRecipient(h.ToAddress);
+                var contact = _contacts.FirstOrDefault(c => c.Address.Equals(h.ToAddress, StringComparison.OrdinalIgnoreCase));
+                var sent = new SentMessage
+                {
+                    Id = Guid.NewGuid().ToString("N")[..8],
+                    ToName = contact?.Name ?? "",
+                    ToAddress = h.ToAddress,
+                    Subject = h.Subject,
+                    Body = h.Body,
+                };
+                _sent.Add(sent);
+                if (isNew) _notices.Add(new HelperNotice { Id = Guid.NewGuid().ToString("N")[..8], Address = h.ToAddress, Subject = h.Subject });
+                h.Decision = "Sent";
+            }
+        }
+        Changed?.Invoke();
+        return true;
+    }
+
     public void AddEvent(CalendarEvent e)
     {
         lock (_gate) _events.Add(e);
@@ -165,6 +222,7 @@ public sealed class MailStore
             _sent = MockData.SeedSent();
             _events = MockData.SeedEvents();
             _notices = [];
+            _heldOutgoing = [];
         }
         Changed?.Invoke();
     }

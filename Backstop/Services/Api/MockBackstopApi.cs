@@ -16,7 +16,7 @@ public sealed class MockApiOptions
 /// trusted-person views see each other's changes live. Each call waits a little, like a real network call.
 /// Replace this class (and its registration in Program.cs) to wire the real back end.
 /// </summary>
-public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOptions options, ILlamaScamChecker? llamaChecker = null) : IBackstopApi
+public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOptions options, ILlamaScamChecker? llamaChecker = null, IAssistant? assistant = null) : IBackstopApi
 {
     private sealed record StoredCheck(CheckResult Result, string Original, DateTimeOffset? AskedAt);
 
@@ -28,6 +28,8 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
     private readonly Dictionary<string, string> _savedFrom = []; // guide or explanation id -> memory id
     private List<MemoryCard> _memories = MemoryFixtures.Seed();
     private List<ActivityEntry> _activity = SeedActivity();
+
+    private const int MaxCheckLength = 20000;
 
     public event Action? Changed;
 
@@ -44,14 +46,16 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
 
         string text;
         string? imgType = null;
-        if (request.Kind == CheckKind.Picture)
+        var isPicture = request.Kind == CheckKind.Picture;
+        if (isPicture)
         {
             if (request.Picture is null || (imgType = ImageSniff.ImageType(request.Picture)) is null)
                 throw new BackstopApiException("We could not read that file. Please choose a photo or a screenshot.");
-            text = CheckFixtures.PictureText; // Local fallback text
+            text = ""; // Only the AI can read a picture. No local text stands in for it.
         }
         else text = request.Text ?? "";
-        if (string.IsNullOrWhiteSpace(text) && request.Picture is null) throw new BackstopApiException("Please paste the message first.");
+        if (text.Length > MaxCheckLength) throw new BackstopApiException("That is too long to check. Please paste a shorter part.");
+        if (string.IsNullOrWhiteSpace(text) && !isPicture) throw new BackstopApiException("Please paste the message first.");
 
         var display = Defang.ForUser(text.Trim());
 
@@ -60,49 +64,73 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         var floorVerdict = MockRiskRules.VerdictFor(floor.Score);
         var combinedFlags = new List<RiskFlag>(floor.Flags);
 
-        Verdict finalVerdict = floorVerdict;
-        string finalReason = MockRiskRules.ReasonFor(floorVerdict, floor.TopBecause);
-        var reviewStatus = ReviewStatus.NotAsked;
-
-        if (llamaChecker is not null)
-        {
-            // If checking a picture, send image bytes to the multimodal AI endpoint;
-            // Otherwise, send text only to save vision processing costs.
-            var llamaResult = request.Kind == CheckKind.Picture && request.Picture is not null
-                ? await llamaChecker.CheckScamAsync(null, request.Picture, imgType, ct)
-                : await llamaChecker.CheckScamAsync(display, null, null, ct);
-            if (!llamaResult.Success)
-            {
-                // Fail closed: Hold the message when AI fails, times out or outputs strangeness
-                reviewStatus = ReviewStatus.Held;
-                finalVerdict = Verdict.BeCareful;
-                finalReason = llamaResult.Reason;
-                foreach (var flag in llamaResult.Flags)
-                {
-                    if (combinedFlags.All(f => f.Id != flag.Id)) combinedFlags.Add(flag);
-                }
-            }
-            else
-            {
-                // The AI can only make the result stricter than the floor rule
-                // Strictness: DontReply > BeCareful > LooksSafe
-                if (IsStricter(llamaResult.Verdict, floorVerdict))
-                {
-                    finalVerdict = llamaResult.Verdict;
-                    finalReason = llamaResult.Reason;
-                }
-                foreach (var flag in llamaResult.Flags)
-                {
-                    if (combinedFlags.All(f => f.Id != flag.Id)) combinedFlags.Add(flag);
-                }
-            }
-        }
+        // If checking a picture, send image bytes to the multimodal AI endpoint;
+        // otherwise, send text only to save vision processing costs.
+        var (finalVerdict, finalReason, reviewStatus) = await ApplyAiAsync(
+            isPicture ? c => c.CheckScamAsync(null, request.Picture, imgType, ct) : c => c.CheckScamAsync(display, null, null, ct),
+            aiRequired: isPicture, floorVerdict, MockRiskRules.ReasonFor(floorVerdict, floor.TopBecause), combinedFlags);
 
         var flags = combinedFlags.Take(4).ToList();
         var result = new CheckResult(NewId("chk"), request.Kind, finalVerdict, finalReason, flags,
             display, floor.Highlights.Where(h => flags.Any(f => f.Id == h.FlagId)).ToList(), null, reviewStatus, false, DateTimeOffset.Now);
         lock (_gate) _checks[result.Id] = new(result, text.Trim(), reviewStatus == ReviewStatus.Held ? DateTimeOffset.Now : null);
         return result;
+    }
+
+    /// <summary>
+    /// The one place the AI result meets the local floor. The AI can only make the verdict stricter.
+    /// Any failure, exception or odd answer holds the item. When <paramref name="aiRequired"/> is set
+    /// (pictures, which local rules cannot read) a missing checker also holds it.
+    /// </summary>
+    private async Task<(Verdict Verdict, string Reason, ReviewStatus Status)> ApplyAiAsync(
+        Func<ILlamaScamChecker, Task<MetaScamAnalysis>> ask, bool aiRequired,
+        Verdict floorVerdict, string floorReason, List<RiskFlag> flags)
+    {
+        var r = await ApplyAiCoreAsync(ask, aiRequired, floorVerdict, floorReason, flags);
+
+        // Someone may be in danger, or the checker wants a human: the helper is always told, whatever else was decided.
+        // The local rules and the AI can both raise this. Nothing can lower it.
+        if (r.Status != ReviewStatus.Held && flags.Any(f => f.Id is "at-risk" or "review-needed"))
+            return (IsStricter(Verdict.BeCareful, r.Verdict) ? Verdict.BeCareful : r.Verdict, r.Reason, ReviewStatus.Held);
+        return r;
+    }
+
+    private async Task<(Verdict Verdict, string Reason, ReviewStatus Status)> ApplyAiCoreAsync(
+        Func<ILlamaScamChecker, Task<MetaScamAnalysis>> ask, bool aiRequired,
+        Verdict floorVerdict, string floorReason, List<RiskFlag> flags)
+    {
+        if (llamaChecker is null)
+        {
+            if (!aiRequired) return (floorVerdict, floorReason, ReviewStatus.NotAsked);
+            return HoldForReview(flags, floorVerdict, "We could not check this picture, so your helper will look at it.");
+        }
+
+        MetaScamAnalysis ai;
+        try { ai = await ask(llamaChecker); }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception)
+        {
+            return HoldForReview(flags, floorVerdict, "We could not finish checking this, so your helper will look at it.");
+        }
+
+        foreach (var flag in ai.Flags)
+            if (flags.All(f => f.Id != flag.Id)) flags.Add(flag);
+
+        if (!ai.Success)
+        {
+            var stricter = IsStricter(Verdict.BeCareful, floorVerdict) ? Verdict.BeCareful : floorVerdict;
+            return (stricter, ai.Reason, ReviewStatus.Held);
+        }
+        return IsStricter(ai.Verdict, floorVerdict)
+            ? (ai.Verdict, ai.Reason, ReviewStatus.NotAsked)
+            : (floorVerdict, floorReason, ReviewStatus.NotAsked);
+    }
+
+    private static (Verdict, string, ReviewStatus) HoldForReview(List<RiskFlag> flags, Verdict floorVerdict, string reason)
+    {
+        if (flags.All(f => f.Id != "review-needed"))
+            flags.Add(new("review-needed", "hourglass", "Needs helper check", "The automatic check could not finish, so your helper will check this."));
+        return (IsStricter(Verdict.BeCareful, floorVerdict) ? Verdict.BeCareful : floorVerdict, reason, ReviewStatus.Held);
     }
 
     private static bool IsStricter(Verdict a, Verdict b)
@@ -120,6 +148,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
     {
         await Wait(600, ct);
         if (string.IsNullOrWhiteSpace(conversation)) throw new BackstopApiException("Please paste the conversation first.");
+        if (conversation.Length > MaxCheckLength) throw new BackstopApiException("That is too long to check. Please paste a shorter part.");
 
         var display = Defang.ForUser(conversation.Trim());
         var thread = new List<ThreadMessage>();
@@ -144,37 +173,10 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         var floorVerdict = MockRiskRules.VerdictFor(seen.Sum(f => MockRiskRules.Weight(f.Id)));
         var combinedFlags = new List<RiskFlag>(seen.OrderByDescending(f => MockRiskRules.Weight(f.Id)));
 
-        Verdict finalVerdict = floorVerdict;
-        string finalReason = MockRiskRules.ReasonFor(floorVerdict, MockRiskRules.BecauseFor(combinedFlags.FirstOrDefault()?.Id), startedFriendly: firstFlagged > 0);
-        var reviewStatus = ReviewStatus.NotAsked;
-
-        if (llamaChecker is not null)
-        {
-            var llamaResult = await llamaChecker.CheckScamAsync(display, ct);
-            if (!llamaResult.Success)
-            {
-                // Fail closed
-                reviewStatus = ReviewStatus.Held;
-                finalVerdict = Verdict.BeCareful;
-                finalReason = llamaResult.Reason;
-                foreach (var flag in llamaResult.Flags)
-                {
-                    if (combinedFlags.All(f => f.Id != flag.Id)) combinedFlags.Add(flag);
-                }
-            }
-            else
-            {
-                if (IsStricter(llamaResult.Verdict, floorVerdict))
-                {
-                    finalVerdict = llamaResult.Verdict;
-                    finalReason = llamaResult.Reason;
-                }
-                foreach (var flag in llamaResult.Flags)
-                {
-                    if (combinedFlags.All(f => f.Id != flag.Id)) combinedFlags.Add(flag);
-                }
-            }
-        }
+        var (finalVerdict, finalReason, reviewStatus) = await ApplyAiAsync(
+            c => c.CheckScamAsync(display, null, null, ct), aiRequired: false, floorVerdict,
+            MockRiskRules.ReasonFor(floorVerdict, MockRiskRules.BecauseFor(combinedFlags.FirstOrDefault()?.Id), startedFriendly: firstFlagged > 0),
+            combinedFlags);
 
         var flags = combinedFlags.Take(4).ToList();
         var result = new CheckResult(NewId("chk"), CheckKind.Conversation, finalVerdict,
@@ -534,6 +536,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
             _checks.Clear(); _stories.Clear(); _guides.Clear(); _explanations.Clear(); _photos.Clear(); _savedFrom.Clear();
             _memories = MemoryFixtures.Seed();
             _activity = SeedActivity();
+            ResetChat();
         }
         Changed?.Invoke();
     }

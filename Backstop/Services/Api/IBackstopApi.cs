@@ -36,6 +36,10 @@ public interface IBackstopApi
     Task<Explanation?> GetExplanationAsync(string id, CancellationToken ct = default);
     Task<ChatAnswer> AskAboutAsync(string explanationId, string question, CancellationToken ct = default);
 
+    // --- Ask Me ---
+    /// <summary>A real conversation with the AI. The helper is told whenever someone may need help.</summary>
+    Task<AskReply> AskAsync(IReadOnlyList<AskTurn> history, string message, CancellationToken ct = default);
+
     // --- Remember ---
     Task<IReadOnlyList<MemoryCard>> GetMemoryCardsAsync(string? search = null, CancellationToken ct = default);
     Task<MemoryCard?> GetMemoryCardAsync(string id, CancellationToken ct = default);
@@ -60,6 +64,30 @@ public interface IBackstopApi
     Task DeleteStoryAsync(string id, CancellationToken ct = default);
     /// <summary>"Make sense of it": reads what happened and gives more than one way to see it.</summary>
     Task<SituationExplanation> MakeSenseOfAsync(string whatHappened, CancellationToken ct = default);
+
+    // --- Chat ---
+    /// <summary>The people the user may message. Set by the helper; the user cannot add to it.</summary>
+    IReadOnlyList<ChatPerson> ChatPeople { get; }
+    /// <summary>One thread per approved person, newest first. Held messages are never part of it.</summary>
+    Task<IReadOnlyList<ChatThread>> GetChatThreadsAsync(CancellationToken ct = default);
+    /// <summary>Delivered messages only, oldest first. Held and blocked messages are never returned.</summary>
+    Task<IReadOnlyList<ChatMessage>> GetChatMessagesAsync(string personId, CancellationToken ct = default);
+    /// <summary>All the user is told about held messages: how many. No sender, no words.</summary>
+    Task<int> GetHeldChatCountAsync(CancellationToken ct = default);
+    Task<ChatMessage> SendChatAsync(string personId, string text, CancellationToken ct = default);
+
+    // --- Chat, helper side ---
+    /// <summary>Messages from other users that failed a check. Always visible to the helper.</summary>
+    Task<IReadOnlyList<HeldChat>> GetHeldChatsAsync(CancellationToken ct = default);
+    /// <summary>Release delivers the message, Block ends it. Anything else leaves it held (fail closed).</summary>
+    Task ResolveHeldChatAsync(string id, ReviewDecision decision, CancellationToken ct = default);
+    /// <summary>The helper writes to the user. Shows in the user's chat with the household's trusted person.</summary>
+    Task<ChatMessage> SendChatAsHelperAsync(string text, CancellationToken ct = default);
+    /// <summary>A normal chat between the user and someone else. Throws unless the helper is allowed to see chats.</summary>
+    Task<IReadOnlyList<ChatMessage>> GetChatLogAsync(string personId, CancellationToken ct = default);
+    /// <summary>What the user allowed this helper to do. Changes how much of the chats the helper can read.</summary>
+    HelperPermissions HelperAccess { get; }
+    void SetHelperAccess(HelperPermissions access);
 
     // --- Trusted person ---
     /// <summary>Held items from the inbox and from Check, newest first.</summary>

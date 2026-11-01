@@ -41,6 +41,19 @@ public sealed class HelperNotice
     public bool Seen { get; set; }
 }
 
+/// <summary>An outgoing message the user wrote that looks private. It is not sent until the helper says so.</summary>
+public sealed class HeldOutgoing
+{
+    public required string Id { get; init; }
+    public required string ToAddress { get; init; }
+    public required string Subject { get; init; }
+    public required string Body { get; init; }
+    public required IReadOnlyList<string> Reasons { get; init; }
+    public DateTimeOffset At { get; init; } = DateTimeOffset.Now;
+    /// <summary>Null while waiting. "Sent" or "Blocked" once decided. Blocked is final.</summary>
+    public string? Decision { get; set; }
+}
+
 public sealed record SearchResults(
     IReadOnlyList<MailMessage> Messages,
     IReadOnlyList<SentMessage> Sent,

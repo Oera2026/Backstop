@@ -29,6 +29,12 @@ public static partial class MockRiskRules
             Feelings(), 1, "it is very loving very quickly"),
         new(new("link", "link", "Has a link in it", "Links can lead to fake websites. We have taken the link out."),
             Link(), 1, "it has a link in it"),
+        // Someone may be in danger or distress. Always goes to a human, whatever else the checks say.
+        new(new("at-risk", "heart", "Your helper is being told", "Someone you trust will look at this and may check in with you."),
+            AtRisk(), 2, "it sounds like someone may need help"),
+        // Orders aimed at the checker. Matched by InputGuard, not by a pattern here.
+        new(new("injection", "alert", "Tries to tell our checker what to say", "A real message does not do this. Your helper will look at it."),
+            Never(), 2, "it tries to tell our checker what to say"),
     ];
 
     public static IReadOnlyList<RiskFlag> AllFlags { get; } = Rules.Select(r => r.Flag).ToList();
@@ -40,10 +46,19 @@ public static partial class MockRiskRules
     {
         var hits = new List<Highlight>();
         var found = new List<Rule>();
+        // Rules read a folded copy too, so zero-width letters, full-width letters and look-alikes cannot hide a phrase.
+        // Highlights still point into the text as written.
+        var folded = InputGuard.Fold(text);
+        var injected = InputGuard.LooksLikeInjection(text);
         foreach (var rule in Rules)
         {
+            if (rule.Flag.Id == "injection")
+            {
+                if (injected) found.Add(rule);
+                continue;
+            }
             var matches = rule.Pattern.Matches(text);
-            if (matches.Count == 0) continue;
+            if (matches.Count == 0 && !rule.Pattern.IsMatch(folded)) continue;
             found.Add(rule);
             hits.AddRange(matches.Select(m => new Highlight(m.Index, m.Length, rule.Flag.Id)));
         }
@@ -106,6 +121,10 @@ public static partial class MockRiskRules
     private static partial Regex Hurry();
     [GeneratedRegex(@"\bmy darling\b|\bi love you\b|\bsoul ?mate\b|\bvery special to me\b|\bknown you for years\b|\bmeant to be\b", RegexOptions.IgnoreCase)]
     private static partial Regex Feelings();
+    [GeneratedRegex(@"\bkill(?:ing)? (?:myself|yourself|you|her|him|them)\b|\bend (?:my|your) life\b|\bsuicid\w*|\bself[- ]?harm\b|\bhurt(?:ing)? (?:myself|yourself|you)\b|\bdon'?t want to (?:be here|live|go on)\b|\bno one would miss me\b|\b(?:scared|afraid|frightened) of (?:him|her|them)\b|\b(?:he|she|they) (?:hits?|hurts?|threatens?|beats?) me\b|\bi(?:'m| am) (?:in danger|being (?:threatened|blackmailed|abused|held|followed))\b|\bi know where you live\b|\bhelp me,? please\b|\bnot safe (?:here|at home)\b", RegexOptions.IgnoreCase)]
+    private static partial Regex AtRisk();
+    [GeneratedRegex(@"(?!)")]
+    private static partial Regex Never();
     [GeneratedRegex(@"\[link removed\]|\bhttps?://\S+|\bwww\.\S+", RegexOptions.IgnoreCase)]
     private static partial Regex Link();
 }
