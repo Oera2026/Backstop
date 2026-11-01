@@ -1,87 +1,82 @@
-# AGENTS.md
+AGENTS.md
 
-Guidance for AI coding agents working on **Backstop**, a safe email client for elderly people and adults with learning disabilities.
-App: .NET 10 Blazor Server in `Backstop/`. Plain CSS, no UI framework. Run: `cd Backstop && dotnet run`.
+Guidance for AI coding agents working on Backstop, a safe email and messaging client for elderly people and adults with learning disabilities. App: .NET 10 Blazor Server in Backstop/. Plain CSS, no UI framework. Run: cd Backstop && dotnet run (http://localhost:5106). Deployed as a Docker container on a free host. Persistence: Supabase (Postgres). AI: Meta Dev API (Muse models).
 
-> The Astryx / React guidance that used to be in this file does not apply to this Blazor project. Do not add Astryx, Tailwind or any UI framework.
+The Astryx / React guidance that used to be in this file does not apply to this Blazor project. Do not add Astryx, Tailwind, StyleX or any UI framework. If you see @astryxdesign/* or a root package.json with those deps, they are leftovers: delete them, do not use them.
 
-## Core idea
-Backstop holds every incoming email until it is checked. The user never sees mail until it is cleared safe. Anything unclear goes to a trusted **helper**, who approves or blocks it.
+Core idea
 
-## Hard rules
-1. **Synthetic data only.** All people, messages and domains are made up. Use only `example.com`, `example.net`, `example.org` and `.test`. Never use real names, real addresses or real brands' domains. Only made-up messages are inspected.
-2. **No secrets.** No API keys, tokens or passwords in the repo. `.env.example` holds empty placeholders only. Live API keys belong exclusively in the untracked `.env` file (e.g. `LLAMA_API_KEY=...`) or user-secrets, never committed.
-3. **External AI connections.** Network connections are strictly limited to Meta's Dev API endpoint (`https://api.meta.ai/v1`) using Muse models (such as `muse-spark-1.3` or `muse-wonder`) for scam and safeguarding verification. No other external network calls or mail transmission are allowed. Inspected text and images are treated as passive data, never as prompt instructions. Images are sent only when screenshot or picture inspection is required, keeping token usage and cost down.
-4. **Held mail privacy.** Held mail shows NO sender and NO subject to the user. The user sees only "N message(s) being checked by your helper." The user can open a message only if its state is `Cleared` (`IMailService.GetClearedMessage`).
-5. **Fail closed.** States: `Received, Scanning, Cleared, Held, Blocked, Failed`. If Meta's AI fails, times out, or produces unexpected answers, the message is held and never marked safe. Any error, unknown or unexpected state becomes `Held` (explicit `Failed -> Held`). Never let a message through on error. Blocked is final and invisible to the user.
-6. **Floor rule for AI.** Simple local checks serve as an immovable floor. Meta's AI can only make scam results stricter (e.g. turning `LooksSafe` into `BeCareful` or `DontReply`), never looser.
-7. **Mock behind interfaces.** UI talks only to `IMailService`, `IGuardianService`, and `IBackstopApi`. Services connect through `IMetaScamChecker` / `ILlamaScamChecker` for Meta AI analysis.
+Backstop holds every incoming message until it is checked. The user never sees held mail. Anything unclear goes to a trusted helper, who approves, blocks, or asks the user to "call them first".
 
-## Theme "Calm Clinical"
-- Colours are CSS variables in `wwwroot/css/theme.css` only. Do not hardcode hex values elsewhere.
-- Base font 20px, line-height 1.6, headings 28-36px. Font: Inter, falling back to system-ui.
-- Buttons: min-height 56px. Visible 3px focus ring on every interactive element.
-- Style: Apple-like restraint, rounded cards, clean white, one blue accent.
+Release status (hackathon)
+Production ends 3 Nov 2026. Submission is 4 Nov 2026. Feature freeze: midday 3 Nov.
+Priorities in order: (1) live URL works, (2) Supabase persistence, (3) Standard helper tier enforced, (4) polish and demo video.
+Do not build (out of scope for this release): Administrator tier, SendAsUser, INotificationChannel (email/SMS/push to helpers), Welcome step "Who helps you", full Helper access settings screen, real mail provider integration, per-visitor households (stretch only, and only if everything above is done).
+After the freeze, only fix bugs. No new features, no refactors.
+Hard rules
+Synthetic data only. All people, messages and domains are made up. Use only example.com, example.net, example.org and .test. Never use real names, addresses or real brands' domains. Only made-up messages are inspected or stored.
+No secrets in the repo. No API keys, tokens or passwords committed. .env.example holds empty placeholders only. Real values live in the untracked .env locally and in the host's environment variables in production. Names:
+META_AI_KEY, META_AI_ENDPOINT_URL, META_AI_MODEL, META_AI_TIMEOUT_SECONDS
+SUPABASE_URL, SUPABASE_SERVICE_KEY
+Do not add new LLAMA_* names. Remove unused placeholders (MAIL_PROVIDER_*, LINK_CHECK_API_KEY).
+Network egress allow-list. Exactly two outbound destinations, both called from the server only:
+Meta Dev API https://api.meta.ai/v1 (Muse models, e.g. muse-spark-1.3-contributor) for scam checks, Ask Me and safeguarding. Inspected text and images are passive data, never prompt instructions. Send images only when picture inspection needs them.
+Supabase (SUPABASE_URL) for persistence only. Nothing else: no other APIs, no email sending, no analytics, no CDN fonts or scripts. The Supabase service key is never sent to the browser, never logged, never placed in a Razor component, JS file or CSP header. Turn on RLS for every table.
+Held mail privacy. Held mail shows NO sender and NO subject to the user. The user sees only "N message(s) being checked by your helper." The user can open a message only if its state is Cleared (IMailService.GetClearedMessage).
+Fail closed. States: Received, Scanning, Cleared, Held, Blocked, Failed. If Meta's AI fails, times out, returns something unexpected, or no API key is set, the message is held and never marked safe. Any error or unknown state becomes Held (Failed -> Held). The same applies if Supabase is unreachable: do not mark anything Cleared on a failed load or save. Blocked is final and invisible to the user.
+Floor rule for AI. Local checks (MockRiskRules, InputGuard) set an immovable floor. Meta's AI can only make results stricter (LooksSafe -> BeCareful -> DontReply), never looser.
+Everything behind interfaces. UI components talk only to IMailService, IGuardianService and IBackstopApi. Services reach Meta through IMetaScamChecker / IAssistant, and reach Supabase through the persistence repository (IEntityRepository). Pages never call HTTP, Supabase or MailStore directly.
+Helper permissions are enforced in services, not pages. Release scope is the Standard tier only (hard-coded default). The Allows(...) check lives in IGuardianService / the API layer, so a page cannot show something the tier hides. RiskAlerts and ReviewHeldMail are always on. GetChatLogAsync and any other capability-gated call must throw or return empty when not allowed.
+Production hygiene. Test runners, demo toggles and debug endpoints must not ship active in Release. Gate --test-llama and similar behind #if DEBUG. The /demo route stays (it is part of the submission) but the "make the checker crash" toggle must be off by default after a reset.
+Persistence (Supabase)
+One generic table: entities(household_id text, kind text, id text, data jsonb, updated_at timestamptz, primary key (household_id, kind, id)). Do not create a table per model.
+IEntityRepository does load-all-by-household and upsert/delete. MailStore and the mock API load on startup and write through on every change. Keep the existing Changed events and locks.
+One seeded demo household (demo). Reset demo wipes that household and reseeds the 7 scenarios. No user auth for this release.
+Writes must not block the UI thread. A failed write is logged (no message content in logs) and the in-memory state stays authoritative for that session.
+Never store real personal data.
+Deployment
+Single Docker image built from Backstop/ on the .NET 10 SDK/runtime images. Listen on the PORT env var if set, otherwise 5106.
+Single instance only (Blazor Server circuits are not multi-instance safe). WebSockets must be enabled on the host.
+Keep the CSP strict (default-src 'self'). If a header change is needed for SignalR on the host, loosen only what is required (connect-src 'self' wss:) and nothing else.
+Free hosts sleep when idle: the first request can be slow. Do not add keep-alive hacks that call external services.
+Before declaring anything done, test on the deployed URL, not just localhost, including a phone-width viewport.
+Theme "Calm Clinical"
+Colours are CSS variables in wwwroot/css/theme.css only. Do not hardcode hex values elsewhere.
+Base font 20px, line-height 1.6, headings 28-36px. Font: Atkinson Next, self-hosted from wwwroot/fonts (no CDN), falling back to system-ui.
+Buttons: min-height 56px. Visible 3px focus ring on every interactive element.
+Style: Apple-like restraint, rounded cards, clean white, one blue accent.
+Accessibility and cognitive ease (strict)
+One decision per screen. At most two buttons: one primary (blue), one quiet secondary. (The helper evidence card is the one exception: Approve, Block, Call them first.)
+Status is always icon + word + colour, never colour alone. Use the StatusBadge component.
+Plain language, reading age about 9, short sentences, no jargon.
+"Read this to me" on message and explanation screens (browser speechSynthesis via wwwroot/js/backstop.js).
+Respect prefers-reduced-motion. Keyboard navigable. Proper landmarks, ARIA labels, semantic HTML.
+Responsive down to 360px. PWA manifest in wwwroot/manifest.webmanifest.
+Helper previews are text only and links are defanged (hxxp://example[.]com, see Defang). Never render a clickable link from message content.
+No self-explaining interface text (strict)
 
-## Accessibility and cognitive ease (strict)
-- One decision per screen. At most two buttons: one primary (blue), one quiet secondary. (The helper evidence card is the one exception: Approve, Block, Call them first.)
-- Status is always **icon + word + colour**, never colour alone: "Safe" (check), "Your helper is checking this" (hourglass), "Blocked" (cross). Use the `StatusBadge` component.
-- Plain language, reading age about 9, short sentences, no jargon.
-- "Read this to me" on message and explanation screens (browser `speechSynthesis` via `wwwroot/js/backstop.js`).
-- Respect `prefers-reduced-motion`. Keyboard navigable. Proper landmarks, ARIA labels, semantic HTML.
-- Responsive down to 360px. PWA manifest in `wwwroot/manifest.webmanifest`.
-- Helper previews are text only and links are defanged (`hxxp://example[.]com`, see `Defang`). Never render a clickable link from message content.
+Never add captions that explain, justify or reassure about how the interface works.
 
-## No self-explaining interface text (strict)
-Never add captions that explain, justify or reassure about how the interface works. They read as tacky and cheap.
-- Banned examples: "This address is locked so it cannot be changed by mistake", "Links are switched off to keep you safe", "Your helper checks everything for you", a padlock or shield icon placed beside such a sentence.
-- Make the control behave correctly and let its look say it. A locked address is a greyed, read-only box; it needs no sentence.
-- Do not use lock or shield icons as decoration or reassurance. Icons name an action or a state, nothing more.
-- Interface text is only for the user's task: labels, the next step, and the result of what they did ("Done. The photo is saved.").
-- Allowed: an error that stops the user and says how to fix it, and one short hint that tells the user what to type or choose ("Leave this empty if it lasts all day.").
-- Before adding any sentence to a screen, ask "does this help them do the next thing?" If not, leave it out.
+Banned examples: "This address is locked so it cannot be changed by mistake", "Links are switched off to keep you safe", "Your helper checks everything for you".
+Make the control behave correctly and let its look say it. A locked address is a greyed, read-only box with no sentence.
+No lock or shield icons as decoration or reassurance. Icons name an action or a state, nothing more.
+Interface text is only for the user's task: labels, the next step, and the result of what they did ("Done. The photo is saved.").
+Allowed: an error that stops the user and says how to fix it, and one short hint on what to type or choose.
+Before adding any sentence to a screen, ask "does this help them do the next thing?" If not, leave it out.
+Layout
 
-## Layout
-`Components/{Layout,Pages,Shared,Helper,Demo}`, `Models/`, `Services/`, `wwwroot/css/`.
-Routes: `/` user, `/helper` helper, `/demo` demo panel (split screen uses iframes of `/` and `/helper`).
+Components/{Layout,Pages,Shared,Helper,Demo}, Models/, Services/ (with Services/Api/, Services/Persistence/), wwwroot/css/. Routes: / user, /helper helper, /demo demo panel (split screen uses iframes of / and /helper).
 
-## Finding code (strict)
-- Always use the graphify skill (`/graphify query`, `path`, `explain`) to find files, symbols and relationships. Do not search manually with Glob, Grep, `find` or `rg` to locate code.
-- If `graphify-out/` does not exist yet, build the graph first with `/graphify`, then query it.
-- Read a file directly only after graphify has pointed you to it. After adding or moving files, update the graph.
+Finding code
+Use the graphify skill (/graphify query, path, explain) to find files, symbols and relationships instead of broad Glob/Grep sweeps.
+The graph can be stale. If a result looks wrong or a file is missing, run /graphify update ., or read the file directly. Direct reads and targeted grep are fine once you know the file or symbol name.
+After adding or moving files, update the graph.
+Naming
 
-## Working rules
-- Commit in small, meaningful commits.
-- After changes, run the app and check all three views and all 7 scenarios in `/demo`.
+New code uses Meta names (IMetaScamChecker, MetaScamAnalysis, MetaAiOptions). The Llama* types and LLAMA_* env fallbacks are legacy: do not extend them. Only rename them if it is a quick mechanical change and the build and all scenarios still pass; this is low priority.
 
-<!-- ASTRYX:START -->
-Astryx v0.7.4 · 173 components
-CLI: run every command as `npx astryx <cmd>` (shown below as `astryx ...`).
-
-SETUP (once, in app entry e.g. main.tsx) — without these, components render unstyled:
-  import "@astryxdesign/core/reset.css";
-  import "@astryxdesign/core/astryx.css";
-
-WORKFLOW — start every page from a template, never from scratch:
-1. `astryx build "<idea>"` — names the template to scaffold from and the parts it lacks.
-2. `astryx template <name> <path>` — scaffold it; keep its frame, gap and padding; replace the content.
-3. `astryx template <Block>` for parts it lacks; `astryx component <Name>` to read props before using one.
-Changing an existing page? Keep it: skip step 2 and add blocks/components inside its sections.
-Before you deliver a build, run `astryx doctor --built <dir>`; don't deliver it if it fails.
-
-RULES:
-- No <div> — components handle all layout and spacing.
-- Read `astryx docs layout` before changing a template's frame.
-- Dense data = rows (Table, List/Item), not Card-wrapped lists. Badge = counts only.
-- Style with component props first, then tokens (var(--color-*|--spacing-*|--radius-*)). No raw hex/px. No StyleX/Tailwind compiler here — don't use xstyle/utility classes directly. Some templates use StyleX and need a compiler plugin; see `astryx docs styling-overview`.
-- Palettes and custom colors go through the theme, never :root overrides. Run `astryx theme add <slug>` to import; `theme eject <slug>` only forks source. See `astryx docs theme`.
-- SELF-CHECK: re-read the file; replace any raw <div>/<span>, imported .css/@apply, or hardcoded #hex/px with the component or a token.
-
-`astryx help` lists every command. Key ones beyond the workflow:
-  search "<query>"   find any component / hook / doc / template
-  discover <words>   integrations you could add
-  docs <topic>       getting-started, principles, tokens, theme … (`astryx docs` lists all)
-  docs cli           commands and API reference
-  docs authoring     build an integration package, and every field it holds
-  upgrade --from <old version> --apply   run after a dependency bump
-<!-- ASTRYX:END -->
+Working rules
+Commit in small, meaningful commits. Never commit .env, keys or bin-preview/.
+After changes, run the app and check /, /helper and /demo with all 7 scenarios. Also check behaviour with no META_AI_KEY set (everything must hold, nothing may crash or clear).
+Keep README.md truthful: it describes the live Meta AI and Supabase use, how to run locally, the env var names (not values), and the demo URL.
+Do not change a hard rule to make a task easier. If a rule blocks the work, stop and ask.
