@@ -45,6 +45,11 @@ Never add captions that explain, justify or reassure about how the interface wor
 `Components/{Layout,Pages,Shared,Helper,Demo}`, `Models/`, `Services/`, `wwwroot/css/`.
 Routes: `/` user, `/helper` helper, `/demo` demo panel (split screen uses iframes of `/` and `/helper`).
 
+## Finding code (strict)
+- Always use the graphify skill (`/graphify query`, `path`, `explain`) to find files, symbols and relationships. Do not search manually with Glob, Grep, `find` or `rg` to locate code.
+- If `graphify-out/` does not exist yet, build the graph first with `/graphify`, then query it.
+- Read a file directly only after graphify has pointed you to it. After adding or moving files, update the graph.
+
 ## Working rules
 - Commit in small, meaningful commits.
 - After changes, run the app and check all three views and all 7 scenarios in `/demo`.
