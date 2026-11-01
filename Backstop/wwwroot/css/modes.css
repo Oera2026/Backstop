@@ -423,3 +423,11 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
   .site-header:not(.site-header--helper) .site-nav a { padding-inline: .4rem; }
 }
 @media (max-width: 959px) { .settings-foot { position: static; border-top: 0; padding-inline: 0; } }
+
+/* Failure notice: plain words, then a closed box of technical detail. */
+.failure { margin-top: .6rem; }
+.failure__message { display: flex; gap: .5rem; align-items: flex-start; margin: 0 0 .4rem; color: var(--check); font-weight: 600; }
+.failure__tech { border: var(--line) solid var(--border); border-radius: var(--radius); background: var(--bg); }
+.failure__tech > summary { cursor: pointer; padding: .5rem .75rem; min-height: 44px; display: flex; align-items: center; font-size: .9rem; }
+.failure__tech > summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.failure__tech pre { margin: 0; padding: .6rem .75rem; border-top: var(--line) solid var(--border); font-size: .85rem; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }

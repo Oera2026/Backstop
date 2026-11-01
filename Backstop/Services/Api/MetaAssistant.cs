@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using Backstop.Models;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
@@ -23,8 +24,11 @@ public sealed class MetaAssistant : IAssistant
     private readonly ILogger<MetaAssistant> _logger;
     private readonly MetaAiOptions _options;
 
-    public MetaAssistant(HttpClient http, IConfiguration config, ILogger<MetaAssistant> logger)
+    private readonly MetaCallGuard? _guard;
+
+    public MetaAssistant(HttpClient http, IConfiguration config, ILogger<MetaAssistant> logger, MetaCallGuard? guard = null)
     {
+        _guard = guard;
         _http = http;
         _logger = logger;
         _options = MetaAiOptions.Load(config);
@@ -58,12 +62,17 @@ public sealed class MetaAssistant : IAssistant
         if (string.IsNullOrWhiteSpace(_options.ApiKey))
         {
             _logger.LogWarning("No Meta AI API key configured. Ask Me cannot answer.");
-            return Fail("API key not configured");
+            return Fail("API key not configured", MetaFailures.NoKey(_options));
         }
         if (!MetaAiScamChecker.IsAllowedEndpoint(_options.EndpointUrl))
         {
             _logger.LogError("Meta AI endpoint is not https://{Host}. Nothing was sent.", MetaAiScamChecker.AllowedHost);
-            return Fail("Endpoint is not the approved Meta host");
+            return Fail("Endpoint is not the approved Meta host", MetaFailures.BadEndpoint(_options));
+        }
+        if (_guard is not null && !_guard.TryEnter(out var waitSeconds, out var used))
+        {
+            _logger.LogWarning("Meta call limit reached ({Used} of {Limit} in the last minute). Ask Me cannot answer.", used, _guard.Limit);
+            return Fail("Local call limit reached", MetaFailures.Busy(waitSeconds, used, _guard.Limit, _options));
         }
 
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -109,7 +118,7 @@ public sealed class MetaAssistant : IAssistant
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogError("Meta AI (Ask Me) returned status {StatusCode}", (int)response.StatusCode);
-                return Fail("Status " + (int)response.StatusCode);
+                return Fail("Status " + (int)response.StatusCode, MetaFailures.Status(response.StatusCode, response.Headers.RetryAfter?.Delta is { } d ? (int?)Math.Ceiling(d.TotalSeconds) : null, _options));
             }
             if (response.Content.Headers.ContentLength is > MaxResponseBytes) return Fail("Response too large");
 
@@ -124,19 +133,34 @@ public sealed class MetaAssistant : IAssistant
             }
             return Parse(Encoding.UTF8.GetString(ms.ToArray()));
         }
+        catch (Polly.CircuitBreaker.BrokenCircuitException)
+        {
+            _logger.LogWarning("Meta AI circuit is open (Ask Me).");
+            return Fail("Circuit open", MetaFailures.CircuitOpen(_options));
+        }
+        catch (Polly.Timeout.TimeoutRejectedException)
+        {
+            _logger.LogWarning("Meta AI (Ask Me) timed out.");
+            return Fail("Timed out", MetaFailures.Timeout(_options));
+        }
         catch (OperationCanceledException)
         {
             _logger.LogWarning("Meta AI (Ask Me) timed out or was cancelled.");
-            return Fail("Timed out");
+            return Fail("Timed out", MetaFailures.Timeout(_options));
         }
-        catch (Exception)
+        catch (HttpRequestException ex)
         {
-            _logger.LogError("Unexpected error calling Meta AI for Ask Me.");
-            return Fail("Unexpected error");
+            _logger.LogError("Could not reach Meta AI for Ask Me ({Type}).", ex.GetType().Name);
+            return Fail("Network error", MetaFailures.Network(ex, _options));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Unexpected error calling Meta AI for Ask Me ({Type}).", ex.GetType().Name);
+            return Fail("Unexpected error", MetaFailures.Unexpected(ex, _options));
         }
     }
 
-    private static AssistantReply Fail(string note) => new("", false, FailureNote: note);
+    private static AssistantReply Fail(string note, FailureInfo? info = null) => new("", false, FailureNote: note, Failure: info ?? MetaFailures.BadReply(note, null));
 
     private static AssistantReply Parse(string responseBody)
     {

@@ -4,4 +4,4 @@ namespace Backstop.Models;
 public sealed record AskTurn(bool FromUser, string Text);
 
 /// <summary>What Ask Me says back. <see cref="Href"/> is a page in the app, never an address from the message.</summary>
-public sealed record AskReply(string Text, string? Href = null, string? LinkText = null, bool HelperTold = false);
+public sealed record AskReply(string Text, string? Href = null, string? LinkText = null, bool HelperTold = false, FailureInfo? Failure = null);

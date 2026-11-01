@@ -66,13 +66,13 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
 
         // If checking a picture, send image bytes to the multimodal AI endpoint;
         // otherwise, send text only to save vision processing costs.
-        var (finalVerdict, finalReason, reviewStatus) = await ApplyAiAsync(
+        var (finalVerdict, finalReason, reviewStatus, failure) = await ApplyAiAsync(
             isPicture ? c => c.CheckScamAsync(null, request.Picture, imgType, ct) : c => c.CheckScamAsync(display, null, null, ct),
             aiRequired: isPicture, floorVerdict, MockRiskRules.ReasonFor(floorVerdict, floor.TopBecause), combinedFlags);
 
         var flags = combinedFlags.Take(4).ToList();
         var result = new CheckResult(NewId("chk"), request.Kind, finalVerdict, finalReason, flags,
-            display, floor.Highlights.Where(h => flags.Any(f => f.Id == h.FlagId)).ToList(), null, reviewStatus, false, DateTimeOffset.Now);
+            display, floor.Highlights.Where(h => flags.Any(f => f.Id == h.FlagId)).ToList(), null, reviewStatus, false, DateTimeOffset.Now, failure);
         lock (_gate) _checks[result.Id] = new(result, text.Trim(), reviewStatus == ReviewStatus.Held ? DateTimeOffset.Now : null);
         return result;
     }
@@ -82,7 +82,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
     /// Any failure, exception or odd answer holds the item. When <paramref name="aiRequired"/> is set
     /// (pictures, which local rules cannot read) a missing checker also holds it.
     /// </summary>
-    private async Task<(Verdict Verdict, string Reason, ReviewStatus Status)> ApplyAiAsync(
+    private async Task<(Verdict Verdict, string Reason, ReviewStatus Status, FailureInfo? Failure)> ApplyAiAsync(
         Func<ILlamaScamChecker, Task<MetaScamAnalysis>> ask, bool aiRequired,
         Verdict floorVerdict, string floorReason, List<RiskFlag> flags)
     {
@@ -91,26 +91,26 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         // Someone may be in danger, or the checker wants a human: the helper is always told, whatever else was decided.
         // The local rules and the AI can both raise this. Nothing can lower it.
         if (r.Status != ReviewStatus.Held && flags.Any(f => f.Id is "at-risk" or "review-needed"))
-            return (IsStricter(Verdict.BeCareful, r.Verdict) ? Verdict.BeCareful : r.Verdict, r.Reason, ReviewStatus.Held);
+            return (IsStricter(Verdict.BeCareful, r.Verdict) ? Verdict.BeCareful : r.Verdict, r.Reason, ReviewStatus.Held, r.Failure);
         return r;
     }
 
-    private async Task<(Verdict Verdict, string Reason, ReviewStatus Status)> ApplyAiCoreAsync(
+    private async Task<(Verdict Verdict, string Reason, ReviewStatus Status, FailureInfo? Failure)> ApplyAiCoreAsync(
         Func<ILlamaScamChecker, Task<MetaScamAnalysis>> ask, bool aiRequired,
         Verdict floorVerdict, string floorReason, List<RiskFlag> flags)
     {
         if (llamaChecker is null)
         {
-            if (!aiRequired) return (floorVerdict, floorReason, ReviewStatus.NotAsked);
-            return HoldForReview(flags, floorVerdict, "We could not check this picture, so your helper will look at it.");
+            if (!aiRequired) return (floorVerdict, floorReason, ReviewStatus.NotAsked, null);
+            return HoldForReview(flags, floorVerdict, "We could not check this picture, so your helper will look at it.", new("The picture checker is not switched on yet. Please tell the person who looks after this app.", "Code: NO_CHECKER\nWhat: No IMetaScamChecker is registered."));
         }
 
         MetaScamAnalysis ai;
         try { ai = await ask(llamaChecker); }
         catch (OperationCanceledException) { throw; }
-        catch (Exception)
+        catch (Exception ex)
         {
-            return HoldForReview(flags, floorVerdict, "We could not finish checking this, so your helper will look at it.");
+            return HoldForReview(flags, floorVerdict, "We could not finish checking this, so your helper will look at it.", new("Something went wrong while checking. Please try again in a minute.", $"Code: CHECK_EXCEPTION\nWhat: {ex.GetType().Name}\nTime: {DateTimeOffset.UtcNow:yyyy-MM-dd HH:mm:ss} UTC"));
         }
 
         foreach (var flag in ai.Flags)
@@ -119,18 +119,18 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         if (!ai.Success)
         {
             var stricter = IsStricter(Verdict.BeCareful, floorVerdict) ? Verdict.BeCareful : floorVerdict;
-            return (stricter, ai.Reason, ReviewStatus.Held);
+            return (stricter, ai.Reason, ReviewStatus.Held, ai.Failure);
         }
         return IsStricter(ai.Verdict, floorVerdict)
-            ? (ai.Verdict, ai.Reason, ReviewStatus.NotAsked)
-            : (floorVerdict, floorReason, ReviewStatus.NotAsked);
+            ? (ai.Verdict, ai.Reason, ReviewStatus.NotAsked, null)
+            : (floorVerdict, floorReason, ReviewStatus.NotAsked, null);
     }
 
-    private static (Verdict, string, ReviewStatus) HoldForReview(List<RiskFlag> flags, Verdict floorVerdict, string reason)
+    private static (Verdict, string, ReviewStatus, FailureInfo?) HoldForReview(List<RiskFlag> flags, Verdict floorVerdict, string reason, FailureInfo? failure)
     {
         if (flags.All(f => f.Id != "review-needed"))
             flags.Add(new("review-needed", "hourglass", "Needs helper check", "The automatic check could not finish, so your helper will check this."));
-        return (IsStricter(Verdict.BeCareful, floorVerdict) ? Verdict.BeCareful : floorVerdict, reason, ReviewStatus.Held);
+        return (IsStricter(Verdict.BeCareful, floorVerdict) ? Verdict.BeCareful : floorVerdict, reason, ReviewStatus.Held, failure);
     }
 
     private static bool IsStricter(Verdict a, Verdict b)
@@ -173,7 +173,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         var floorVerdict = MockRiskRules.VerdictFor(seen.Sum(f => MockRiskRules.Weight(f.Id)));
         var combinedFlags = new List<RiskFlag>(seen.OrderByDescending(f => MockRiskRules.Weight(f.Id)));
 
-        var (finalVerdict, finalReason, reviewStatus) = await ApplyAiAsync(
+        var (finalVerdict, finalReason, reviewStatus, failure) = await ApplyAiAsync(
             c => c.CheckScamAsync(display, null, null, ct), aiRequired: false, floorVerdict,
             MockRiskRules.ReasonFor(floorVerdict, MockRiskRules.BecauseFor(combinedFlags.FirstOrDefault()?.Id), startedFriendly: firstFlagged > 0),
             combinedFlags);
@@ -181,7 +181,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         var flags = combinedFlags.Take(4).ToList();
         var result = new CheckResult(NewId("chk"), CheckKind.Conversation, finalVerdict,
             finalReason,
-            flags, display, [], thread, reviewStatus, false, DateTimeOffset.Now);
+            flags, display, [], thread, reviewStatus, false, DateTimeOffset.Now, failure);
         lock (_gate) _checks[result.Id] = new(result, conversation.Trim(), reviewStatus == ReviewStatus.Held ? DateTimeOffset.Now : null);
         return result;
     }

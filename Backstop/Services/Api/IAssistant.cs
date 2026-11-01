@@ -14,7 +14,8 @@ public sealed record AssistantReply(
     bool NeedsHuman = false,
     bool AtRisk = false,
     string? Suggest = null,
-    string? FailureNote = null);
+    string? FailureNote = null,
+    Backstop.Models.FailureInfo? Failure = null);
 
 /// <summary>Talks with the user in Ask Me. The only implementation talks to Meta's Muse models.</summary>
 public interface IAssistant

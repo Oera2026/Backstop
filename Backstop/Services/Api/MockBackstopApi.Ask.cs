@@ -23,12 +23,14 @@ public sealed partial class MockBackstopApi
         var looksScammy = floor.Flags.Any(f => f.Id is not ("at-risk" or "injection"));
 
         AssistantReply reply;
-        if (assistant is null) reply = new("", false, FailureNote: "No assistant configured");
+        if (assistant is null) reply = new("", false, FailureNote: "No assistant configured",
+            Failure: new("Ask Me is not switched on yet. Please tell the person who looks after this app.", "Code: NO_ASSISTANT\nWhat: No IAssistant is registered."));
         else
         {
             try { reply = await assistant.ReplyAsync([.. history.Select(t => new AssistantTurn(t.FromUser, t.Text))], text, ct); }
             catch (OperationCanceledException) { throw; }
-            catch (Exception) { reply = new("", false, FailureNote: "Assistant failed"); }
+            catch (Exception ex) { reply = new("", false, FailureNote: "Assistant failed",
+                Failure: new("Something went wrong. Please try again in a minute.", $"Code: ASSISTANT_EXCEPTION\nWhat: {ex.GetType().Name}\nTime: {DateTimeOffset.UtcNow:yyyy-MM-dd HH:mm:ss} UTC")); }
         }
 
         // Someone may be in danger, or the assistant wants a human: the helper is always told.
@@ -42,9 +44,12 @@ public sealed partial class MockBackstopApi
             if (told && !answer.Contains("helper", StringComparison.OrdinalIgnoreCase) && !answer.Contains(Helper, StringComparison.OrdinalIgnoreCase))
                 answer += $" I have told {Helper}.";
         }
-        else answer = told
-            ? $"I could not answer that properly, so I have asked {Helper} to look at it."
-            : "Sorry, I could not think of an answer just now. Please try again in a moment.";
+        else
+        {
+            // Say what went wrong, in plain words. The technical detail travels separately.
+            var plain = reply.Failure?.Message ?? "Sorry, I could not think of an answer just now. Please try again in a moment.";
+            answer = told ? $"{plain} I have asked {Helper} to look at your message." : plain;
+        }
 
         // Only fixed pages of the app can be suggested, never anything taken from the message or the reply.
         var suggest = looksScammy ? "check" : reply.Suggest;
@@ -56,7 +61,7 @@ public sealed partial class MockBackstopApi
             "story" => ("stories/new", "Make a story"),
             _ => ((string?)null, (string?)null),
         };
-        return new AskReply(answer, href, link, told);
+        return new AskReply(answer, href, link, told, reply.Success ? null : reply.Failure);
     }
 
     /// <summary>Puts the conversation in the helper's queue, held, so a person looks at it.</summary>

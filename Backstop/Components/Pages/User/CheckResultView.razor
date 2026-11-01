@@ -29,6 +29,10 @@ else if (_r.Status == ReviewStatus.Held)
     <p><StatusBadge State="MessageState.Held" /></p>
     <h1>We've asked @Helper to check this.</h1>
     <p class="lead">You'll see it once it's cleared.</p>
+    @if (_r.Failure is { } failure)
+    {
+        <FailureNotice Failure="failure" />
+    }
     @if (_r.CallRequested)
     {
         <p class="call-note"><Icon Name="phone" /> <span>@Helper will call you about it.</span></p>

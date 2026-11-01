@@ -71,8 +71,11 @@ public sealed class MetaAiScamChecker : ILlamaScamChecker, IMetaScamChecker
         && u.IsDefaultPort
         && string.IsNullOrEmpty(u.UserInfo);
 
-    public MetaAiScamChecker(HttpClient http, IConfiguration config, ILogger<MetaAiScamChecker> logger)
+    private readonly MetaCallGuard? _guard;
+
+    public MetaAiScamChecker(HttpClient http, IConfiguration config, ILogger<MetaAiScamChecker> logger, MetaCallGuard? guard = null)
     {
+        _guard = guard;
         _http = http;
         _config = config;
         _logger = logger;
@@ -97,19 +100,27 @@ public sealed class MetaAiScamChecker : ILlamaScamChecker, IMetaScamChecker
                 "Our checker needs review before you reply.",
                 [new("review-needed", "hourglass", "Needs helper check", "The automated check could not connect, so your helper will check this.")],
                 Success: false,
-                FailureNote: "API key not configured"
+                FailureNote: "API key not configured",
+                Failure: MetaFailures.NoKey(_options)
             );
         }
 
         if (!IsAllowedEndpoint(_options.EndpointUrl))
         {
             _logger.LogError("Meta AI endpoint is not https://{Host}. Nothing was sent. Failing closed.", AllowedHost);
-            return FailClosed("Endpoint is not the approved Meta host");
+            return FailClosed("Endpoint is not the approved Meta host", MetaFailures.BadEndpoint(_options));
         }
         if (imageBytes is { Length: > MaxImageBytes })
-            return FailClosed("Image is too large to inspect");
+            return FailClosed("Image is too large to inspect", new("That picture is too big to check. Please choose a smaller one.", "Code: IMAGE_TOO_LARGE\nWhat: Image is over " + MaxImageBytes / 1024 / 1024 + " MB."));
         if (imageBytes is { Length: > 0 } && !AllowedImageTypes.Contains((mimeType ?? "").ToLowerInvariant()))
-            return FailClosed("Image type is not allowed");
+            return FailClosed("Image type is not allowed", new("We can only check photos and screenshots. Please choose a different file.", "Code: IMAGE_TYPE_NOT_ALLOWED\nWhat: Allowed types are png, jpeg, gif and webp."));
+
+        // The app's own cap on calls to Meta. Over it, nothing is sent and the item is held.
+        if (_guard is not null && !_guard.TryEnter(out var waitSeconds, out var used))
+        {
+            _logger.LogWarning("Meta call limit reached ({Used} of {Limit} in the last minute). Failing closed.", used, _guard.Limit);
+            return FailClosed("Local call limit reached", MetaFailures.Busy(waitSeconds, used, _guard.Limit, _options));
+        }
 
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(TimeSpan.FromSeconds(Math.Max(2, _options.TimeoutSeconds)));
@@ -189,7 +200,9 @@ public sealed class MetaAiScamChecker : ILlamaScamChecker, IMetaScamChecker
             {
                 // Status only. The body could echo the inspected message, so it is never logged.
                 _logger.LogError("Meta AI API returned non-success code {StatusCode}", (int)response.StatusCode);
-                return FailClosed("Meta AI API returned non-success status " + (int)response.StatusCode);
+                var retry = response.Headers.RetryAfter?.Delta is { } d ? (int?)Math.Ceiling(d.TotalSeconds) : null;
+                return FailClosed("Meta AI API returned non-success status " + (int)response.StatusCode,
+                    MetaFailures.Status(response.StatusCode, retry, _options));
             }
             if (response.Content.Headers.ContentLength is > MaxResponseBytes)
                 return FailClosed("Meta AI response was too large");
@@ -217,15 +230,30 @@ public sealed class MetaAiScamChecker : ILlamaScamChecker, IMetaScamChecker
             }
             return analysis;
         }
+        catch (Polly.CircuitBreaker.BrokenCircuitException)
+        {
+            _logger.LogWarning("Meta AI circuit is open. Failing closed.");
+            return FailClosed("Meta AI circuit open", MetaFailures.CircuitOpen(_options));
+        }
+        catch (Polly.Timeout.TimeoutRejectedException)
+        {
+            _logger.LogWarning("Meta AI check timed out. Failing closed.");
+            return FailClosed("Meta AI API timed out", MetaFailures.Timeout(_options));
+        }
         catch (OperationCanceledException)
         {
             _logger.LogWarning("Meta AI check timed out or was cancelled. Failing closed to protect user.");
-            return FailClosed("Meta AI API timed out");
+            return FailClosed("Meta AI API timed out", MetaFailures.Timeout(_options));
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError("Could not reach Meta AI ({Type}). Failing closed.", ex.GetType().Name);
+            return FailClosed("Network error", MetaFailures.Network(ex, _options));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unexpected error calling Meta AI API. Failing closed.");
-            return FailClosed("Unexpected error");
+            return FailClosed("Unexpected error", MetaFailures.Unexpected(ex, _options));
         }
     }
 
@@ -243,14 +271,15 @@ public sealed class MetaAiScamChecker : ILlamaScamChecker, IMetaScamChecker
         return Encoding.UTF8.GetString(ms.ToArray());
     }
 
-    private static MetaScamAnalysis FailClosed(string reason)
+    private static MetaScamAnalysis FailClosed(string reason, FailureInfo? failure = null)
     {
         return new MetaScamAnalysis(
             Verdict.BeCareful,
             "We asked your helper to check this before you reply.",
             [new("review-needed", "hourglass", "Needs helper check", "The automated check was slow or interrupted, so your helper is checking it.")],
             Success: false,
-            FailureNote: reason
+            FailureNote: reason,
+            Failure: failure ?? MetaFailures.BadReply(reason, null)
         );
     }
 

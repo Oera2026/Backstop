@@ -4,7 +4,7 @@ A safe email client for elderly people and adults with learning disabilities.
 Backstop holds every incoming email until it is checked. The user never sees mail until it is cleared safe.
 If a message is not clearly safe, a trusted person (the **helper**) reviews it and approves or blocks it.
 
-> This is a **front-end shell**. All data is synthetic and hardcoded. There is no backend, no real email, no API calls and no secrets.
+> All data is synthetic. There is no real email. Scam checks and Ask Me call Meta's Dev API from the server. No secrets are in the repo.
 
 ## Run it
 
@@ -16,6 +16,19 @@ dotnet run
 ```
 
 Then open http://localhost:5106.
+
+## Configuration
+
+Set these as environment variables (locally in an untracked `.env`, in production in the host's settings). `.env.example` lists the names with empty values.
+
+| Name | What |
+|---|---|
+| `PORT` | Port to listen on. Defaults to 5106. |
+| `META_AI_KEY` | Meta Dev API key. With no key, every check fails closed (held), and Ask Me says it cannot answer. |
+| `META_AI_ENDPOINT_URL`, `META_AI_MODEL`, `META_AI_TIMEOUT_SECONDS` | Meta endpoint (must be `https://api.meta.ai`), model and timeout. |
+| `MetaAI:MaxCallsPerMinute` | Cap on calls to Meta per minute, shared by all visitors. Default 40. Over the cap, items are held and Ask Me shows a "busy" message. Set as the environment variable `MetaAI__MaxCallsPerMinute` (double underscore). |
+
+Calls to Meta retry twice with backoff, honour `Retry-After`, and pause for 20 seconds if most recent calls fail. Any failure ends in Held, never Cleared. Errors show a plain message and a closed "Technical details" box.
 
 ## Routes
 
