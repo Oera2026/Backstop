@@ -1,5 +1,16 @@
 // Small JS interop: read text aloud with the browser's built-in speech. No network, no data leaves the device.
 window.backstop = {
+  scrollToEnd(el) {
+    if (!el) return;
+    const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches || document.documentElement.dataset.motion === "calm";
+    // Wait two frames so the bubble that was just added has been laid out, then measure.
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      // The composer sticks to the bottom of the screen, so stop short of it instead of scrolling behind it.
+      const composer = document.querySelector(".composer");
+      el.style.scrollMarginBottom = composer ? Math.max(0, window.innerHeight - composer.getBoundingClientRect().top) + 8 + "px" : "0px";
+      el.scrollIntoView({ block: "end", behavior: calm ? "auto" : "smooth" });
+    }));
+  },
   speak(text) {
     if (!('speechSynthesis' in window)) return false;
     window.speechSynthesis.cancel();

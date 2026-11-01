@@ -1,50 +1,54 @@
-/* "Easy Read" theme. Change colours here only.
-   Deep navy ink on white, pale blue bands, one marker yellow used as a highlighter.
-   State colours (green, orange, red) always travel with an icon and a word.
-   Every text pair below is at least 7:1 (the lowest is 5.6:1 on its tint).
+/* "Inclusive Design" theme. Change colours here only.
+   Navy and green carry the brand, amber and red carry warnings. None of them is ever alone:
+   state colours travel with an icon and a word.
+   Brights (#166534 green, #F59E0B amber, #DC2626 red) fill backgrounds and borders.
+   Text on a tint uses the darker text colour, so every text pair meets WCAG AA (4.5:1) and most reach 7:1.
    Dark mode swaps the same tokens (see data-scheme below), so no other file needs a dark rule. */
 :root {
   color-scheme: light;
 
   --bg: #FFFFFF;
-  --band: #E2EAFF;
-  --surface: #F0F4FF;
-  --rule: #B8C6EE;
+  --band: #D6ECEE;
+  --surface: #F3F9F9;
+  --rule: #6B7280;
+  --border: #6B7280;
 
-  --navy: #0B2A6F;
-  --navy-hover: #061B4D;
+  --navy: #0F4C5C;
+  --navy-hover: #0A3440;
   --on-navy: #FFFFFF;
 
-  --header: #0B2A6F;
+  --header: #0F4C5C;
   --on-header: #FFFFFF;
 
-  --text: #0B1B44;
-  --text-2: #31406B;
+  --text: #111827;
+  --text-2: #374151;
 
-  --accent: #0B2A6F;
-  --accent-hover: #061B4D;
-  --accent-soft: #E2EAFF;
+  --accent: #0F4C5C;
+  --accent-hover: #0A3440;
+  --accent-soft: #E1F1F2;
   --on-accent: #FFFFFF;
 
-  --marker: #FFE14D;
-  --on-marker: #0B1B44;
+  --marker: #F59E0B;
+  --on-marker: #111827;
 
-  --logo-ink: #0B2A6F;
+  --logo-ink: #0F4C5C;
 
-  --safe: #0A6B3A;
-  --safe-soft: #D3F0DF;
-  --check: #8A3F00;
-  --check-soft: #FFE2BD;
-  --block: #A3121F;
-  --block-hover: #7D0C17;
-  --block-soft: #FFD9DC;
+  --safe: #166534;
+  --safe-soft: #DCFCE7;
+  --check: #92400E;
+  --check-edge: #F59E0B;
+  --check-soft: #FEF3C7;
+  --block: #B91C1C;
+  --block-fill: #DC2626;
+  --block-hover: #991B1B;
+  --block-soft: #FEE2E2;
 
-  --line: 3px;
-  --radius: 12px;
-  --radius-lg: 16px;
+  --line: 2px;
+  --radius: 8px;
+  --radius-lg: 12px;
 
-  --focus: #0B2A6F;
-  --focus-halo: #FFE14D;
+  --focus: #0F4C5C;
+  --focus-halo: #F59E0B;
 
   --font: "Atkinson Hyperlegible Next", "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
@@ -52,19 +56,21 @@
 /* Settings: High contrast darkens secondary text, state colours and rules, and thickens lines. */
 :root[data-contrast="high"] {
   --text: #000000;
-  --text-2: #0B1B44;
-  --rule: #4A5F9F;
-  --band: #D2DEFF;
-  --navy: #061B4D;
-  --header: #061B4D;
-  --accent: #061B4D;
-  --safe: #064D29;
-  --check: #5E2B00;
-  --block: #7D0C17;
+  --text-2: #111827;
+  --rule: #374151;
+  --border: #111827;
+  --band: #C2E3E7;
+  --navy: #0A3440;
+  --header: #0A3440;
+  --accent: #0A3440;
+  --safe: #14532D;
+  --check: #78350F;
+  --block: #7F1D1D;
+  --block-fill: #B91C1C;
   --line: 4px;
 }
 
-/* Settings: Dark. Ink and fills turn pale blue, the page turns deep navy, yellow stays yellow.
+/* Settings: Dark. Ink and fills turn pale blue, the page turns deep navy, amber stays amber.
    js/settings.js sets data-scheme to "dark" for Dark, and for Match my device when the device is dark. */
 :root[data-scheme="dark"] {
   color-scheme: dark;
@@ -73,6 +79,7 @@
   --band: #1B2757;
   --surface: #131C42;
   --rule: #3A4C8F;
+  --border: #8FA0D8;
 
   --navy: #B7C8FF;
   --navy-hover: #DCE5FF;
@@ -94,17 +101,19 @@
   --check: #FFB866;
   --check-soft: #3E2A0B;
   --block: #FF8590;
+  --block-fill: #F87171;
   --block-hover: #FFA7AF;
   --block-soft: #4A1319;
 
   --focus: #FFFFFF;
-  --focus-halo: #FFE14D;
+  --focus-halo: #F59E0B;
 }
 
 :root[data-scheme="dark"][data-contrast="high"] {
   --text: #FFFFFF;
   --text-2: #EEF2FF;
   --rule: #8FA6EE;
+  --border: #DCE5FF;
   --band: #26357A;
   --navy: #DCE5FF;
   --header: #0B1230;
