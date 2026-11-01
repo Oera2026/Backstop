@@ -1,20 +1,13 @@
 @inherits ModeComponentBase
 
-<h2>Shared with you</h2>
-@if (_cards is null && _problem is null)
+@if (_problem is not null)
 {
-    <LoadingState Text="Getting shared memories…" />
-}
-else if (_problem is not null)
-{
+    <h2>Shared with you</h2>
     <ErrorState Message="@_problem" OnRetry="Load" />
 }
-else if (_cards!.Count == 0)
+else if (_cards is { Count: > 0 })
 {
-    <p class="empty">@UserName has not shared any memories with you.</p>
-}
-else
-{
+    <h2>Shared with you</h2>
     <ul class="memories">
         @foreach (var c in _cards)
         {

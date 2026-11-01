@@ -15,24 +15,19 @@
             </li>
         }
     </ul>
-    <div class="appnav__display">
-        <DisplayControls />
-    </div>
 </nav>
 
 @code {
     private sealed record Item(string Href, string Icon, string Label, string[] Paths, bool PhoneToo);
 
-    // Home sits behind the logo on phones, so the tab bar keeps to five big targets.
+    // Five places on the phone tab bar.
     private static readonly Item[] Items =
     [
-        new("home", "home", "Home", ["home"], false),
+        new("home", "home", "Home", ["home"], true),
         new("/", "mail", "Inbox", ["", "message", "compose", "sent", "contacts", "calendar", "search"], true),
-        new("check", "inspect", "Check", ["check"], true),
-        new("stories", "story", "Stories", ["stories", "make-sense"], true),
-        new("show-me", "camera", "Show me", ["show-me"], true),
-        new("explain", "book", "Explain", ["explain"], true),
-        new("remember", "bookmark", "Remember", ["remember"], false),
+        new("ask-me", "chat", "Ask Me", ["ask-me", "check", "stories", "make-sense", "show-me", "explain"], true),
+        new("messages", "people", "Messages", ["messages"], true),
+        new("remember", "bookmark", "Remember", ["remember"], true),
     ];
 
     protected override void OnInitialized() => Nav.LocationChanged += OnMoved;

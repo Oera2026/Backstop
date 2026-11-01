@@ -1,0 +1,68 @@
+@page "/messages"
+@inherits ModeComponentBase
+
+<PageTitle>Messages – Backstop</PageTitle>
+
+<h1>Messages</h1>
+
+@if (_threads is null && _problem is null)
+{
+    <LoadingState Text="Getting your messages…" />
+}
+else if (_problem is not null)
+{
+    <ErrorState Message="@_problem" OnRetry="Load" />
+}
+else
+{
+    @if (_held > 0)
+    {
+        <div class="banner banner--check" role="status">
+            <Icon Name="hourglass" />
+            <p>@(_held == 1 ? "1 message is" : $"{_held} messages are") being checked by your helper.</p>
+        </div>
+    }
+
+    <ul class="rows" aria-label="People you can message">
+        @foreach (var t in _threads!)
+        {
+            <li>
+                <a class="row" href="messages/@t.Person.Id">
+                    <span class="pic pic--blue" aria-hidden="true"><Icon Name="@(t.Person.Role == PersonRole.Helper ? "heart" : "user")" /></span>
+                    <span class="row__main">
+                        <span class="row__from">@t.Person.Name</span>
+                        <span class="row__subject">@t.Person.Relationship</span>
+                        @if (t.LastText is not null)
+                        {
+                            <span class="row__preview">@t.LastText</span>
+                        }
+                    </span>
+                    @if (t.LastAt is { } at)
+                    {
+                        <span class="row__side"><span class="row__time">@Clock.When(at)</span></span>
+                    }
+                </a>
+            </li>
+        }
+    </ul>
+}
+
+@code {
+    private IReadOnlyList<ChatThread>? _threads;
+    private int _held;
+    private string? _problem;
+
+    protected override Task OnInitializedAsync() => Load();
+    protected override Task OnApiChangedAsync() => Load();
+
+    private async Task Load()
+    {
+        _problem = null;
+        try
+        {
+            _threads = await Api.GetChatThreadsAsync();
+            _held = await Api.GetHeldChatCountAsync();
+        }
+        catch (BackstopApiException ex) { _problem = ex.Message; }
+    }
+}

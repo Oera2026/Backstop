@@ -1,0 +1,185 @@
+@page "/ask-me"
+@inherits ModeComponentBase
+@inject IJSRuntime JS
+
+<PageTitle>Ask Me – Backstop</PageTitle>
+
+<div class="chat">
+    <h1>Ask Me</h1>
+
+    <ol class="chat__log" aria-live="polite" aria-label="Your conversation">
+        <li class="bubble bubble--bot">What do you need help with?</li>
+        @foreach (var t in _turns)
+        {
+            @if (t.FromUser)
+            {
+                <li class="bubble bubble--user">
+                    @t.Text
+                    @if (t.HadPicture)
+                    {
+                        <span class="bubble__pic"><Icon Name="camera" /> Picture</span>
+                    }
+                </li>
+            }
+            else
+            {
+                <li class="bubble bubble--bot">
+                    @if (t.Verdict is { } v)
+                    {
+                        <span class="bubble__verdict bubble__verdict--@v.ToString().ToLowerInvariant()">
+                            <Icon Name="@(v == Verdict.LooksSafe ? "check" : v == Verdict.BeCareful ? "hand" : "cross")" />
+                            @(v == Verdict.LooksSafe ? "Looks safe" : v == Verdict.BeCareful ? "Be careful" : "Do not reply")
+                        </span>
+                    }
+                    <span class="bubble__text">@t.Text</span>
+                    @if (t.Lines.Count > 0)
+                    {
+                        <ul class="bubble__list">
+                            @foreach (var line in t.Lines)
+                            {
+                                <li>@line</li>
+                            }
+                        </ul>
+                    }
+                    @if (t.Href is not null)
+                    {
+                        <a class="btn btn-quiet bubble__link" href="@t.Href">@t.LinkText <Icon Name="arrow-right" /></a>
+                    }
+                </li>
+            }
+        }
+        @if (_busy)
+        {
+            <li class="bubble bubble--bot bubble--working" role="status">
+                <span class="working working--sm" aria-hidden="true"><span class="working__ring"></span><Icon Name="inspect" /></span>
+                <span>Working on it<span class="dots" aria-hidden="true"><i></i><i></i><i></i></span></span>
+            </li>
+        }
+        <li class="chat__end" @ref="_end" aria-hidden="true"></li>
+    </ol>
+
+    <form class="composer" @onsubmit="Send" novalidate>
+        @if (_picture is not null)
+        {
+            <p class="composer__file">
+                <Icon Name="camera" /> <span>@_picture.Name</span>
+                <button type="button" class="btn btn-text" @onclick="() => _picture = null">Remove</button>
+            </p>
+        }
+        <label class="sr-note" for="ask-text">Type here</label>
+        <textarea id="ask-text" rows="2" @bind="_text" @bind:event="oninput" placeholder="Type here, or paste a message"></textarea>
+        <div class="composer__row">
+            <label class="btn btn-quiet composer__attach">
+                <Icon Name="camera" /> <span class="composer__label">Add a picture</span>
+                <InputFile OnChange="PickPicture" accept="image/*" class="sr-note" />
+            </label>
+            <button type="submit" class="btn btn-primary" disabled="@_busy" aria-busy="@(_busy ? "true" : null)">
+                @if (_busy) { <span class="spinner" aria-hidden="true"></span> } else { <Icon Name="send" /> }
+                Send
+            </button>
+        </div>
+        <p class="form-error" role="alert">@_error</p>
+    </form>
+</div>
+
+@code {
+    private sealed record Turn(bool FromUser, string Text, bool HadPicture = false, Verdict? Verdict = null,
+                               IReadOnlyList<string>? LinesOrNull = null, string? Href = null, string? LinkText = null)
+    {
+        public IReadOnlyList<string> Lines => LinesOrNull ?? [];
+    }
+
+    private const long MaxPicture = 10 * 1024 * 1024;
+
+    private readonly List<Turn> _turns = [];
+    private string _text = "";
+    private string? _error;
+    private bool _busy;
+    private PicturePicker.PickedFile? _picture;
+    private ElementReference _end;
+
+    private async Task PickPicture(InputFileChangeEventArgs e)
+    {
+        _error = null;
+        try
+        {
+            await using var stream = e.File.OpenReadStream(MaxPicture);
+            using var memory = new MemoryStream();
+            await stream.CopyToAsync(memory);
+            _picture = new PicturePicker.PickedFile(memory.ToArray(), e.File.Name);
+        }
+        catch (IOException)
+        {
+            _picture = null;
+            _error = "That picture is too big. Please choose a smaller one.";
+        }
+    }
+
+    private async Task Send()
+    {
+        _error = null;
+        var text = _text.Trim();
+        if (_busy) return;
+        if (text.Length == 0 && _picture is null)
+        {
+            _error = "Please type something, or add a picture.";
+            return;
+        }
+
+        var picture = _picture;
+        _turns.Add(new Turn(true, text, picture is not null));
+        _text = "";
+        _picture = null;
+        _busy = true;
+        await ScrollDown();
+
+        try
+        {
+            _turns.Add(await Answer(text, picture));
+        }
+        catch (BackstopApiException ex)
+        {
+            _turns.Add(new Turn(false, ex.Message));
+        }
+        catch (Exception)
+        {
+            // Anything unexpected: say so plainly. Nothing is marked safe on an error.
+            _turns.Add(new Turn(false, "Sorry, I could not do that. Please try again."));
+        }
+        finally
+        {
+            _busy = false;
+        }
+        await ScrollDown();
+    }
+
+    /// <summary>A picture, or a plain question about a scam, goes through Check (the full verdict). Everything else is a conversation with the AI.</summary>
+    private static bool WantsCheck(string text, bool hasPicture)
+    {
+        if (hasPicture) return true;
+        var t = text.ToLowerInvariant();
+        return new[] { "is this safe", "is this real", "is this a scam", "is this genuine", "is it a scam", "scam", "suspicious", "is this message", "is this email" }.Any(t.Contains);
+    }
+
+    private async Task<Turn> Answer(string text, PicturePicker.PickedFile? picture)
+    {
+        if (WantsCheck(text, picture is not null))
+        {
+            var result = picture is not null
+                ? await Api.CheckContentAsync(new CheckRequest(CheckKind.Picture, null, picture.Bytes, picture.Name))
+                : await Api.CheckContentAsync(new CheckRequest(CheckKind.Message, text));
+            return new Turn(false, result.Reason, Verdict: result.Verdict, Href: $"check/{result.Id}", LinkText: "See the whole check");
+        }
+
+        // The turns so far, without the message just added: the API adds that one itself.
+        var history = _turns.SkipLast(1).Select(t => new AskTurn(t.FromUser, t.Text)).ToList();
+        var reply = await Api.AskAsync(history, text);
+        return new Turn(false, reply.Text, Href: reply.Href, LinkText: reply.LinkText);
+    }
+
+    private async Task ScrollDown()
+    {
+        StateHasChanged();
+        try { await JS.InvokeVoidAsync("backstop.scrollToEnd", _end); } catch (Exception) { /* scrolling is a nicety */ }
+    }
+}

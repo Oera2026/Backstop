@@ -10,6 +10,32 @@
     var queue = Guardian.GetQueue();
     var decided = Guardian.GetDecided();
     var notices = Guardian.GetNotices();
+    var outgoing = Guardian.GetHeldOutgoing();
+}
+
+@* The user's own message looked private, so it waits here. Nothing is sent until the helper decides. *@
+@if (outgoing.Count > 0)
+{
+    <h2>Waiting to be sent</h2>
+    <ul class="rows" aria-label="Messages waiting to be sent">
+        @foreach (var o in outgoing)
+        {
+            <li>
+                <div class="row row--static row--notice">
+                    <span class="pic pic--check" aria-hidden="true"><Icon Name="hourglass" /></span>
+                    <span class="row__main">
+                        <span class="row__from">To <code>@Defang.ForHelper(o.ToAddress)</code></span>
+                        <span class="row__subject">@o.Subject</span>
+                        <span class="row__preview">@Defang.ForHelper(o.Body)</span>
+                        <span class="row__preview">@string.Join(" ", o.Reasons)</span>
+                        <span class="row__time">@Clock.When(o.At)</span>
+                    </span>
+                    <button type="button" class="btn btn-primary" @onclick="@(() => Guardian.ApproveOutgoing(o.Id))"><Icon Name="check" /> Send it</button>
+                    <button type="button" class="btn btn-quiet" @onclick="@(() => Guardian.BlockOutgoing(o.Id))"><Icon Name="cross" /> Do not send</button>
+                </div>
+            </li>
+        }
+    </ul>
 }
 
 @* FYI only: the user wrote to someone for the first time. Nothing to approve, just "Got it". *@

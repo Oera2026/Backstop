@@ -1,0 +1,75 @@
+@page "/messages/{PersonId}"
+@inherits ModeComponentBase
+
+<PageTitle>@(_person?.Name ?? "Messages") – Backstop</PageTitle>
+
+@if (_person is null)
+{
+    <h1>Messages</h1>
+    <p class="empty">You can only message people on your list.</p>
+    <a class="btn btn-quiet" href="messages"><Icon Name="arrow-left" /> All messages</a>
+}
+else
+{
+    <div class="convo">
+        <header class="convo__head">
+            <a class="btn btn-quiet convo__back" href="messages" aria-label="Back to all messages"><Icon Name="arrow-left" /></a>
+            <span class="pic pic--blue" aria-hidden="true"><Icon Name="@(_person.Role == PersonRole.Helper ? "heart" : "user")" /></span>
+            <div class="convo__who">
+                <h1>@_person.Name</h1>
+                <p>@_person.Relationship</p>
+            </div>
+        </header>
+
+        @if (_problem is not null)
+        {
+            <ErrorState Message="@_problem" OnRetry="Load" />
+        }
+
+        <ChatLog Messages="_messages" Label="@($"Your messages with {_person.Name}")" EmptyText="No messages yet. Say hello.">
+            @if (_held > 0)
+            {
+                <li class="convo__notice banner banner--check" role="status">
+                    <Icon Name="hourglass" />
+                    <p>@(_held == 1 ? "1 message is" : $"{_held} messages are") being checked by your helper.</p>
+                </li>
+            }
+        </ChatLog>
+
+        <ChatComposer Label="@($"Message to {_person.Name}")" OnSend="Send" />
+    </div>
+}
+
+@code {
+    [Parameter] public string PersonId { get; set; } = "";
+
+    private ChatPerson? _person;
+    private IReadOnlyList<ChatMessage> _messages = [];
+    private int _held;
+    private string? _problem;
+
+    protected override Task OnParametersSetAsync()
+    {
+        _person = Api.ChatPeople.FirstOrDefault(p => p.Id == PersonId);
+        return _person is null ? Task.CompletedTask : Load();
+    }
+
+    protected override Task OnApiChangedAsync() => _person is null ? Task.CompletedTask : Load();
+
+    private async Task Load()
+    {
+        _problem = null;
+        try
+        {
+            _messages = await Api.GetChatMessagesAsync(PersonId);
+            _held = await Api.GetHeldChatCountAsync();
+        }
+        catch (BackstopApiException ex) { _problem = ex.Message; }
+    }
+
+    private async Task Send(string text)
+    {
+        await Api.SendChatAsync(PersonId, text);
+        await Load();
+    }
+}

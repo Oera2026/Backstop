@@ -1,6 +1,6 @@
 <div class="choice" role="radiogroup" aria-labelledby="@(Name)-q">
     <span id="@(Name)-q" class="choice__q @(HideLegend ? "sr-note" : "")">@if (!string.IsNullOrEmpty(Glyph)) {<span class="pic pic--blue" aria-hidden="true"><Icon Name="@Glyph" /></span>}<span>@Legend</span></span>
-    <div class="choice__options">
+    <div class="choice__options" style="--n:@Options.Count">
         @foreach (var (value, label) in Options)
         {
             var id = $"{Name}-{value}";

@@ -1,0 +1,37 @@
+<form class="composer composer--inline" @onsubmit="Submit" novalidate>
+    <label class="sr-note" for="@_id">@Label</label>
+    <textarea id="@_id" rows="1" maxlength="500" @bind="_text" @bind:event="oninput" placeholder="Type your message"></textarea>
+    <button type="submit" class="btn btn-primary" disabled="@_busy"><Icon Name="send" /> Send</button>
+    <p class="form-error" role="alert">@_error</p>
+</form>
+
+@code {
+    /// <summary>Sends the text. Throw <see cref="BackstopApiException"/> to show an error under the box.</summary>
+    [Parameter, EditorRequired] public Func<string, Task> OnSend { get; set; } = _ => Task.CompletedTask;
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+
+    private readonly string _id = "composer-" + Guid.NewGuid().ToString("N")[..6];
+    private string _text = "";
+    private string? _error;
+    private bool _busy;
+
+    private async Task Submit()
+    {
+        if (_busy) return;
+        _error = null;
+        if (string.IsNullOrWhiteSpace(_text))
+        {
+            _error = "Please type your message first.";
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            await OnSend(_text.Trim());
+            _text = "";
+        }
+        catch (BackstopApiException ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+}

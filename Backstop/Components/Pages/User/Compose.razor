@@ -254,8 +254,17 @@
         _stage = Stage.Form;
     }
 
-    // MOCK: the held outgoing message is not queued anywhere yet. Nothing is sent.
-    private void AskHelper() => _stage = Stage.Asked;
+    // The message is kept for the helper. Nothing is sent until they approve it.
+    private void AskHelper()
+    {
+        if (!Mail.HoldOutgoing(_to, _subject, _body, _reasons))
+        {
+            _error = "That is a no-reply address. Nobody reads messages sent to it, so we cannot send this.";
+            _stage = Stage.Form;
+            return;
+        }
+        _stage = Stage.Asked;
+    }
 
     private void GoBack() => _stage = Stage.Form;
 

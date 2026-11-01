@@ -1,0 +1,42 @@
+@inject IJSRuntime JS
+
+<ol class="convo__log" aria-live="polite" aria-label="@Label">
+    @if (Messages.Count == 0)
+    {
+        <li class="convo__empty">@EmptyText</li>
+    }
+    @foreach (var m in Messages)
+    {
+        var mine = m.FromMe != Flip;
+        <li class="msg @(mine ? "msg--mine" : "msg--theirs")">
+            <p class="msg__text">@m.Text</p>
+            <span class="msg__time">@Clock.When(m.At)</span>
+        </li>
+    }
+    @ChildContent
+    <li class="chat__end" @ref="_end" aria-hidden="true"></li>
+</ol>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<ChatMessage> Messages { get; set; } = [];
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+    [Parameter] public string EmptyText { get; set; } = "No messages yet.";
+
+    /// <summary>Puts the other side on the right. The helper reads the user's chats from the user's side.</summary>
+    [Parameter] public bool Flip { get; set; }
+
+    /// <summary>Extra items at the end of the log, for example "being checked".</summary>
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    [CascadingParameter] private UserClock Clock { get; set; } = UserClock.Server;
+
+    private ElementReference _end;
+    private int _shown;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (Messages.Count == _shown) return;
+        _shown = Messages.Count;
+        try { await JS.InvokeVoidAsync("backstop.scrollToEnd", _end); } catch (Exception) { /* scrolling is a nicety */ }
+    }
+}

@@ -1,0 +1,132 @@
+@page "/helper/messages"
+@layout HelperLayout
+@inherits ModeComponentBase
+@using Backstop.Services.Api.Fixtures
+
+<PageTitle>Messages – Backstop Helper</PageTitle>
+
+<h1>Messages</h1>
+
+@if (_problem is not null)
+{
+    <ErrorState Message="@_problem" OnRetry="Load" />
+}
+else if (_held is null)
+{
+    <LoadingState Text="Getting messages…" />
+}
+else
+{
+    <div class="msgs">
+        <ul class="msgs__list" aria-label="Chats">
+            @foreach (var p in Api.ChatPeople)
+            {
+                var mine = p.Id == ChatFixtures.TrustedId;
+                var waiting = _held.Count(h => h.From.Id == p.Id);
+                <li>
+                    <button type="button" class="row row--button @(_selected == p.Id ? "row--on" : "")" aria-current="@(_selected == p.Id ? "true" : null)" @onclick="@(() => Pick(p.Id))">
+                        <span class="pic pic--blue" aria-hidden="true"><Icon Name="@(mine ? "user" : p.Role == PersonRole.Helper ? "heart" : "people")" /></span>
+                        <span class="row__main">
+                            <span class="row__from">@(mine ? UserName : p.Name)</span>
+                            <span class="row__subject">@(mine ? "You and " + UserName : p.Relationship)</span>
+                        </span>
+                        @if (waiting > 0)
+                        {
+                            <span class="msgs__tag"><Icon Name="hourglass" /> @waiting to check</span>
+                        }
+                    </button>
+                </li>
+            }
+        </ul>
+
+        <section class="msgs__pane" aria-label="@PaneTitle">
+            <h2>@PaneTitle</h2>
+
+            @foreach (var h in _held.Where(h => h.From.Id == _selected))
+            {
+                <div class="held" role="group" aria-label="Message waiting for you">
+                    <p class="held__verdict"><Icon Name="hourglass" /> @VerdictCard.WordFor(h.Verdict)@(h.Flags.Count > 0 ? $": {h.Flags[0].Title.ToLowerInvariant()}" : "")</p>
+                    <p class="held__text">@h.Preview</p>
+                    <p class="held__why">@h.Reason</p>
+                    <div class="held__actions">
+                        <button type="button" class="btn btn-primary" disabled="@_busy" @onclick="@(() => Decide(h.Id, ReviewDecision.Release))"><Icon Name="check" /> Let it through</button>
+                        <button type="button" class="btn btn-quiet" disabled="@_busy" @onclick="@(() => Decide(h.Id, ReviewDecision.Block))"><Icon Name="cross" /> Block</button>
+                    </div>
+                </div>
+            }
+
+            @if (_logProblem is not null)
+            {
+                <p class="form-error" role="alert">@_logProblem</p>
+            }
+            else
+            {
+                <ChatLog Messages="_log" Flip="@(!IsMine)" Label="@PaneTitle" EmptyText="No messages yet." />
+            }
+
+            @if (IsMine)
+            {
+                <ChatComposer Label="@($"Message to {UserName}")" OnSend="Send" />
+            }
+        </section>
+    </div>
+}
+
+@code {
+    private IReadOnlyList<HeldChat>? _held;
+    private IReadOnlyList<ChatMessage> _log = [];
+    private string? _selected;
+    private string? _problem;
+    private string? _logProblem;
+    private bool _busy;
+
+    private bool IsMine => _selected == ChatFixtures.TrustedId;
+
+    private string PaneTitle => IsMine
+        ? $"Chat with {UserName}"
+        : $"{UserName} and {Api.ChatPeople.FirstOrDefault(p => p.Id == _selected)?.Name}";
+
+    protected override Task OnInitializedAsync() => Load();
+    protected override Task OnApiChangedAsync() => Load();
+
+    private async Task Load()
+    {
+        _problem = null;
+        try
+        {
+            _held = await Api.GetHeldChatsAsync();
+            // Open on whoever needs a decision first, otherwise on the helper's own chat.
+            _selected ??= _held.FirstOrDefault()?.From.Id ?? ChatFixtures.TrustedId;
+            await LoadLog();
+        }
+        catch (BackstopApiException ex) { _problem = ex.Message; }
+    }
+
+    private async Task LoadLog()
+    {
+        _logProblem = null;
+        try { _log = await Api.GetChatLogAsync(_selected!); }
+        catch (BackstopApiException ex) { _log = []; _logProblem = ex.Message; }
+    }
+
+    private async Task Pick(string id)
+    {
+        _selected = id;
+        await LoadLog();
+    }
+
+    private async Task Decide(string id, ReviewDecision decision)
+    {
+        if (_busy) return;
+        _busy = true;
+        try { await Api.ResolveHeldChatAsync(id, decision); await Load(); }
+        catch (BackstopApiException ex) { _problem = ex.Message; }
+        finally { _busy = false; }
+    }
+
+    private async Task Send(string text)
+    {
+        await Api.SendChatAsHelperAsync(text);
+        await LoadLog();
+    }
+}

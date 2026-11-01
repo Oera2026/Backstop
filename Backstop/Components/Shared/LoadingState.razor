@@ -1,8 +1,19 @@
 <div class="loading" role="status">
-    <span class="spinner" aria-hidden="true"></span>
-    <span>@Text</span>
+    <span class="working" aria-hidden="true">
+        <span class="working__ring"></span>
+        <Icon Name="inspect" />
+    </span>
+    <span class="loading__text">@Text.TrimEnd('…', '.')<span class="dots" aria-hidden="true"><i></i><i></i><i></i></span></span>
+    <span class="loading__bar" aria-hidden="true"></span>
+    @if (Patient)
+    {
+        <p class="loading__late">Still working on it. Thank you for waiting.</p>
+    }
 </div>
 
 @code {
     [Parameter] public string Text { get; set; } = "Loading…";
+
+    /// <summary>Adds a calm line after a few seconds, so a long wait does not look frozen. Off for quick loads.</summary>
+    [Parameter] public bool Patient { get; set; } = true;
 }

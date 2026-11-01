@@ -1,38 +1,43 @@
 @inject IJSRuntime JS
-@inject NavigationManager Nav
-@inject IBackstopApi Api
 
 @* Device settings, shared by the user's and the helper's Settings pages. Done goes back to whichever side opened it. *@
 <div class="settings-head">
     <h1>Settings</h1>
-    <a class="btn btn-primary" href="@DoneHref"><Icon Name="check" /> Done</a>
 </div>
 
 <div class="settings">
-    <ChoiceGroup Legend="Size of the words" Glyph="type" Name="size" Value="@_s["size"]" OnPick="@(v => Set("size", v))"
-                 Options="@(new[] { ("normal", "Normal"), ("large", "Large"), ("xlarge", "Extra large") })" />
+    <section class="settings__group" aria-labelledby="set-read">
+        <h2 id="set-read">Reading</h2>
+        <div class="settings__list">
+            <ChoiceGroup Legend="Size of the words" Glyph="type" Name="size" Value="@_s["size"]" OnPick="@(v => Set("size", v))"
+                         Options="@(new[] { ("normal", "Normal"), ("large", "Large"), ("xlarge", "Extra large") })" />
 
-    <ChoiceGroup Legend="Light or dark" Glyph="@(_s["theme"] == "dark" ? "moon" : "sun")" Name="theme" Value="@_s["theme"]" OnPick="@(v => Set("theme", v))"
-                 Options="@(new[] { ("light", "Light"), ("dark", "Dark"), ("auto", "Like my device") })" />
+            <ChoiceGroup Legend="Space between lines" Glyph="lines" Name="spacing" Value="@_s["spacing"]" OnPick="@(v => Set("spacing", v))"
+                         Options="@(new[] { ("normal", "Normal"), ("roomy", "Roomy") })" />
 
-    <ChoiceGroup Legend="Contrast" Glyph="contrast" Name="contrast" Value="@_s["contrast"]" OnPick="@(v => Set("contrast", v))"
-                 Options="@(new[] { ("standard", "Standard"), ("high", "High") })" />
+            <ChoiceGroup Legend="Voice speed" Glyph="speaker" Name="rate" Value="@_s["rate"]" OnPick="@(v => Set("rate", v))"
+                         Options="@(new[] { ("slow", "Slow"), ("normal", "Normal"), ("fast", "Fast") })" />
+        </div>
+    </section>
 
-    <ChoiceGroup Legend="Space between lines" Glyph="lines" Name="spacing" Value="@_s["spacing"]" OnPick="@(v => Set("spacing", v))"
-                 Options="@(new[] { ("normal", "Normal"), ("roomy", "Roomy") })" />
+    <section class="settings__group" aria-labelledby="set-look">
+        <h2 id="set-look">Colours and movement</h2>
+        <div class="settings__list">
+            <ChoiceGroup Legend="Light or dark" Glyph="@(_s["theme"] == "dark" ? "moon" : "sun")" Name="theme" Value="@_s["theme"]" OnPick="@(v => Set("theme", v))"
+                         Options="@(new[] { ("light", "Light"), ("dark", "Dark"), ("auto", "Like my device") })" />
 
-    <ChoiceGroup Legend="Movement" Glyph="motion" Name="motion" Value="@_s["motion"]" OnPick="@(v => Set("motion", v))"
-                 Options="@(new[] { ("normal", "Normal"), ("calm", "None") })" />
+            <ChoiceGroup Legend="Contrast" Glyph="contrast" Name="contrast" Value="@_s["contrast"]" OnPick="@(v => Set("contrast", v))"
+                         Options="@(new[] { ("standard", "Standard"), ("high", "High") })" />
 
-    <ChoiceGroup Legend="Voice speed" Glyph="speaker" Name="rate" Value="@_s["rate"]" OnPick="@(v => Set("rate", v))"
-                 Options="@(new[] { ("slow", "Slow"), ("normal", "Normal"), ("fast", "Fast") })" />
+            <ChoiceGroup Legend="Movement" Glyph="motion" Name="motion" Value="@_s["motion"]" OnPick="@(v => Set("motion", v))"
+                         Options="@(new[] { ("normal", "Normal"), ("calm", "None") })" />
+        </div>
+    </section>
 
-    @* MOCK: switches between the two views for the demo. A real app puts the trusted person view behind their own sign-in. *@
-    <ChoiceGroup Legend="Whose view" Glyph="people" Name="view" Value="@View" OnPick="SwitchView"
-                 Options="@(new[] { ("me", "My view"), ("helper", $"Trusted person view ({Api.Household.TrustedPersonName})") })" />
 </div>
 
-<div class="actions actions--quiet">
+<div class="settings-foot">
+    <a class="btn btn-primary" href="@DoneHref"><Icon Name="check" /> Done</a>
     <button type="button" class="btn btn-quiet" @onclick="Reset"><Icon Name="refresh" /> Put everything back</button>
     @if (ShowWelcome)
     {
@@ -45,14 +50,6 @@
 
     /// <summary>The welcome screens are for the user only.</summary>
     [Parameter] public bool ShowWelcome { get; set; }
-
-    /// <summary>"me" on the user's Settings, "helper" on the trusted person's.</summary>
-    [Parameter] public string View { get; set; } = "me";
-
-    private void SwitchView(string view)
-    {
-        if (view != View) Nav.NavigateTo(view == "helper" ? "/helper" : "/home");
-    }
 
     private Dictionary<string, string> _s = new()
     {
