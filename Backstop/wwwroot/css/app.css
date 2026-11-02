@@ -459,3 +459,7 @@ input.is-locked { background: var(--surface); border-style: dashed; cursor: not-
 .emptystate__title { font-weight: 800; font-size: calc(1.2rem * var(--tx)); }
 
 .actions--quiet { margin-top: .5rem; }
+
+/* Marks made-up content. Not a status, so it is quiet and has no icon. */
+.demo-label { display: inline-block; font-size: calc(.85rem * var(--tx)); font-weight: 700; color: var(--text-2); background: var(--band); border: 1px solid var(--border); border-radius: var(--radius); padding: .05rem .6rem; }
+.demo-row { margin: 0 0 .75rem; }

@@ -24,9 +24,7 @@
 @code {
     private string TierName => Guardian.Access.Tier switch
     {
-        HelperTier.Administrator => "Administrator",
         HelperTier.Standard => "Standard",
-        HelperTier.Custom => "Custom",
         _ => "Minimal",
     };
 

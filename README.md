@@ -103,7 +103,7 @@ Notes for the host:
 ## Try it
 
 1. Open `/demo`. Side by side is on by default.
-2. Pick one of the seven scenarios and press **Simulate incoming email**.
+2. Pick one of the seven example emails (or write your own) and press **Simulate incoming email**.
 3. Safe mail appears in the user pane. Held mail appears in the helper pane, and the user pane only shows that a message is being checked.
 4. Approve in the helper pane and the message moves into the user inbox live.
 5. Tick "Make the checker crash" to see fail-closed behaviour.

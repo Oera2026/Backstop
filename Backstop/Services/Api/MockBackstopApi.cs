@@ -250,11 +250,11 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
             photoUrl = $"/mode-photo/{photoId}";
         }
 
-        // MOCK: a real back end looks at the photo and writes the steps. Here the goal's words pick a task.
+        // Example guides only: the photo is kept and shown back, never analysed. The goal's words pick a fixed guide.
         var task = GuideFixtures.Match(request.Goal);
         if (task is null) return null;
         var guide = new Guide(NewId("g"), task.Title, request.Goal.Trim(), photoUrl, task.Picture, task.Steps,
-            photoUrl is null ? null : task.Highlight, task.NeedsCare, DateTimeOffset.Now);
+            task.NeedsCare, DateTimeOffset.Now);
         lock (_gate) _guides[guide.Id] = (guide, task);
         return guide;
     }

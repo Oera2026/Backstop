@@ -4,6 +4,10 @@
 <PageTitle>Check – Backstop</PageTitle>
 
 <h1>Check a message</h1>
+@if (_isExample)
+{
+    <p class="demo-row"><DemoLabel Text="Example" /></p>
+}
 
 @if (Deleted)
 {
@@ -74,7 +78,7 @@ else
     private string _kind = "message", _text = "";
     private string? _error, _problem;
     private PicturePicker.PickedFile? _picture;
-    private bool _busy;
+    private bool _busy, _isExample;
     private IReadOnlyList<CheckResult>? _asked;
 
     protected override async Task OnInitializedAsync()
@@ -83,6 +87,7 @@ else
         {
             _kind = ex.Kind == CheckKind.Conversation ? "conversation" : "message";
             _text = ex.Text;
+            _isExample = true;
         }
         // "Is this safe?" from Explain brings its words here.
         if (FromExplain is not null)

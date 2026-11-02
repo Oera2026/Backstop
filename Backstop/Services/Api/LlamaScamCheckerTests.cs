@@ -1,3 +1,5 @@
+#if DEBUG
+// Test runner (dotnet run -- --test-llama). Debug builds only: it does not exist in Release.
 using System.Net;
 using Backstop.Models;
 using Backstop.Services;
@@ -689,8 +691,10 @@ public class LlamaScamCheckerTests
             guardian.Block(scam.Id);
             Assert(scam.State == MessageState.Blocked && guardian.GetMailActivity().Count == 1, "Block works and is written to the activity log");
 
-            // Access: the standard setup is administrator. A lower tier cannot read cleared mail it did not decide.
-            Assert(guardian.Access.Tier == HelperTier.Administrator && guardian.Get(m.Id) is not null, "Default access can read cleared mail");
+            // Access: the default is Standard, the most this release allows. Asking for more is clamped. It cannot read cleared mail it did not decide.
+            Assert(guardian.Access.Tier == HelperTier.Standard && HelperPermissions.Default.Tier == HelperTier.Standard && guardian.Get(m.Id) is null, "Default helper tier is Standard");
+            guardian.SetAccess(new HelperPermissions((HelperTier)3));
+            Assert(guardian.Access.Tier == HelperTier.Standard && !guardian.Allows(HelperCapability.SendAsUser) && !guardian.Allows(HelperCapability.SeeClearedMail) && !guardian.Allows(HelperCapability.SeeChats) && !guardian.Allows(HelperCapability.SeeFullActivity), "A tier above Standard is clamped to Standard");
             guardian.SetAccess(new HelperPermissions(HelperTier.Standard));
             var other = (await mail.ReceiveAsync(new InboundMail("Sam Lee", "sam.lee@example.org", "Cake", "Cake on Friday?"), false))!;
             Assert(other.State == MessageState.Cleared && guardian.Get(other.Id) is null, "Standard cannot open cleared mail it never decided");
@@ -699,7 +703,7 @@ public class LlamaScamCheckerTests
             guardian.SetAccess(new HelperPermissions(HelperTier.Minimal));
             Assert((await api.GetActivityAsync()).Count == 0 && (await api.GetSharedMemoriesAsync()).Count == 0, "Minimal sees no activity or shared memories");
             store.Reset();
-            Assert(store.HelperAccess.Tier == HelperTier.Administrator, "Reset puts the standard access back");
+            Assert(store.HelperAccess.Tier == HelperTier.Standard, "Reset puts the standard access back");
             Console.WriteLine("PASS: Unchecked mail stays held and is rescanned; helper access is enforced in the service.");
         }
 
@@ -749,16 +753,15 @@ public class LlamaScamCheckerTests
             api.RemoveChatPerson(added.Id);
             Assert(api.ChatPeople.Count == before, "A person can be taken off");
 
-            // Send as user: Administrator only, marked as sent by the helper, bad addresses refused.
-            var ok = guardian.SendAsUser("friend@example.org", "Hello", "Hi there");
-            Assert(ok.Message is { SentBy: not null } && store.Sent().Any(x => x.SentBy is not null), "Sent as the user and marked as sent by the helper");
+            // Send as user is not built in this release: Standard is refused, and asking for more is clamped.
+            guardian.SetAccess(new HelperPermissions((HelperTier)99));
+            Assert(guardian.SendAsUser("friend@example.org", "Hello", "Hi there").Refused is not null && store.Sent().All(x => x.SentBy is null), "Send as user is refused, even when more is asked for");
             Assert(guardian.SendAsUser("noreply@example.org", "x", "y").Refused is not null && guardian.SendAsUser("not an address", "x", "y").Refused is not null, "No-reply and bad addresses are refused");
             guardian.SetAccess(new HelperPermissions(HelperTier.Standard));
             Assert(guardian.SendAsUser("friend@example.org", "Hello", "Hi").Refused is not null, "Standard cannot send as the user");
             Assert(guardian.GetCleared().Count == 0 && guardian.GetUserSent().Count == 0 && guardian.GetUserContacts().Count == 0, "Standard sees no cleared mail, sent mail or contacts");
-            guardian.SetAccess(HelperPermissions.Default);
-            Assert(guardian.GetCleared().Count > 0 && guardian.GetUserSent().Count > 0, "Administrator sees them");
-            Console.WriteLine("PASS: Helper digest, safeguarding floor, calls, help requests, history, people and send-as-user.");
+            Assert(guardian.Access.Tier == HelperTier.Standard && guardian.GetCleared().Count == 0 && guardian.GetUserSent().Count == 0, "Standard is still the ceiling");
+            Console.WriteLine("PASS: Helper digest, safeguarding floor, calls, help requests, history, people; send-as-user is refused.");
         }
 
         // 12d. Profiles: online / hidden and a picture, one per side, checked by the bytes.
@@ -991,3 +994,5 @@ public class LlamaScamCheckerTests
         catch (BackstopApiException) { return true; }
     }
 }
+
+#endif

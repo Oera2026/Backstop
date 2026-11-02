@@ -12,8 +12,9 @@ public sealed class MockGuardianService(MailStore store) : IGuardianService
         remove => store.Changed -= value;
     }
 
-    public HelperPermissions Access => store.HelperAccess;
-    public void SetAccess(HelperPermissions access) => store.SetHelperAccess(access);
+    // Clamped here, in the service: nothing above Standard can be read back or stored, whatever a page asks for.
+    public HelperPermissions Access => HelperPermissions.Clamp(store.HelperAccess);
+    public void SetAccess(HelperPermissions access) => store.SetHelperAccess(HelperPermissions.Clamp(access));
     public bool Allows(HelperCapability capability) => Access.Allows(capability);
     public IReadOnlyList<ActivityEntry> GetMailActivity() => store.Activity();
 

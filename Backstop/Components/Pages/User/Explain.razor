@@ -4,6 +4,10 @@
 <PageTitle>Explain – Backstop</PageTitle>
 
 <h1>Explain something</h1>
+@if (_isExample)
+{
+    <p class="demo-row"><DemoLabel Text="Example letter" /></p>
+}
 
 @if (_busy)
 {
@@ -42,12 +46,12 @@ else
 
     private string _source = "text", _text = "";
     private PicturePicker.PickedFile? _file;
-    private bool _busy, _fromCheck;
+    private bool _busy, _fromCheck, _isExample;
     private string? _error, _problem;
 
     protected override async Task OnInitializedAsync()
     {
-        if (Example == "letter") _text = Services.Api.Fixtures.ExplainFixtures.CouncilLetter;
+        if (Example == "letter") { _text = Services.Api.Fixtures.ExplainFixtures.CouncilLetter; _isExample = true; }
         if (FromCheckId is null) return;
         // "Explain this to me" from Check: use those words, and go straight to the explanation.
         try

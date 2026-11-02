@@ -4,7 +4,7 @@ Generated 2026-11-01 from commit `2dc315c` (branch `main`, clean tree, 21 commit
 
 ## 1. Executive Summary & Core Stack
 
-- **Project Purpose:** **Backstop** is a safe email and messaging client for elderly people and adults with learning disabilities. Every incoming message is held until checked. The user never sees held mail (no sender, no subject, only "N messages being checked by your helper"). Anything unclear goes to a trusted **helper**, who approves, blocks, or asks to "call them first". Around the mail core sit assistive modes: Check (scam check), Show me (step guides), Explain, Remember (memory cards), Stories (social stories), Make sense, Ask Me (AI chat), and Chat with approved people.
+- **Project Purpose:** **Backstop** is a safe email and messaging client for elderly people and adults with learning disabilities. Every incoming message is held until checked. The user never sees held mail (no sender, no subject, only "N messages being checked by your helper"). Anything unclear goes to a trusted **helper**, who approves, blocks, or asks to "call them first". Around the mail core sit assistive modes: Check (scam check), Show me (step guides), Explain, Remember (memory cards), Stories (social stories), Ask Me (AI chat), and Chat with approved people.
 - **Tech Stack:**
   - Frontend and backend: .NET 10 Blazor Server (interactive server render mode), Razor components, plain CSS (no UI framework), small vanilla JS (`wwwroot/js`).
   - Database: none. All state is in memory (`MailStore`, `MockBackstopApi`). Data is synthetic.
@@ -25,7 +25,7 @@ Meta Hackathon/
 ├── .claude/ (launch.json, skills/impeccable)   .impeccable/ (design.json, critiques)
 ├── graphify-out/                Knowledge graph (built at 0ab498b, stale)
 └── Backstop/
-    ├── Program.cs               DI, .env loader, CSP/security headers, photo endpoints, --test-llama
+    ├── Program.cs               DI, .env loader, CSP/security headers, photo endpoints, --test-llama (Debug builds only)
     ├── Backstop.csproj          net10.0
     ├── Models/                  MailMessage (+MessageState), Scenario, Modes (Check/Guide/Explain/Memory),
     │                            Ask, Chat, Stories, Extras (Contact, Calendar, Sent, HelperNotice, HeldOutgoing),
@@ -65,18 +65,18 @@ Roughly 4,000 lines of C# in `Services/` and `Models/`, about 100 Razor componen
 ## 3. Architecture & Data Flow
 
 - **System Architecture:** Browser <-> SignalR circuit (Blazor Server) <-> Razor pages. Pages talk only to `IMailService`, `IGuardianService`, `IBackstopApi` (AGENTS rule 7). Mock singletons implement them over in-memory stores. `MetaAiScamChecker` and `MetaAssistant` (typed `HttpClient`, no redirects, no cookies) call Meta. Singleton `Changed` events plus `LiveComponentBase` push live updates between the user, helper, and demo views, which are the same server process (the demo's split screen uses iframes of `/` and `/helper`). Routes: `/` user, `/helper` helper, `/demo` demo panel.
-- **Mail pipeline:** `Received -> Scanning -> (Cleared | Held | Blocked)`. Any error or unknown state becomes `Failed -> Held` (fail closed). The mock runs 4 tiers with fake latency. Only `Cleared` is returned by `GetInbox` and `GetClearedMessage`. `Blocked` is final and invisible to the user.
+- **Mail pipeline:** `Received -> Scanning -> (Cleared | Held | Blocked)`. Any error or unknown state becomes `Failed -> Held` (fail closed). The pipeline runs 4 tiers (Rules, Meta AI, Link check, Policy); no timings are shown or invented. Only `Cleared` is returned by `GetInbox` and `GetClearedMessage`. `Blocked` is final and invisible to the user.
 - **Floor rule:** Local checks (`MockRiskRules`, `InputGuard`) set a minimum. Meta's verdict can only be stricter (`LooksSafe -> BeCareful -> DontReply`), never looser. Failure or timeout means held.
-- **Data Models:** `MailMessage` (state, flags, links as defanged text, tiers, helper decision), `Scenario` (7 synthetic emails), `Contact`, `CalendarEvent`, `SentMessage`, `HeldOutgoing`, `HelperNotice`. In `Modes.cs`: `CheckResult`, `Guide`, `Explanation`, `MemoryCard`, `ReviewItem`, `Household`. Also `Story`, `ChatThread`/`ChatMessage`/`HeldChat`, `AskTurn`, and `HelperPermissions` (flags enum: RiskAlerts and ReviewHeldMail form an always-on floor, then SeeCheckRequests, SeeSharedMemories, SeeActivitySummary, SeeClearedMail, SeeFullActivity, SendAsUser, SeeChats). Tiers: Minimal, Standard, Custom, Administrator.
+- **Data Models:** `MailMessage` (state, flags, links as defanged text, tiers, helper decision), `Scenario` (7 synthetic emails), `Contact`, `CalendarEvent`, `SentMessage`, `HeldOutgoing`, `HelperNotice`. In `Modes.cs`: `CheckResult`, `Guide`, `Explanation`, `MemoryCard`, `ReviewItem`, `Household`. Also `Story`, `ChatThread`/`ChatMessage`/`HeldChat`, `AskTurn`, and `HelperPermissions` (flags enum: RiskAlerts and ReviewHeldMail form an always-on floor, then SeeCheckRequests, SeeSharedMemories, SeeActivitySummary, SeeClearedMail, SeeFullActivity, SendAsUser, SeeChats). Tiers: Minimal and Standard only; Standard is the default and the ceiling (clamped in the guardian service).
 - **State Management & Integrations:** In-memory singletons guarded by locks, with `Changed` events. No persistence, so state resets on restart (`ResetDemo`). The only integration is Meta Dev API. Key resolution order: `MetaAI` config section, then `META_AI_KEY`, `MODEL_API_KEY`, `LLAMA_API_KEY`, `CHECKER_MODEL_API_KEY`. Images are sent only when inspection needs them. Inspected text is treated as passive data. Message content never renders as a clickable link (links are defanged).
 - **Security headers (Program.cs):** Strict CSP (`default-src 'self'`), nosniff, SAMEORIGIN, no-referrer, COOP, Permissions-Policy (camera self only). Uploads are type-sniffed from the bytes (`ImageSniff`).
 
 ## 4. Completed Features & Implementation Details
 
-- Held-mail inbox with privacy rules (user sees only a count). Helper queue and evidence card (Approve, Block, Call them first) with defanged links, flags, confidence, and tier timeline.
+- Held-mail inbox with privacy rules (user sees only a count). Helper queue and evidence card (Approve, Block, Call them first) with defanged links, flags, the real rules score and the address signals that fired.
 - Compose with an outgoing-check "pause" for private details. Held outgoing mail goes to the helper. No-reply addresses are refused. First-time recipients raise a helper notice.
 - Contacts (with validated profile photos), calendar, search (cleared and sent mail and contacts only), sent items.
-- Modes: Check (text and images), Show me (guides with pictures, "I'm stuck"), Explain (with follow-up Q&A), Remember (cards, share with helper, memory Q&A), Stories (sensitive topics are held), Make sense, Ask Me (live Muse chat that alerts the helper when someone may need help), and Chat with approved people (held chats go to the helper).
+- Modes: Check (text and images), Show me (guides with pictures, "I'm stuck"), Explain (with follow-up Q&A), Remember (cards, share with helper, memory Q&A), Stories (sensitive topics are held), Ask Me (live Muse chat that alerts the helper when someone may need help), and Chat with approved people (held chats go to the helper).
 - Real Meta AI scam checker with tests. Ask Me AI with escalation.
 - Helper permission model (`Permissions.cs`) and `HelperAccess` get/set on the API. It gates chat-log reading (`GetChatLogAsync` throws unless allowed).
 - Demo panel with 7 scenarios, a "make the checker crash" toggle, and split screen.
@@ -94,7 +94,7 @@ Roughly 4,000 lines of C# in `Services/` and `Models/`, about 100 Razor componen
 
 ## 6. Known Technical Debt, Bugs & Blockers
 
-- **Tests:** no xUnit or CI. `LlamaScamCheckerTests.cs` is a hand-rolled runner inside the app assembly, run with `dotnet run -- --test-llama`. It ships in production code, and the app calls `RunAllTests` from `Program.cs`. No tests for mail pipeline, permissions, or UI.
+- **Tests:** no xUnit or CI. `LlamaScamCheckerTests.cs` is a hand-rolled runner inside the app assembly, run with `dotnet run -- --test-llama`. It is wrapped in `#if DEBUG`, so it does not exist in Release. No tests for mail pipeline, permissions, or UI.
 - **Naming debt:** `LlamaScamChecker.cs`, `ILlamaScamChecker`, `LlamaScamAnalysis`, and `LLAMA_*` env fallbacks are legacy aliases after the move to Meta Muse. Duplicate record types (`MetaScamAnalysis` and `LlamaScamAnalysis`).
 - **Permissions enforcement gap:** `Allows` is checked in few places. Pages may show things the tier should hide, and the guardian service is not yet the gate.
 - **Persistence and scale:** in-memory singletons are shared by all users and circuits (one household). There is no auth, no multi-user model, and no database. `MockBackstopApi` is about 660 lines and is a god object (123 graph edges).

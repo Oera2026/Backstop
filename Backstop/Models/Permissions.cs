@@ -26,28 +26,33 @@ public enum HelperCapability
     Floor = RiskAlerts | ReviewHeldMail,
 }
 
-/// <summary>How much a helper can do. Custom means the user ticked each capability themselves.</summary>
-public enum HelperTier { Minimal, Standard, Custom, Administrator }
+/// <summary>
+/// How much a helper can do. This release has the Standard tier only; Minimal is the one stricter setting.
+/// Administrator and custom access are not built.
+/// </summary>
+public enum HelperTier { Minimal, Standard }
 
-/// <summary>The user's choice, kept per household. Created in the setup flow and editable in Settings.</summary>
-public sealed record HelperPermissions(HelperTier Tier, HelperCapability Custom = HelperCapability.None)
+/// <summary>The helper's access, kept per household. It is fixed at Standard in this release.</summary>
+public sealed record HelperPermissions(HelperTier Tier)
 {
-    /// <summary>The standard setup: the helper has administrator access.</summary>
-    public static readonly HelperPermissions Default = new(HelperTier.Administrator);
+    /// <summary>The default, and the most any helper can have in this release.</summary>
+    public static readonly HelperPermissions Default = new(HelperTier.Standard);
 
-    /// <summary>What each named tier allows. The floor is part of every one.</summary>
-    public static HelperCapability For(HelperTier tier, HelperCapability custom = HelperCapability.None) => HelperCapability.Floor | tier switch
+    /// <summary>
+    /// Anything above Standard (or a tier value that does not exist) becomes Standard. Minimal stays Minimal, because
+    /// stricter is always allowed. Services call this, so a page or a caller cannot ask for more.
+    /// </summary>
+    public static HelperPermissions Clamp(HelperPermissions? access) => access?.Tier == HelperTier.Minimal ? access : Default;
+
+    /// <summary>What each tier allows. The floor is part of every one. An unknown tier gets the floor only (fail closed).</summary>
+    public static HelperCapability For(HelperTier tier) => HelperCapability.Floor | tier switch
     {
         HelperTier.Minimal => HelperCapability.None,
         HelperTier.Standard => HelperCapability.SeeCheckRequests | HelperCapability.SeeSharedMemories | HelperCapability.SeeActivitySummary,
-        HelperTier.Custom => custom,
-        HelperTier.Administrator => HelperCapability.SeeCheckRequests | HelperCapability.SeeSharedMemories | HelperCapability.SeeActivitySummary
-                                    | HelperCapability.SeeClearedMail | HelperCapability.SeeFullActivity | HelperCapability.SendAsUser
-                                    | HelperCapability.SeeChats,
-        _ => HelperCapability.None, // unknown tier: floor only (fail closed)
+        _ => HelperCapability.None,
     };
 
-    public HelperCapability Granted => For(Tier, Custom);
+    public HelperCapability Granted => For(Clamp(this).Tier);
 
     public bool Allows(HelperCapability capability) => (Granted & capability) == capability;
 }

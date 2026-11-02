@@ -107,7 +107,7 @@ public sealed class MetaAiScamChecker : ILlamaScamChecker, IMetaScamChecker, IMe
     }
 
     /// <summary>
-    /// Connection test (the "Test the connection" button and /diag/meta). Checks the key, model and URL, makes one tiny
+    /// Connection test (the "Test the connection" button). Checks the key, model and URL, makes one tiny
     /// call, lists the models the key can use, and says what is most likely wrong. Never shows the key or any message.
     /// </summary>
     public async Task<string> DiagnoseAsync(CancellationToken ct)

@@ -56,7 +56,6 @@ public sealed record CheckResult(
 // ---------- Show me ----------
 
 /// <summary>A box on the user's photo, in percent of its width and height.</summary>
-public sealed record Region(double X, double Y, double Width, double Height, string Label);
 
 /// <summary>Shown on tasks that need care (medicines, electrics, chemicals).</summary>
 public sealed record CareNote(string Topic, string Text);
@@ -72,7 +71,6 @@ public sealed record Guide(
     // Key of the "what it looks like when done" guide picture.
     string Picture,
     IReadOnlyList<string> Steps,
-    Region? Highlight,
     CareNote? NeedsCare,
     DateTimeOffset MadeAt);
 

@@ -24,6 +24,7 @@ else if (_g is null)
 else
 {
     <PageTitle>@_g.Title – Backstop</PageTitle>
+    <p class="demo-row"><DemoLabel Text="Example guide" /></p>
     @if (_g.NeedsCare is { } care)
     {
         <div class="care" role="note">
@@ -85,12 +86,6 @@ else
                         <figcaption>Your photo</figcaption>
                         <div class="figure__frame">
                             <img src="@_g.PhotoUrl" alt="The photo you took" />
-                            @if (_g.Highlight is { } h)
-                            {
-                                <span class="lookhere" style="left:@P(h.X)%;top:@P(h.Y)%;width:@P(h.Width)%;height:@P(h.Height)%" role="img" aria-label="Look here: @h.Label">
-                                    <span aria-hidden="true">@h.Label</span>
-                                </span>
-                            }
                         </div>
                     </figure>
                 }
@@ -163,8 +158,6 @@ else
         catch (BackstopApiException ex) { _problem = ex.Message; }
         _loading = false;
     }
-
-    private static string P(double v) => v.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
     private void StartSteps()
     {
