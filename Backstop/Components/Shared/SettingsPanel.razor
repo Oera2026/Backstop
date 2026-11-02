@@ -7,38 +7,38 @@
 </div>
 
 <div class="settings">
-    <section class="settings__group" aria-labelledby="set-read">
-        <h2 id="set-read">Reading</h2>
+    <section class="settings__group settings__group--read" aria-labelledby="set-read">
+        <h2 id="set-read"><span class="pic pic--navy" aria-hidden="true"><Icon Name="book" /></span> Reading</h2>
         <div class="settings__list">
-            <ChoiceGroup Legend="Size of the words" Glyph="type" Name="size" Value="@_s["size"]" OnPick="@(v => Set("size", v))"
+            <ChoiceGroup ShowNow="true" Legend="Size of the words" Glyph="type" Name="size" Value="@_s["size"]" OnPick="@(v => Set("size", v))"
                          Options="@(new[] { ("normal", "Normal"), ("large", "Large"), ("xlarge", "Extra large") })" />
 
-            <ChoiceGroup Legend="Space between lines" Glyph="lines" Name="spacing" Value="@_s["spacing"]" OnPick="@(v => Set("spacing", v))"
+            <ChoiceGroup ShowNow="true" Legend="Space between lines" Glyph="lines" Name="spacing" Value="@_s["spacing"]" OnPick="@(v => Set("spacing", v))"
                          Options="@(new[] { ("normal", "Normal"), ("roomy", "Roomy") })" />
 
-            <ChoiceGroup Legend="Voice speed" Glyph="speaker" Name="rate" Value="@_s["rate"]" OnPick="@(v => Set("rate", v))"
+            <ChoiceGroup ShowNow="true" Legend="Voice speed" Glyph="speaker" Name="rate" Value="@_s["rate"]" OnPick="@(v => Set("rate", v))"
                          Options="@(new[] { ("slow", "Slow"), ("normal", "Normal"), ("fast", "Fast") })" />
         </div>
     </section>
 
-    <section class="settings__group" aria-labelledby="set-look">
-        <h2 id="set-look">Colours and movement</h2>
+    <section class="settings__group settings__group--look" aria-labelledby="set-look">
+        <h2 id="set-look"><span class="pic" aria-hidden="true"><Icon Name="contrast" /></span> Colours and movement</h2>
         <div class="settings__list">
-            <ChoiceGroup Legend="Light or dark" Glyph="@(_s["theme"] == "dark" ? "moon" : "sun")" Name="theme" Value="@_s["theme"]" OnPick="@(v => Set("theme", v))"
+            <ChoiceGroup ShowNow="true" Legend="Light or dark" Glyph="@(_s["theme"] == "dark" ? "moon" : "sun")" Name="theme" Value="@_s["theme"]" OnPick="@(v => Set("theme", v))"
                          Options="@(new[] { ("light", "Light"), ("dark", "Dark"), ("auto", "Like my device") })" />
 
-            <ChoiceGroup Legend="Contrast" Glyph="contrast" Name="contrast" Value="@_s["contrast"]" OnPick="@(v => Set("contrast", v))"
+            <ChoiceGroup ShowNow="true" Legend="Contrast" Glyph="contrast" Name="contrast" Value="@_s["contrast"]" OnPick="@(v => Set("contrast", v))"
                          Options="@(new[] { ("standard", "Standard"), ("high", "High") })" />
 
-            <ChoiceGroup Legend="Movement" Glyph="motion" Name="motion" Value="@_s["motion"]" OnPick="@(v => Set("motion", v))"
+            <ChoiceGroup ShowNow="true" Legend="Movement" Glyph="motion" Name="motion" Value="@_s["motion"]" OnPick="@(v => Set("motion", v))"
                          Options="@(new[] { ("normal", "Normal"), ("calm", "None") })" />
         </div>
     </section>
 
     @if (ShowWelcome)
     {
-        <section class="settings__group" aria-labelledby="set-helper">
-            <h2 id="set-helper">Your helper</h2>
+        <section class="settings__group settings__group--helper" aria-labelledby="set-helper">
+            <h2 id="set-helper"><span class="pic pic--safe" aria-hidden="true"><Icon Name="people" /></span> Your helper</h2>
             <a class="row" href="helper-access">
                 <span class="pic pic--blue" aria-hidden="true"><Icon Name="user" /></span>
                 <span class="row__main">

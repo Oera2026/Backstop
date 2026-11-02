@@ -1,5 +1,5 @@
 <div class="choice" role="radiogroup" aria-labelledby="@(Name)-q">
-    <span id="@(Name)-q" class="choice__q @(HideLegend ? "sr-note" : "")">@if (!string.IsNullOrEmpty(Glyph)) {<span class="pic pic--blue" aria-hidden="true"><Icon Name="@Glyph" /></span>}<span>@Legend</span></span>
+    <span id="@(Name)-q" class="choice__q @(HideLegend ? "sr-note" : "")">@if (!string.IsNullOrEmpty(Glyph)) {<span class="pic pic--blue" aria-hidden="true"><Icon Name="@Glyph" /></span>}<span>@Legend</span>@if (ShowNow) {<span class="choice__now">@Now</span>}</span>
     <div class="choice__options" style="--n:@Options.Count">
         @foreach (var (value, label) in Options)
         {
@@ -14,6 +14,10 @@
     [Parameter, EditorRequired] public string Legend { get; set; } = "";
     [Parameter] public string Glyph { get; set; } = "";
     [Parameter] public bool HideLegend { get; set; }
+
+    /// <summary>Shows the chosen word beside the question, so the setting can be read at a glance.</summary>
+    [Parameter] public bool ShowNow { get; set; }
+    private string Now => Options.FirstOrDefault(o => o.Value == Value).Label ?? "";
     [Parameter, EditorRequired] public string Name { get; set; } = "";
     [Parameter, EditorRequired] public string Value { get; set; } = "";
     [Parameter, EditorRequired] public IReadOnlyList<(string Value, string Label)> Options { get; set; } = [];

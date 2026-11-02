@@ -1,0 +1,26 @@
+@page "/demo-start"
+@layout LoginLayout
+
+<PageTitle>Try the demo – Backstop</PageTitle>
+
+<h1>Try the demo</h1>
+<p class="lead">Which side do you want to see?</p>
+
+<ul class="sidecards">
+    <li>
+        <a class="sidecard" href="/account/demo?side=user" data-enhance-nav="false">
+            <span class="pic pic--navy" aria-hidden="true"><Icon Name="user" /></span>
+            <span class="sidecard__title">The user</span>
+            <span class="sidecard__text">Reads and writes messages.</span>
+            <span class="sidecard__go">Start <Icon Name="arrow-right" /></span>
+        </a>
+    </li>
+    <li>
+        <a class="sidecard sidecard--helper" href="/account/demo?side=helper" data-enhance-nav="false">
+            <span class="pic pic--safe" aria-hidden="true"><Icon Name="people" /></span>
+            <span class="sidecard__title">The helper</span>
+            <span class="sidecard__text">Decides on held messages.</span>
+            <span class="sidecard__go">Start <Icon Name="arrow-right" /></span>
+        </a>
+    </li>
+</ul>

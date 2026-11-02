@@ -74,5 +74,17 @@
     find();
   }
 
-  window.backstopTour = { show: show, hide: hide };
+  // "Show me" taps the lit-up link for the visitor. Says whether there was something to tap.
+  function tap(selector) {
+    var el = document.querySelector(selector);
+    if (!el) return false;
+    el.click();
+    return true;
+  }
+
+  // Keeps the place in the guide when the page is reloaded (this tab only).
+  function save(value) { try { sessionStorage.setItem("backstop.tour", value); } catch (e) { /* blocked */ } }
+  function load() { try { return sessionStorage.getItem("backstop.tour") || ""; } catch (e) { return ""; } }
+
+  window.backstopTour = { show: show, hide: hide, tap: tap, save: save, load: load };
 })();

@@ -195,10 +195,10 @@ app.MapPost("/account/login", async (HttpContext http, AccountStore accounts, [M
 });
 
 // Demo mode: one click, both sides, with the guided tour. Only two places can be asked for.
-app.MapGet("/account/demo", async (HttpContext http, string? next) =>
+app.MapGet("/account/demo", async (HttpContext http, string? next, string? side) =>
 {
     await http.SignInAsync(AccountStore.Principal("Demo visitor", Roles.Demo));
-    return Results.Redirect(next == "demo" ? "/demo" : "/?tour=1");
+    return Results.Redirect(next == "demo" ? "/demo" : side == "helper" ? "/helper?tour=1" : "/?tour=1");
 });
 
 app.MapGet("/account/logout", async (HttpContext http) =>

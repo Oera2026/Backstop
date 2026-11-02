@@ -3,13 +3,13 @@
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 
-@* Demo visitors only: a User / Helper switch, and a guide that lights up one thing at a time and asks them to try it. *@
+@* Demo visitors only: a User / Helper switch, and a guide that goes through one side page by page, lighting up what it talks about. *@
 <AuthorizeView Roles="@Roles.Demo">
     <div class="demobar" role="region" aria-label="Demo guide">
         <div class="demobar__row">
             <div class="demobar__switch" role="group" aria-label="View as">
-                <button type="button" class="demobar__side" aria-pressed="@(Side == TourSide.User ? "true" : "false")" @onclick="@(() => Switch(TourSide.User))">User</button>
-                <button type="button" class="demobar__side" aria-pressed="@(Side == TourSide.Helper ? "true" : "false")" @onclick="@(() => Switch(TourSide.Helper))">Helper</button>
+                <button type="button" class="demobar__side" aria-pressed="@(Tour.Side == TourSide.User ? "true" : "false")" @onclick="@(() => Switch(TourSide.User))">User</button>
+                <button type="button" class="demobar__side" aria-pressed="@(Tour.Side == TourSide.Helper ? "true" : "false")" @onclick="@(() => Switch(TourSide.Helper))">Helper</button>
             </div>
             @if (!Tour.Active)
             {
@@ -23,14 +23,14 @@
         <section class="tourcard" role="region" aria-label="Guide" aria-live="polite">
             <div class="tourcard__head">
                 <p class="tourcard__title">@s.Title</p>
-                <span class="tourcard__count">@(Tour.Index + 1) of @DemoTour.Steps.Count</span>
+                <span class="tourcard__count">@(Tour.Index + 1) of @Tour.Steps.Count</span>
                 <button type="button" class="btn btn-text tourcard__close" @onclick="Tour.Close" aria-label="Close guide"><Icon Name="cross" /></button>
             </div>
             <p class="tourcard__text">@s.Text</p>
             <div class="tourcard__actions">
                 @if (!Tour.IsFirst)
                 {
-                    <button type="button" class="btn btn-quiet" @onclick="Back" aria-label="Previous step"><Icon Name="arrow-left" /></button>
+                    <button type="button" class="btn btn-quiet" @onclick="Back" aria-label="Previous slide"><Icon Name="arrow-left" /></button>
                 }
                 @if (Tour.IsLast)
                 {
@@ -52,13 +52,15 @@
     private bool _isDemo;
 
     private string Here => Nav.ToBaseRelativePath(Nav.Uri);
-    private TourSide Side => Here.StartsWith("helper", StringComparison.OrdinalIgnoreCase) ? TourSide.Helper : TourSide.User;
+    private static TourSide SideOf(string path) => path.StartsWith("helper", StringComparison.OrdinalIgnoreCase) ? TourSide.Helper : TourSide.User;
 
     protected override async Task OnInitializedAsync()
     {
         _isDemo = AuthState is not null && (await AuthState).User.IsInRole(Roles.Demo);
         Tour.Changed += OnChanged;
         Nav.LocationChanged += OnMoved;
+        // A fresh tab starts on the side the visitor is looking at.
+        if (Tour.Side != SideOf(Here) && !DemoTour.Matches(Tour.Current, Here)) Tour.Start(SideOf(Here));
         Tour.Follow(Here);
     }
 
@@ -70,30 +72,52 @@
         InvokeAsync(StateHasChanged);
     }
 
-    // Light up the thing this step is about whenever the step or the page changes.
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!_isDemo) return;
-        var key = Tour.Active ? $"{Tour.Index}|{Here}" : "off";
-        if (key == _key) return;
-        _key = key;
         try
         {
-            if (!Tour.Active) { await JS.InvokeVoidAsync("backstopTour.hide"); return; }
-            await JS.InvokeVoidAsync("backstopTour.show", Tour.Current.Selector);
+            // After a reload, pick up where this tab was.
+            if (firstRender && DemoTour.TryParse(await JS.InvokeAsync<string>("backstopTour.load"), out var side, out var index, out var active))
+            {
+                Tour.Restore(side, index, active);
+                Tour.Follow(Here);
+            }
+            // Light up what this slide is about whenever the slide or the page changes.
+            var key = Tour.Active ? $"{Tour.Side}|{Tour.Index}|{Here}" : "off";
+            if (key == _key) return;
+            _key = key;
+            await JS.InvokeVoidAsync("backstopTour.save", Tour.Save());
+            if (!Tour.Active) await JS.InvokeVoidAsync("backstopTour.hide");
+            else await JS.InvokeVoidAsync("backstopTour.show", Tour.Current.Selector);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or InvalidOperationException or TaskCanceledException) { /* closed, or still drawing on the server */ }
     }
 
-    private void Go() => Nav.NavigateTo(Tour.Current.Path);
-    private void Restart() { Tour.Restart(Side); Go(); }
-    private void Next() { Tour.Next(); Go(); }
+    // Goes to the page for the current slide, if it is not already there.
+    private void Go()
+    {
+        var path = Tour.PathForCurrent();
+        if (path is not null && !DemoTour.Matches(Tour.Current, Here)) Nav.NavigateTo(path);
+    }
+
+    private async Task Next()
+    {
+        var was = Tour.Current;
+        Tour.Next();
+        // Slides that say "tap this" are tapped for the visitor, so the next page opens the way a real tap would.
+        if (was.Tap && await JS.InvokeAsync<bool>("backstopTour.tap", was.Selector)) return;
+        Go();
+    }
+
     private void Back() { Tour.Back(); Go(); }
+
+    private void Restart() { Tour.Start(Tour.Side); Go(); }
 
     private void Switch(TourSide side)
     {
-        Tour.GoToSide(side);
-        Nav.NavigateTo(Tour.Current.Path);
+        Tour.Start(side);
+        Nav.NavigateTo(Tour.PathForCurrent() ?? "/");
     }
 
     public async ValueTask DisposeAsync()

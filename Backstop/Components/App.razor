@@ -37,5 +37,5 @@
 
     // The sign-in page is plain server-rendered HTML (its form posts to /account/login); everything else is interactive.
     private IComponentRenderMode? PageRenderMode =>
-        HttpContext?.Request.Path.StartsWithSegments("/login") == true ? null : InteractiveServer;
+        HttpContext?.Request.Path.StartsWithSegments("/login") == true || HttpContext?.Request.Path.StartsWithSegments("/demo-start") == true ? null : InteractiveServer;
 }

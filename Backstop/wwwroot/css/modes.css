@@ -569,7 +569,7 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 .framed .tour-spot, .framed .tourcard { display: none; }
 .tourcard {
   position: fixed; z-index: 50; left: 0; top: 0; visibility: hidden;
-  width: min(22rem, calc(100vw - 1.5rem)); height: 13.5rem; overflow: auto;
+  width: min(22rem, calc(100vw - 1.5rem)); height: 12rem; overflow: auto;
   display: flex; flex-direction: column; justify-content: space-between; gap: .5rem;
   background: var(--bg); border: var(--line) solid var(--navy); border-radius: var(--radius-lg); padding: .75rem 1rem 1rem; box-shadow: 0 8px 24px var(--scrim);
 }
@@ -582,3 +582,39 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 .tourcard__actions .btn-primary { flex: 1; }
 .tourcard__close { min-height: 48px; min-width: 48px; padding: 0; }
 .tourcard__head .tourcard__title { flex: 1; }
+
+/* Settings: each group has its own look, and every setting says what it is set to */
+@media (min-width: 960px) { .settings { display: block; } .settings__group { display: block; } .settings__group > .settings__list { display: block; } .settings__group > .settings__list > .choice { display: block; } }
+.settings__group { margin: 0 0 2.25rem; }
+.settings__group > h2 {
+  display: flex; align-items: center; gap: .85rem; margin: 0; padding: .85rem 1.25rem;
+  font-size: calc(1.4rem * var(--tx)); font-weight: 800; letter-spacing: 0; color: var(--text);
+  background: var(--band); border: 1px solid var(--border); border-bottom: 0; border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+.settings__group > h2 .pic { width: 2.75rem; height: 2.75rem; }
+.settings__group > h2 .pic .icon { width: 1.6rem; height: 1.6rem; }
+.settings__group--look > h2 { background: var(--check-soft); }
+.settings__group--helper > h2 { background: var(--safe-soft); }
+.settings__list { border-radius: 0 0 var(--radius-lg) var(--radius-lg); }
+.pic--navy { background: var(--navy); color: var(--on-navy); border-color: var(--navy); }
+.settings__group--look .choice__q .pic { background: var(--check-soft); color: var(--check); border-color: var(--check-edge); }
+.choice__now { margin-inline-start: auto; padding: .15rem .75rem; border-radius: 999px; background: var(--accent-soft); color: var(--navy); font-size: .95rem; font-weight: 800; white-space: nowrap; }
+.settings .choice label { background: var(--surface); }
+.settings .choice input:checked + label { background: var(--navy); }
+.settings__group--helper .row { border-top: 0; border-radius: 0 0 var(--radius-lg) var(--radius-lg); }
+
+/* Demo entry: two cards, one for each side */
+.sidecards { list-style: none; margin: 1.5rem 0; padding: 0; display: grid; gap: 1rem; }
+.sidecard {
+  display: grid; grid-template-columns: auto 1fr; grid-template-areas: "pic title" "pic text" "go go"; column-gap: 1.25rem; row-gap: .15rem; align-items: center;
+  min-height: 56px; padding: 1.25rem; text-decoration: none; color: var(--text);
+  background: var(--band); border: var(--line) solid var(--navy); border-radius: var(--radius-lg);
+}
+.sidecard--helper { background: var(--safe-soft); border-color: var(--safe); }
+.sidecard .pic { grid-area: pic; width: 4rem; height: 4rem; }
+.sidecard__title { grid-area: title; font-size: calc(1.5rem * var(--tx, 1)); font-weight: 800; align-self: end; }
+.sidecard__text { grid-area: text; align-self: start; }
+.sidecard__go { grid-area: go; display: flex; align-items: center; gap: .5rem; margin-top: .75rem; min-height: 56px; padding-inline: 1.25rem; justify-content: center; font-weight: 800; background: var(--navy); color: var(--on-navy); border-radius: var(--radius); }
+.sidecard--helper .sidecard__go { background: var(--safe); }
+@media (hover: hover) { .sidecard:hover { box-shadow: 0 4px 14px var(--scrim); } }
+.sidecard:focus-visible { outline: 4px solid var(--focus); outline-offset: 3px; }
