@@ -57,7 +57,7 @@ else
         </div>
         <figure class="storyfig">
             <div class="figure__frame">
-                @if (pg.Scene is { Items.Count: > 0 }) { <SceneArt @key="_at" Scene="pg.Scene" Label="@("Picture: " + pg.Heading)" /> } else { <StoryPicture Name="@pg.Picture" /> }
+                @if (pg.Scene is { IsDrawable: true }) { <SceneArt @key="_at" Scene="pg.Scene" Label="@("Picture: " + pg.Heading)" /> } else { <StoryPicture Name="@pg.Picture" /> }
             </div>
         </figure>
         <h2 class="storypage__h">@pg.Heading</h2>

@@ -11,12 +11,17 @@ public interface IStoryWriter
     Task<StoryDraft> WriteAsync(string situation, string? when, CancellationToken ct = default);
 }
 
-/// <summary>The only shapes, tones and motions a scene may use. Anything else is dropped.</summary>
+/// <summary>The only settings, people and things a scene may use. Anything else is dropped. Nothing here can show danger or harm.</summary>
 public static class SceneVocabulary
 {
-    public static readonly HashSet<string> Shapes =
-        ["person", "door", "bus", "chair", "clock", "building", "shop", "speech", "heart", "sun", "tree", "table", "paper"];
-    public static readonly HashSet<string> Tones = ["band", "paper", "mark", "ink"];
-    public static readonly HashSet<string> Motions = ["none", "float", "pulse", "slide-in", "fade-in"];
+    public static readonly HashSet<string> Settings = ["clinic", "bus_stop", "shop", "home", "kitchen", "park", "office", "street"];
+    public static readonly HashSet<string> Lights = ["day", "evening"];
+    public static readonly HashSet<string> Roles = ["me", "helper", "friend", "neighbour", "family", "doctor", "nurse", "driver", "shopkeeper", "receptionist", "teacher"];
+    public static readonly HashSet<string> Ages = ["child", "adult", "older"];
+    public static readonly HashSet<string> Hairs = ["short", "long", "curly", "bun", "bald"];
+    public static readonly HashSet<string> Poses = ["stand", "wave", "talk", "walk", "sit"];
+    public static readonly HashSet<string> Moods = ["calm", "happy", "unsure", "thinking"];
+    public static readonly HashSet<string> Holdings = ["paper", "phone", "cup", "bag"];
+    public static readonly HashSet<string> Things = ["bus", "door", "clock", "plant", "chair", "table"];
     public static readonly HashSet<string> Pictures = ["door", "bus", "desk", "chair", "talk", "feel", "calm", "shop", "home"];
 }

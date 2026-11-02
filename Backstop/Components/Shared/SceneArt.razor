@@ -1,87 +1,98 @@
-@* An animated picture drawn from a Scene. The scene is only shape names and numbers (already checked), so nothing
-   from the model is ever written out as markup. Colours come from theme classes. *@
-<svg class="guidepic" viewBox="0 0 320 240" role="img" aria-label="@Label">
-    @foreach (var it in Scene.Items)
+@* An animated, hand-painted picture of a Scene. The scene is only fixed keys (already checked), so nothing from the model is
+   ever written out as markup. The app lays everyone out, so people never overlap. Colours come from theme variables. *@
+@{
+    var cast = Scene.Cast ?? [];
+    var things = Scene.Things ?? [];
+    var outdoors = Scene.Setting is "bus_stop" or "park" or "street";
+    var xs = cast.Count switch { 1 => new[] { 105 }, 2 => new[] { 85, 235 }, _ => new[] { 55, 160, 265 } };
+    var gap = cast.Count switch { 1 => 235, 2 => 160, _ => -1 };
+    var gapUsed = false;
+}
+<svg class="guidepic art" viewBox="0 0 320 240" role="img" aria-label="@Label">
+    <defs>
+        <filter id="sa-rough" x="-5%" y="-5%" width="110%" height="110%">
+            <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="2" seed="4" result="n" />
+            <feDisplacementMap in="SourceGraphic" in2="n" scale="2.6" xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+        <filter id="sa-grain" x="0" y="0" width="100%" height="100%">
+            <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="9" />
+            <feColorMatrix values="0 0 0 0 0.35  0 0 0 0 0.28  0 0 0 0 0.2  0 0 0 0.9 -0.3" />
+        </filter>
+    </defs>
+    <g style="filter:url(#sa-rough)">
+        <SceneBackdrop Setting="@(Scene.Setting ?? "home")" />
+
+        @foreach (var t in things)
+        {
+            switch (t)
+            {
+                case "door":
+                    <g class="art-in" style="animation-delay:.1s"><rect class="ln" style="fill:var(--art-cloth-6)" x="270" y="60" width="38" height="92" rx="4" /><rect style="fill:var(--art-coat);opacity:.25" x="276" y="68" width="26" height="30" rx="3" /><circle class="ln" style="fill:var(--art-sun)" cx="278" cy="108" r="3.5" /></g>
+                    break;
+                case "clock":
+                    <g class="art-in" style="animation-delay:.2s">
+                        @if (outdoors) { <rect class="ln" style="fill:var(--art-charcoal)" x="157" y="46" width="6" height="106" rx="2" /> }
+                        <circle class="ln" style="fill:var(--art-coat)" cx="160" cy="44" r="19" />
+                        <path class="ln ln--thin" d="M160 44V32" /><path class="ln ln--thin art-hand" d="M160 44L169 49" />
+                    </g>
+                    break;
+                case "plant":
+                    <g class="art-sway art-sway--2" style="transform-origin:290px 190px">
+                        <path style="fill:var(--art-leaf)" class="ln" d="M290 176 Q268 150 274 128 Q292 146 290 176Z M290 176 Q312 148 304 124 Q286 144 290 176Z M290 176 Q290 140 292 118 Q300 146 290 176Z" />
+                    </g>
+                    <path class="ln" style="fill:var(--art-cloth-2)" d="M276 174 H304 L300 204 H280Z" />
+                    break;
+                case "bus":
+                    if (outdoors)
+                    {
+                        <g class="art-bus">
+                            <rect class="ln" style="fill:var(--art-bus)" x="150" y="82" width="150" height="66" rx="12" />
+                            <rect style="fill:var(--art-bus-2)" x="150" y="124" width="150" height="10" />
+                            <g class="ln ln--thin" style="fill:var(--art-glass)"><rect x="162" y="92" width="28" height="22" rx="3" /><rect x="196" y="92" width="28" height="22" rx="3" /><rect x="230" y="92" width="28" height="22" rx="3" /><rect x="264" y="90" width="28" height="30" rx="3" /></g>
+                            <circle class="ln" style="fill:var(--art-charcoal)" cx="190" cy="148" r="12" /><circle class="ln" style="fill:var(--art-coat)" cx="190" cy="148" r="4.5" />
+                            <circle class="ln" style="fill:var(--art-charcoal)" cx="262" cy="148" r="12" /><circle class="ln" style="fill:var(--art-coat)" cx="262" cy="148" r="4.5" />
+                        </g>
+                    }
+                    break;
+                case "chair":
+                    if (gap > 0 && !gapUsed)
+                    {
+                        gapUsed = true;
+                        <g class="art-in" style="animation-delay:.3s" transform="translate(@gap 206)">
+                            <rect class="ln" style="fill:var(--art-wood)" x="-18" y="-62" width="36" height="42" rx="5" />
+                            <rect class="ln" style="fill:var(--art-cloth-4)" x="-22" y="-26" width="44" height="10" rx="4" />
+                            <path class="ln" d="M-18 -16v16M18 -16v16" />
+                        </g>
+                    }
+                    break;
+                case "table":
+                    if (gap > 0 && !gapUsed)
+                    {
+                        gapUsed = true;
+                        <g class="art-in" style="animation-delay:.3s" transform="translate(@gap 206)">
+                            <rect class="ln" style="fill:var(--art-wood)" x="-36" y="-40" width="72" height="9" rx="3" />
+                            <path class="ln" d="M-30 -31V0M30 -31V0" />
+                            <path class="ln" style="fill:var(--art-cloth-3)" d="M-8 -40 h16 l-2 -11 h-12z" />
+                        </g>
+                    }
+                    break;
+            }
+        }
+
+        @for (var i = 0; i < cast.Count; i++)
+        {
+            var facing = cast.Count == 1 ? 1 : xs[i] < 160 ? 1 : xs[i] > 160 ? -1 : 0;
+            <StoryActor A="cast[i]" X="xs[i]" Y="208" Facing="facing" Order="i + 1" />
+        }
+    </g>
+    @if (Scene.Light == "evening")
     {
-        var tone = "gp-" + (it.Tone is "band" or "paper" or "mark" or "ink" ? it.Tone : "paper");
-        var motion = it.Motion switch { "float" => "an-float", "pulse" => "an-pulse", "slide-in" => "an-slide-in", "fade-in" => "an-fade-in", _ => "" };
-        var delay = it.Delay switch { 1 => "0.6s", 2 => "1.2s", 3 => "1.8s", _ => "0s" };
-        <g transform="translate(@it.X @it.Y) scale(@(it.Scale / 100.0))">
-            <g class="an @motion" style="animation-delay:@delay">
-                @switch (it.Shape)
-                {
-                    case "person":
-                        <circle class="@tone" cx="0" cy="-26" r="14" />
-                        <path class="@tone" d="M-22 34c0-26 10-44 22-44s22 18 22 44z" />
-                        break;
-                    case "door":
-                        <rect class="@tone" x="-24" y="-40" width="48" height="80" rx="4" />
-                        <circle class="gp-ink" cx="14" cy="2" r="2" />
-                        break;
-                    case "bus":
-                        <rect class="@tone" x="-44" y="-22" width="88" height="40" rx="10" />
-                        <rect class="gp-paper" x="-34" y="-14" width="16" height="14" rx="2" />
-                        <rect class="gp-paper" x="-12" y="-14" width="16" height="14" rx="2" />
-                        <rect class="gp-paper" x="10" y="-14" width="16" height="14" rx="2" />
-                        <circle class="gp-paper" cx="-24" cy="20" r="8" />
-                        <circle class="gp-paper" cx="24" cy="20" r="8" />
-                        break;
-                    case "chair":
-                        <path class="@tone" d="M-18 -34h26v40h-26z" />
-                        <rect class="@tone" x="-24" y="6" width="42" height="10" rx="3" />
-                        <line class="gp-ink" x1="-20" y1="16" x2="-22" y2="36" />
-                        <line class="gp-ink" x1="14" y1="16" x2="16" y2="36" />
-                        break;
-                    case "clock":
-                        <circle class="@tone" cx="0" cy="0" r="30" />
-                        <line class="gp-ink" x1="0" y1="0" x2="0" y2="-18" />
-                        <line class="gp-ink" x1="0" y1="0" x2="12" y2="6" />
-                        break;
-                    case "building":
-                        <rect class="@tone" x="-30" y="-40" width="60" height="80" rx="4" />
-                        <rect class="gp-paper" x="-20" y="-28" width="14" height="14" rx="2" />
-                        <rect class="gp-paper" x="6" y="-28" width="14" height="14" rx="2" />
-                        <rect class="gp-paper" x="-7" y="10" width="14" height="30" rx="2" />
-                        break;
-                    case "shop":
-                        <rect class="@tone" x="-36" y="-12" width="72" height="50" rx="4" />
-                        <path class="gp-mark" d="M-42 -12 -32 -38h64l10 26z" />
-                        <rect class="gp-paper" x="-9" y="8" width="18" height="30" rx="2" />
-                        break;
-                    case "speech":
-                        <path class="@tone" d="M-34 -24h68a8 8 0 0 1 8 8v28a8 8 0 0 1-8 8H-6l-16 14V20h-12a8 8 0 0 1-8-8v-28a8 8 0 0 1 8-8z" />
-                        <line class="gp-ink" x1="-26" y1="-6" x2="26" y2="-6" />
-                        <line class="gp-ink" x1="-26" y1="6" x2="8" y2="6" />
-                        break;
-                    case "heart":
-                        <path class="@tone" d="M0 30C-40 4-34 -26-14 -26c10 0 14 6 14 12 0-6 4-12 14-12 20 0 26 30-14 56z" />
-                        break;
-                    case "sun":
-                        <circle class="@tone" cx="0" cy="0" r="16" />
-                        <path class="gp-ink" d="M0 -30v-8M0 30v8M-30 0h-8M30 0h8M-21 -21l-6 -6M21 21l6 6M21 -21l6 -6M-21 21l-6 6" />
-                        break;
-                    case "tree":
-                        <rect class="gp-band" x="-6" y="8" width="12" height="32" rx="2" />
-                        <circle class="@tone" cx="0" cy="-8" r="28" />
-                        break;
-                    case "table":
-                        <rect class="@tone" x="-40" y="-6" width="80" height="12" rx="3" />
-                        <line class="gp-ink" x1="-32" y1="6" x2="-34" y2="34" />
-                        <line class="gp-ink" x1="32" y1="6" x2="34" y2="34" />
-                        break;
-                    case "paper":
-                        <rect class="@tone" x="-22" y="-30" width="44" height="60" rx="3" />
-                        <line class="gp-ink" x1="-12" y1="-14" x2="12" y2="-14" />
-                        <line class="gp-ink" x1="-12" y1="-2" x2="12" y2="-2" />
-                        <line class="gp-ink" x1="-12" y1="10" x2="4" y2="10" />
-                        break;
-                }
-            </g>
-        </g>
+        <rect width="320" height="240" style="fill:var(--art-evening);opacity:.22;mix-blend-mode:multiply" />
     }
+    <rect width="320" height="240" style="filter:url(#sa-grain);opacity:.22;mix-blend-mode:multiply" pointer-events="none" />
 </svg>
 
 @code {
-    [Parameter, EditorRequired] public Scene Scene { get; set; } = new([]);
+    [Parameter, EditorRequired] public Scene Scene { get; set; } = new();
     [Parameter] public string Label { get; set; } = "Picture for this part of the story";
 }

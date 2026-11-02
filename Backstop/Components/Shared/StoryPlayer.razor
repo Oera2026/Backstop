@@ -7,7 +7,7 @@
         <figure class="storyfig">
             <div class="figure__frame">
                 @* Re-keyed per page so the animation starts again on each page. *@
-                @if (pg.Scene is { Items.Count: > 0 })
+                @if (pg.Scene is { IsDrawable: true })
                 {
                     <SceneArt @key="_at" Scene="pg.Scene" Label="@("Picture: " + pg.Heading)" />
                 }

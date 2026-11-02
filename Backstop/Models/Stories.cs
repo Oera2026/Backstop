@@ -10,11 +10,19 @@ public sealed record StoryRequest(string Situation, string? When);
 /// <summary>One page of a story: a short heading, a few short sentences and a picture key.</summary>
 public sealed record StoryPage(string Heading, string Text, string Picture, Scene? Scene = null);
 
-/// <summary>A drawn scene: a few shapes from a fixed list, placed and animated. Never raw markup.</summary>
-public sealed record Scene(IReadOnlyList<SceneItem> Items);
+/// <summary>
+/// A painted scene: a setting, the people in it and a few things. Every field is a key from <c>SceneVocabulary</c>,
+/// so the model can only choose from fixed, calm pictures. It never sends markup, and the app does the layout.
+/// Stories saved by an older version have no cast and fall back to their picture key.
+/// </summary>
+public sealed record Scene(string? Setting = null, string? Light = null, IReadOnlyList<Actor>? Cast = null, IReadOnlyList<string>? Things = null)
+{
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool IsDrawable => !string.IsNullOrEmpty(Setting) && Cast is { Count: > 0 };
+}
 
-/// <summary>Shape is a key from <c>SceneVocabulary.Shapes</c>; X, Y fit a 320 x 240 picture; Scale is a percent; Delay is 0 to 3.</summary>
-public sealed record SceneItem(string Shape, int X, int Y, int Scale, string Tone, string Motion, int Delay);
+/// <summary>One person. Role sets the clothes. Skin is 1-4, HairColour 1-5, Colour 1-6. Age, Hair, Pose and Mood are keys.</summary>
+public sealed record Actor(string Role, string Age, int Skin, string Hair, int HairColour, int Colour, bool Glasses, string Pose, string Mood, string? Holding);
 
 public sealed record Story(
     string Id,

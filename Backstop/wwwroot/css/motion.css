@@ -174,3 +174,64 @@ body:has(#main) .boot { display: none; }
 @keyframes an-fade-in { from { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .an { animation: none; } }
 :root[data-motion="calm"] .an { animation: none; }
+
+/* ---------- Story art: painted people and places ---------- */
+.art .ln { stroke: var(--art-ink); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.art .ln--thin { stroke-width: 1.4; }
+.art .soft { opacity: .25; fill: none; }
+.art .art-shadow { fill: var(--art-ink); opacity: .14; }
+.art .art-beam { opacity: .28; }
+.art .art-eyes, .art .art-mouth { transform-box: view-box; }
+.art .arm, .art .leg, .art .art-body, .art .art-eyes, .art .art-mouth, .art .art-hand, .art .art-sway, .art .art-cloud, .art .art-sun, .art .art-bus, .art .art-idle, .art .art-walk, .art .art-in, .art .art-dot { transform-box: view-box; }
+
+.art .art-in { animation: art-in .9s ease-out both; }
+@keyframes art-in { from { opacity: 0; } }
+
+.art .art-body { transform-origin: 0 -40px; animation: art-breathe 3.6s ease-in-out infinite; }
+@keyframes art-breathe { 50% { transform: translateY(-1.2px) scale(1.012, 1.01); } }
+.art .art-eyes { transform-origin: 0 0; animation: art-blink 5s infinite; }
+@keyframes art-blink { 0%, 93%, 100% { transform: scaleY(1); } 96% { transform: scaleY(.1); } }
+.art .art-mouth { transform-origin: 0 0; animation: art-talk .5s ease-in-out infinite; }
+@keyframes art-talk { 50% { transform: scaleY(.3); } }
+
+.art .arm { transform-origin: 0 0; }
+.art .arm--rest-r { transform: rotate(-4deg); }
+.art .arm--rest-l { transform: rotate(4deg); }
+.art .arm--wave { transform: rotate(-150deg); animation: art-wave 1.1s ease-in-out infinite; }
+@keyframes art-wave { 50% { transform: rotate(-176deg); } }
+.art .arm--talk { transform: rotate(-38deg); animation: art-gesture 2.2s ease-in-out infinite; }
+@keyframes art-gesture { 50% { transform: rotate(-58deg); } }
+
+.art .art-walk { animation: art-walk-in 1.4s ease-out both, art-bob .7s ease-in-out 1.4s infinite; }
+@keyframes art-walk-in { from { transform: translateX(-70px); opacity: 0; } }
+@keyframes art-bob { 50% { transform: translateY(-2.5px); } }
+.art .art-walk .leg { transform-origin: 0 -42px; animation: art-step .7s ease-in-out 1.4s infinite alternate; }
+.art .art-walk .leg--r { animation-direction: alternate-reverse; }
+@keyframes art-step { from { transform: rotate(14deg); } to { transform: rotate(-14deg); } }
+.art .arm--swing-a { transform-origin: 0 0; animation: art-swing .7s ease-in-out 1.4s infinite alternate; }
+.art .arm--swing-b { transform-origin: 0 0; animation: art-swing .7s ease-in-out 1.4s infinite alternate-reverse; }
+@keyframes art-swing { from { transform: rotate(16deg); } to { transform: rotate(-16deg); } }
+
+.art .art-bubble { animation: art-in .6s ease-out .9s both; }
+.art .art-dot { animation: art-dot 1.4s ease-in-out infinite; }
+.art .art-dot--2 { animation-delay: .2s; }
+.art .art-dot--3 { animation-delay: .4s; }
+@keyframes art-dot { 0%, 60%, 100% { opacity: .25; } 30% { opacity: 1; } }
+
+.art .art-cloud { animation: art-drift 26s linear infinite alternate; }
+.art .art-cloud--2 { animation-duration: 34s; animation-direction: alternate-reverse; }
+@keyframes art-drift { to { transform: translateX(34px); } }
+.art .art-sun { transform-origin: 270px 32px; animation: art-sunpulse 5s ease-in-out infinite; }
+@keyframes art-sunpulse { 50% { transform: scale(1.07); } }
+.art .art-sway { transform-origin: 50px 130px; animation: art-sway 5s ease-in-out infinite alternate; }
+.art .art-sway--2 { animation-duration: 6.2s; animation-delay: -2s; }
+@keyframes art-sway { to { transform: rotate(1.8deg); } }
+.art .art-bus { animation: art-bus-in 2s ease-out both; }
+@keyframes art-bus-in { from { transform: translateX(190px); } }
+.art .art-hand { transform-origin: 160px 44px; animation: art-tick 12s linear infinite; }
+@keyframes art-tick { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) { .art *, .art { animation: none !important; } .art .arm--wave { transform: rotate(-150deg); } .art .arm--talk { transform: rotate(-38deg); } }
+:root[data-motion="calm"] .art * { animation: none !important; }
+:root[data-motion="calm"] .art .arm--wave { transform: rotate(-150deg); }
+:root[data-motion="calm"] .art .arm--talk { transform: rotate(-38deg); }

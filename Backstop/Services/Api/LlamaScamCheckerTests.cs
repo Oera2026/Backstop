@@ -461,14 +461,19 @@ public class LlamaScamCheckerTests
 
             // Social stories: the model sends a scene as data. Unknown shapes are dropped, numbers clamped, markup never passes.
             var okJson = "{\"title\":\"Going to the dentist\",\"sensitive\":false,\"pages\":[{\"heading\":\"What happens\",\"text\":\"I go to the dentist. I sit down.\",\"picture\":\"door\",\"scene\":[" +
-                "{\"shape\":\"person\",\"x\":9999,\"y\":-5,\"scale\":900,\"tone\":\"paper\",\"motion\":\"fade-in\",\"delay\":9}," +
-                "{\"shape\":\"script\",\"x\":10,\"y\":10},{\"shape\":\"door\",\"tone\":\"red\",\"motion\":\"spin\"}]}]}";
+                "{\"shape\":\"person\"}]}]}";
+            okJson = "{\"title\":\"Going to the dentist\",\"sensitive\":false,\"pages\":[{\"heading\":\"What happens\",\"text\":\"I go to the dentist. I sit down.\",\"picture\":\"door\",\"scene\":{\"setting\":\"clinic\",\"light\":\"night\",\"cast\":[" +
+                "{\"role\":\"doctor\",\"age\":\"giant\",\"skin\":99,\"hair\":\"spiky\",\"hairColour\":-3,\"colour\":0,\"pose\":\"fight\",\"mood\":\"angry\",\"holding\":\"knife\"}," +
+                "{\"role\":\"me\"},{\"role\":\"nurse\"},{\"role\":\"nurse\"}],\"things\":[\"door\",\"gun\",\"door\",\"bus\",\"clock\",\"plant\"]}}]}";
             var okStory = MetaStoryWriter.ParseContent(okJson);
             Assert(okStory.Success && okStory.Pages.Count == 1, "A good story is read");
-            var items = okStory.Pages[0].Scene!.Items;
-            Assert(items.Count == 2, "Unknown shapes are dropped");
-            Assert(items[0].X == 300 && items[0].Y == 20 && items[0].Scale == 200 && items[0].Delay == 3, "Numbers are clamped");
-            Assert(items[1].Tone == "paper" && items[1].Motion == "none", "Unknown tone and motion fall back");
+            var scn = okStory.Pages[0].Scene!;
+            Assert(scn.IsDrawable && scn.Setting == "clinic" && scn.Light == "day", "Unknown light falls back to day");
+            Assert(scn.Cast!.Count == 3 && scn.Cast[0].Role == "me" && scn.Cast[1].Role == "friend", "The first person is always me; at most 3 people");
+            var a0 = scn.Cast[0];
+            Assert(a0.Age == "adult" && a0.Skin == 4 && a0.Hair == "short" && a0.HairColour == 1 && a0.Colour == 1, "Unknown or out-of-range looks fall back");
+            Assert(a0.Pose == "stand" && a0.Mood == "calm" && a0.Holding is null, "Unknown pose, mood and held things become calm defaults");
+            Assert(scn.Things!.SequenceEqual(["door", "bus", "clock"]), "Unknown or repeated things are dropped; at most 3");
             Assert(!MetaStoryWriter.ParseContent("{\"title\":\"x\",\"pages\":[{\"heading\":\"Go to http://example.com\",\"text\":\"Hi\",\"picture\":\"door\"}]}").Success, "A page with a link is refused");
             Assert(!MetaStoryWriter.ParseContent("not json").Success, "Rubbish is refused");
             Assert(MetaStoryWriter.ParseContent("{\"title\":\"A\",\"pages\":[{\"heading\":\"B\",\"text\":\"C.\",\"picture\":\"nope\",\"scene\":[{\"shape\":\"bad\"}]}]}").Pages[0].Scene is null, "A page with no valid items has no scene");

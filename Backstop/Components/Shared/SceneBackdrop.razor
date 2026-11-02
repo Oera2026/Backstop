@@ -1,0 +1,98 @@
+@* The painted place behind the people. A fixed set of settings; colours are theme variables. 320 x 240. *@
+@switch (Setting)
+{
+    case "clinic":
+        <rect style="fill:var(--art-wall-2)" width="320" height="152" />
+        <rect style="fill:var(--art-floor)" y="150" width="320" height="90" />
+        <path class="ln ln--thin soft" d="M0 150H320M0 178H320M0 210H320M60 150L20 240M160 150V240M260 150L300 240" />
+        <rect class="ln" style="fill:var(--art-glass)" x="214" y="28" width="80" height="70" rx="6" />
+        <path class="ln ln--thin" d="M254 28V98M214 63H294" />
+        <path class="art-beam" style="fill:var(--art-coat)" d="M214 98 L294 98 L316 150 L196 150Z" />
+        <rect class="ln" style="fill:var(--art-coat)" x="30" y="30" width="34" height="34" rx="7" />
+        <path style="fill:var(--art-leaf-2)" d="M44 36h6v8h8v6h-8v8h-6v-8h-8v-6h8z" />
+        <rect class="ln" style="fill:var(--art-wood)" x="18" y="104" width="96" height="46" rx="5" />
+        <rect class="ln" style="fill:var(--art-floor-2)" x="14" y="98" width="104" height="10" rx="4" />
+        break;
+    case "bus_stop":
+        <rect style="fill:var(--art-sky)" width="320" height="140" />
+        <g class="art-cloud"><ellipse style="fill:var(--art-cloud)" cx="70" cy="40" rx="30" ry="11" /><ellipse style="fill:var(--art-cloud)" cx="92" cy="33" rx="20" ry="11" /><ellipse style="fill:var(--art-cloud)" cx="52" cy="35" rx="17" ry="9" /></g>
+        <g class="art-cloud art-cloud--2"><ellipse style="fill:var(--art-cloud)" cx="230" cy="58" rx="26" ry="9" /><ellipse style="fill:var(--art-cloud)" cx="246" cy="52" rx="16" ry="9" /></g>
+        <circle class="art-sun" style="fill:var(--art-sun)" cx="270" cy="30" r="14" />
+        <path style="fill:var(--art-grass-2)" d="M0 118 Q60 92 130 112 Q200 126 260 104 Q300 94 320 106 V140 H0Z" />
+        <rect style="fill:var(--art-road)" y="128" width="320" height="34" />
+        <path class="ln ln--thin" style="stroke-dasharray:14 12" d="M0 146H320" />
+        <rect style="fill:var(--art-pave)" y="160" width="320" height="80" />
+        <path class="ln ln--thin soft" d="M0 160H320M0 190H320M0 222H320" />
+        <g><rect class="ln" style="fill:var(--art-charcoal)" x="34" y="66" width="5" height="96" rx="2" /><circle class="ln" style="fill:var(--art-cloth-1)" cx="36.5" cy="62" r="13" /><rect style="fill:var(--art-coat)" x="30" y="60" width="13" height="4" rx="1" /></g>
+        <g><path class="ln" style="fill:var(--art-cloth-6)" d="M225 80 H315 V90 H225Z" /><rect class="ln" style="fill:var(--art-glass)" x="231" y="90" width="78" height="52" /><path class="ln" d="M231 90V162M309 90V162" /></g>
+        break;
+    case "shop":
+        <rect style="fill:var(--art-wall)" width="320" height="152" />
+        <rect style="fill:var(--art-floor)" y="150" width="320" height="90" />
+        <path class="ln ln--thin soft" d="M0 150H320M0 180H320M0 214H320M80 150L50 240M160 150V240M240 150L270 240" />
+        <path class="ln" style="fill:var(--art-cloth-2)" d="M0 0 H320 V30 Q304 40 288 30 Q272 40 256 30 Q240 40 224 30 Q208 40 192 30 Q176 40 160 30 Q144 40 128 30 Q112 40 96 30 Q80 40 64 30 Q48 40 32 30 Q16 40 0 30Z" />
+        <path style="fill:var(--art-coat);opacity:.8" d="M32 0h32v33Q48 40 32 33zM96 0h32v33Q112 40 96 33zM160 0h32v33Q176 40 160 33zM224 0h32v33Q240 40 224 33z" />
+        <rect class="ln" style="fill:var(--art-wood)" x="20" y="58" width="150" height="8" rx="3" />
+        <rect class="ln" style="fill:var(--art-wood)" x="20" y="102" width="150" height="8" rx="3" />
+        <g class="ln ln--thin"><rect style="fill:var(--art-cloth-1)" x="28" y="38" width="20" height="20" rx="3" /><rect style="fill:var(--art-cloth-3)" x="52" y="42" width="16" height="16" rx="3" /><rect style="fill:var(--art-cloth-4)" x="74" y="34" width="22" height="24" rx="3" /><rect style="fill:var(--art-cloth-2)" x="102" y="40" width="18" height="18" rx="3" /><rect style="fill:var(--art-cloth-5)" x="126" y="36" width="24" height="22" rx="3" />
+            <rect style="fill:var(--art-cloth-3)" x="30" y="82" width="22" height="20" rx="3" /><rect style="fill:var(--art-cloth-6)" x="58" y="78" width="18" height="24" rx="3" /><rect style="fill:var(--art-cloth-2)" x="82" y="84" width="24" height="18" rx="3" /><rect style="fill:var(--art-cloth-4)" x="112" y="80" width="20" height="22" rx="3" /><rect style="fill:var(--art-cloth-1)" x="138" y="84" width="18" height="18" rx="3" /></g>
+        <rect class="ln" style="fill:var(--art-glass)" x="214" y="48" width="84" height="64" rx="6" />
+        break;
+    case "kitchen":
+        <rect style="fill:var(--art-wall-2)" width="320" height="152" />
+        <rect style="fill:var(--art-floor)" y="150" width="320" height="90" />
+        <path class="ln ln--thin soft" d="M0 150H320M0 182H320M0 216H320M80 150V240M160 150V240M240 150V240" />
+        <rect class="ln" style="fill:var(--art-wood)" x="16" y="30" width="120" height="44" rx="5" /><path class="ln ln--thin" d="M76 30V74" />
+        <rect class="ln" style="fill:var(--art-glass)" x="196" y="30" width="96" height="66" rx="6" /><path class="ln ln--thin" d="M244 30V96M196 63H292" />
+        <rect class="ln" style="fill:var(--art-wood)" x="10" y="108" width="170" height="44" rx="4" /><rect class="ln" style="fill:var(--art-floor-2)" x="6" y="102" width="178" height="9" rx="4" />
+        <path class="ln" style="fill:var(--art-cloth-2)" d="M44 100 h22 l-3 -18 h-16z M66 90 q10 0 8 8" />
+        <rect class="ln" style="fill:var(--art-coat)" x="104" y="88" width="14" height="14" rx="3" />
+        break;
+    case "park":
+        <rect style="fill:var(--art-sky)" width="320" height="140" />
+        <g class="art-cloud"><ellipse style="fill:var(--art-cloud)" cx="90" cy="34" rx="30" ry="11" /><ellipse style="fill:var(--art-cloud)" cx="112" cy="28" rx="18" ry="10" /></g>
+        <circle class="art-sun" style="fill:var(--art-sun)" cx="272" cy="34" r="15" />
+        <path style="fill:var(--art-grass-2)" d="M0 110 Q70 80 150 104 Q230 126 320 92 V150 H0Z" />
+        <rect style="fill:var(--art-grass)" y="130" width="320" height="110" />
+        <path style="fill:var(--art-pave)" d="M120 240 Q150 190 200 160 Q230 142 280 138 L290 150 Q240 158 212 176 Q182 200 200 240Z" />
+        <g class="art-sway"><rect class="ln" style="fill:var(--art-wood)" x="40" y="62" width="10" height="70" rx="3" /><circle class="ln" style="fill:var(--art-leaf)" cx="45" cy="52" r="30" /><circle style="fill:var(--art-leaf-2);opacity:.6" cx="54" cy="60" r="16" /></g>
+        <g class="art-sway art-sway--2"><rect class="ln" style="fill:var(--art-wood)" x="262" y="76" width="9" height="62" rx="3" /><circle class="ln" style="fill:var(--art-leaf)" cx="266" cy="68" r="25" /><circle style="fill:var(--art-leaf-2);opacity:.6" cx="274" cy="74" r="13" /></g>
+        <g><circle style="fill:var(--art-cloth-3)" cx="96" cy="170" r="3" /><circle style="fill:var(--art-cloth-2)" cx="108" cy="182" r="3" /><circle style="fill:var(--art-coat)" cx="84" cy="188" r="3" /><circle style="fill:var(--art-cloth-5)" cx="250" cy="200" r="3" /><circle style="fill:var(--art-cloth-3)" cx="270" cy="216" r="3" /></g>
+        break;
+    case "office":
+        <rect style="fill:var(--art-wall-2)" width="320" height="152" />
+        <rect style="fill:var(--art-floor-2)" y="150" width="320" height="90" />
+        <path class="ln ln--thin soft" d="M0 150H320M0 184H320M0 220H320" />
+        <rect class="ln" style="fill:var(--art-glass)" x="30" y="28" width="104" height="72" rx="6" /><path class="ln ln--thin" d="M82 28V100" />
+        <rect style="fill:var(--art-charcoal);opacity:.35" x="42" y="62" width="14" height="38" /><rect style="fill:var(--art-charcoal);opacity:.35" x="60" y="48" width="16" height="52" /><rect style="fill:var(--art-charcoal);opacity:.35" x="92" y="70" width="14" height="30" />
+        <rect class="ln" style="fill:var(--art-coat)" x="188" y="32" width="100" height="62" rx="5" /><path class="ln ln--thin" d="M200 48h50M200 60h72M200 72h40" /><rect style="fill:var(--art-cloth-3)" x="262" y="44" width="16" height="12" rx="2" />
+        <rect class="ln" style="fill:var(--art-wood)" x="20" y="108" width="120" height="44" rx="4" /><rect class="ln" style="fill:var(--art-floor)" x="14" y="102" width="132" height="9" rx="4" />
+        <rect class="ln" style="fill:var(--art-charcoal)" x="60" y="82" width="34" height="22" rx="3" /><rect class="ln" style="fill:var(--art-glass)" x="64" y="85" width="26" height="14" rx="1" />
+        break;
+    case "street":
+        <rect style="fill:var(--art-sky)" width="320" height="130" />
+        <g class="art-cloud"><ellipse style="fill:var(--art-cloud)" cx="250" cy="30" rx="28" ry="10" /><ellipse style="fill:var(--art-cloud)" cx="270" cy="25" rx="16" ry="9" /></g>
+        <rect class="ln" style="fill:var(--art-brick)" x="0" y="46" width="88" height="96" /><rect class="ln" style="fill:var(--art-wall)" x="88" y="30" width="76" height="112" /><rect class="ln" style="fill:var(--art-cloth-6)" x="164" y="56" width="68" height="86" /><rect class="ln" style="fill:var(--art-cloth-3)" x="232" y="40" width="88" height="102" />
+        <g class="ln ln--thin" style="fill:var(--art-glass)"><rect x="12" y="60" width="18" height="22" /><rect x="40" y="60" width="18" height="22" /><rect x="12" y="94" width="18" height="22" /><rect x="100" y="44" width="18" height="22" /><rect x="130" y="44" width="18" height="22" /><rect x="100" y="80" width="18" height="22" /><rect x="130" y="80" width="18" height="22" /><rect x="176" y="70" width="16" height="20" /><rect x="204" y="70" width="16" height="20" /><rect x="246" y="54" width="18" height="22" /><rect x="282" y="54" width="18" height="22" /></g>
+        <rect class="ln" style="fill:var(--art-wood)" x="52" y="104" width="26" height="38" rx="2" /><rect class="ln" style="fill:var(--art-wood)" x="256" y="106" width="28" height="36" rx="2" />
+        <rect style="fill:var(--art-road)" y="142" width="320" height="26" />
+        <path class="ln ln--thin" style="stroke-dasharray:14 12" d="M0 156H320" />
+        <rect style="fill:var(--art-pave)" y="168" width="320" height="72" />
+        <path class="ln ln--thin soft" d="M0 168H320M0 196H320M0 226H320" />
+        <g class="art-sway"><rect class="ln" style="fill:var(--art-wood)" x="296" y="116" width="8" height="52" rx="2" /><circle class="ln" style="fill:var(--art-leaf)" cx="300" cy="106" r="20" /></g>
+        break;
+    default: // "home"
+        <rect style="fill:var(--art-wall)" width="320" height="152" />
+        <rect style="fill:var(--art-floor)" y="150" width="320" height="90" />
+        <path class="ln ln--thin soft" d="M0 150H320M0 180H320M0 214H320M80 150L50 240M200 150L220 240" />
+        <ellipse style="fill:var(--art-cloth-2);opacity:.55" cx="160" cy="214" rx="120" ry="20" />
+        <rect class="ln" style="fill:var(--art-glass)" x="28" y="30" width="80" height="72" rx="5" /><path class="ln ln--thin" d="M68 30V102M28 66H108" />
+        <path class="ln curtain" style="fill:var(--art-cloth-5)" d="M18 24 H36 Q42 60 34 108 H18Z" /><path class="ln curtain" style="fill:var(--art-cloth-5)" d="M118 24 H100 Q94 60 102 108 H118Z" />
+        <rect class="ln" style="fill:var(--art-coat)" x="150" y="36" width="52" height="40" rx="3" /><path style="fill:var(--art-leaf)" d="M156 70 L172 50 L182 62 L190 54 L198 70Z" /><circle style="fill:var(--art-sun)" cx="188" cy="46" r="5" />
+        <rect class="ln" style="fill:var(--art-cloth-4)" x="206" y="92" width="96" height="48" rx="12" /><rect class="ln" style="fill:var(--art-cloth-4)" x="200" y="112" width="106" height="34" rx="10" />
+        break;
+}
+
+@code {
+    [Parameter, EditorRequired] public string Setting { get; set; } = "home";
+}

@@ -123,3 +123,49 @@
   --check: #FFCE94;
   --block: #FFB0B7;
 }
+
+/* Story pictures: a fixed hand-painted palette. The pictures keep these colours in every scheme, like a printed page. */
+:root {
+  --art-ink: #3B2F2A;
+  --art-paper: #FBF6EC;
+  --art-sky: #CFE8F3;
+  --art-sky-low: #F4EAD2;
+  --art-evening: #F2A65A;
+  --art-wall: #F1E3CF;
+  --art-wall-2: #DDE9E4;
+  --art-floor: #D9B98C;
+  --art-floor-2: #C9A472;
+  --art-grass: #A8CF8E;
+  --art-grass-2: #86B874;
+  --art-leaf: #6FAE6B;
+  --art-leaf-2: #4F9060;
+  --art-wood: #B98558;
+  --art-road: #B8BCC4;
+  --art-pave: #E2DED6;
+  --art-glass: #DDF0F7;
+  --art-brick: #D58B6E;
+  --art-cloud: #FFFFFF;
+  --art-sun: #F7C65A;
+  --art-bus: #E7685A;
+  --art-bus-2: #C9493F;
+  --art-coat: #FFFFFF;
+  --art-scrubs: #5FB3B3;
+  --art-denim: #4A6A8F;
+  --art-charcoal: #5B5F6B;
+  --art-cheek: #F2A99A;
+  --art-skin-1: #F9DCC4;
+  --art-skin-2: #EBBE97;
+  --art-skin-3: #C98B5E;
+  --art-skin-4: #8D5A3C;
+  --art-hair-1: #2B2118;
+  --art-hair-2: #6B4423;
+  --art-hair-3: #B8642B;
+  --art-hair-4: #D9D3C8;
+  --art-hair-5: #E3B65A;
+  --art-cloth-1: #3E93A3;
+  --art-cloth-2: #E58F73;
+  --art-cloth-3: #EBBE5A;
+  --art-cloth-4: #8DBB9F;
+  --art-cloth-5: #9A7BA0;
+  --art-cloth-6: #5F82B3;
+}
