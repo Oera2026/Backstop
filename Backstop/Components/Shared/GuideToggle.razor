@@ -4,7 +4,7 @@
 
 @* Demo visitors only: turns the guide off and on. *@
 <AuthorizeView Roles="@Roles.Demo">
-    <button type="button" class="guide-toggle" aria-pressed="@(Tour.Active ? "true" : "false")" @onclick="Toggle"><Icon Name="question" /> Guide</button>
+    <button type="button" class="guide-toggle" aria-pressed="@(Tour.Active ? "true" : "false")" aria-label="Guide" @onclick="Toggle"><Icon Name="question" /> <span class="guide-toggle__text">Guide</span></button>
 </AuthorizeView>
 
 @code {

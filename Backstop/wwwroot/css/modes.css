@@ -679,3 +679,17 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 .can .pic { width: 3rem; height: 3rem; flex: none; }
 .can__word { font-weight: 800; margin-inline-start: .5rem; }
 .can--nav li > span:last-child strong { display: block; }
+@media (max-width: 959px) {
+  .guide-toggle__text { display: none; }
+  .guide-toggle { min-width: 48px; justify-content: center; }
+  .header-for { min-width: 0; padding: .2rem .7rem; font-size: .85rem; white-space: nowrap; }
+  .header-for .icon { display: none; }
+  .progress { white-space: nowrap; }
+  .progress__dot { width: 1.25rem; }
+}
+.role-tag__who { display: none; }
+@media (max-width: 959px) {
+  .header-for { display: none; }
+  .role-tag__who { display: inline; }
+  .site-header--helper { gap: 0 .5rem; }
+}
