@@ -11,10 +11,7 @@
                 <button type="button" class="demobar__side" aria-pressed="@(Tour.Side == TourSide.User ? "true" : "false")" @onclick="@(() => Switch(TourSide.User))">User</button>
                 <button type="button" class="demobar__side" aria-pressed="@(Tour.Side == TourSide.Helper ? "true" : "false")" @onclick="@(() => Switch(TourSide.Helper))">Helper</button>
             </div>
-            @if (!Tour.Active)
-            {
-                <button type="button" class="btn btn-quiet" @onclick="Restart">Start the guide</button>
-            }
+<button type="button" class="btn btn-quiet demobar__guide" aria-pressed="@(Tour.Active ? "true" : "false")" @onclick="ToggleGuide"><Icon Name="question" /> Guide</button>
         </div>
     </div>
     @if (Tour.Active)
@@ -112,7 +109,12 @@
 
     private void Back() { Tour.Back(); Go(); }
 
-    private void Restart() { Tour.Start(Tour.Side); Go(); }
+    private void ToggleGuide()
+    {
+        if (Tour.Active) { Tour.Close(); return; }
+        Tour.Start(Tour.Side);
+        Go();
+    }
 
     private void Switch(TourSide side)
     {

@@ -17,11 +17,24 @@
     <link rel="stylesheet" href="@Assets["css/modes.css"]" />
     <link rel="stylesheet" href="@Assets["css/motion.css"]" />
     <link rel="stylesheet" href="@Assets["Backstop.styles.css"]" />
+    <title>Backstop</title>
+    <link rel="preload" href="fonts/atkinson-next-400.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="fonts/atkinson-next-700.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="fonts/atkinson-next-800.woff2" as="font" type="font/woff2" crossorigin />
     <ImportMap />
-    <HeadOutlet @rendermode="InteractiveServer" />
+    <HeadOutlet @rendermode="InteractiveNoPrerender" />
 </head>
 
 <body>
+    <div class="boot" aria-hidden="true">
+        <span class="skel__bar skel__bar--title"></span>
+        <div class="skel">
+            @for (var i = 0; i < 3; i++)
+            {
+                <div class="skel__row"><span class="skel__pic"></span><span class="skel__lines"><span class="skel__bar skel__bar--short"></span><span class="skel__bar"></span></span></div>
+            }
+        </div>
+    </div>
     <Routes @rendermode="PageRenderMode" TimeZone="@HttpContext?.Request.Cookies["backstop.tz"]" />
     <ReconnectModal />
     <script src="@Assets["js/backstop.js"]"></script>
@@ -35,7 +48,11 @@
 @code {
     [CascadingParameter] private HttpContext? HttpContext { get; set; }
 
+    // Pages are drawn once, when the live connection opens. Drawing them on the server first and then again
+    // makes everything flash and jump; the start-up shapes above fill the gap instead.
+    private static readonly IComponentRenderMode InteractiveNoPrerender = new InteractiveServerRenderMode(prerender: false);
+
     // The sign-in page is plain server-rendered HTML (its form posts to /account/login); everything else is interactive.
     private IComponentRenderMode? PageRenderMode =>
-        HttpContext?.Request.Path.StartsWithSegments("/login") == true || HttpContext?.Request.Path.StartsWithSegments("/demo-start") == true ? null : InteractiveServer;
+        HttpContext?.Request.Path.StartsWithSegments("/login") == true || HttpContext?.Request.Path.StartsWithSegments("/demo-start") == true ? null : InteractiveNoPrerender;
 }

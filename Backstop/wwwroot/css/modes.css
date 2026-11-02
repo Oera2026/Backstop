@@ -547,9 +547,9 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 /* Demo guide: User / Helper switch and the walk-around. One compact row; the step words fold away. */
 .demobar { background: var(--surface); border-bottom: var(--line) solid var(--rule); padding: .5rem max(.75rem, env(safe-area-inset-left)); }
 .framed .demobar { display: none; }
-.demobar__row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem .75rem; }
+.demobar__row { display: flex; flex-wrap: nowrap; align-items: center; justify-content: space-between; gap: .5rem .75rem; }
 .demobar__switch { display: inline-flex; border: var(--line) solid var(--navy); border-radius: var(--radius-lg); overflow: hidden; }
-.demobar__side { min-height: 56px; min-width: 5.5rem; padding: 0 1rem; font: inherit; font-weight: 700; background: var(--bg); color: var(--navy); border: 0; cursor: pointer; }
+.demobar__side { min-height: 56px; min-width: 4.5rem; padding: 0 1rem; font: inherit; font-weight: 700; background: var(--bg); color: var(--navy); border: 0; cursor: pointer; }
 .demobar__side[aria-pressed="true"] { background: var(--navy); color: var(--on-navy); }
 .demobar__side:focus-visible { outline: 3px solid var(--focus); outline-offset: -3px; }
 .demobar__nav { display: flex; gap: .5rem; }
@@ -618,3 +618,5 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 .sidecard--helper .sidecard__go { background: var(--safe); }
 @media (hover: hover) { .sidecard:hover { box-shadow: 0 4px 14px var(--scrim); } }
 .sidecard:focus-visible { outline: 4px solid var(--focus); outline-offset: 3px; }
+.demobar__guide { flex: none; }
+.demobar__guide[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--navy); }

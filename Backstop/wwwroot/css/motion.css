@@ -66,13 +66,13 @@
 .btn-primary .spinner { border-color: color-mix(in srgb, var(--on-navy) 30%, transparent); border-top-color: var(--on-navy); }
 
 /* ---------- Things arriving ---------- */
-.shell > .page > * { animation: rise .36s cubic-bezier(.16, 1, .3, 1) backwards; }
+.shell > .page > * { animation: rise .2s ease-out backwards; }
 .shell > .page > :nth-child(2) { animation-delay: .04s; }
 .shell > .page > :nth-child(3) { animation-delay: .08s; }
 .shell > .page > :nth-child(4) { animation-delay: .12s; }
 .shell > .page > :nth-child(5) { animation-delay: .16s; }
 .shell > .page > :nth-child(n + 6) { animation-delay: .2s; }
-@keyframes rise { from { opacity: 0; transform: translateY(10px); } }
+@keyframes rise { from { opacity: 0; } }
 
 .bubble { animation: bubble-in .32s cubic-bezier(.16, 1, .3, 1) backwards; }
 .bubble--bot { transform-origin: left bottom; }
@@ -129,3 +129,30 @@ body { transition: background-color .3s ease, color .3s ease; }
 :root[data-motion="calm"] .btn:hover:not(:disabled), :root[data-motion="calm"] .tile:hover, :root[data-motion="calm"] .modecard:hover,
 :root[data-motion="calm"] .btn:active:not(:disabled), :root[data-motion="calm"] .row:active,
 :root[data-motion="calm"] .tile:active, :root[data-motion="calm"] .modecard:active { transform: none; }
+
+/* ---------- Skeletons: grey shapes where content will be, so the page does not jump ---------- */
+.skel { display: grid; gap: 1rem; margin: 1.25rem 0; }
+.skel__row { display: flex; align-items: center; gap: 1rem; min-height: 96px; padding: 1rem; border: var(--line) solid var(--rule); border-radius: var(--radius-lg); background: var(--bg); }
+.skel__lines { display: grid; gap: .6rem; flex: 1; min-width: 0; }
+.skel__article { display: grid; gap: .75rem; }
+.skel__pic, .skel__bar, .skel__block { position: relative; overflow: hidden; background: var(--band); border-radius: var(--radius); }
+.skel__pic { flex: none; width: 3.5rem; height: 3.5rem; }
+.skel__bar { height: 1rem; }
+.skel__bar--short { width: 55%; }
+.skel__bar--title { height: 1.8rem; width: 70%; margin-bottom: .5rem; }
+.skel__block { height: 8rem; margin-top: .75rem; }
+.skel__pic::after, .skel__bar::after, .skel__block::after {
+  content: ""; position: absolute; inset: 0; transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, var(--surface), transparent); animation: shimmer 1.4s ease-in-out infinite;
+}
+@keyframes shimmer { to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) { .skel__pic::after, .skel__bar::after, .skel__block::after { animation: none; } }
+:root[data-motion="calm"] .skel__pic::after, :root[data-motion="calm"] .skel__bar::after, :root[data-motion="calm"] .skel__block::after { animation: none; }
+
+/* Shown while the app starts, so the first look is a page shape and not a blank screen. Hidden once a page is drawn. */
+.boot { padding: 1.25rem max(.75rem, env(safe-area-inset-left)); max-width: 52rem; margin: 0 auto; }
+.boot .skel__bar--title { margin-bottom: 1rem; }
+body:has(#main) .boot { display: none; }
+
+/* On a phone the guide card sits at the bottom, so the page needs room to scroll the lit-up thing above it */
+@media (max-width: 699px) { .tour-on .shell > .page { padding-bottom: 22rem; } }

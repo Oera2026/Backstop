@@ -1,0 +1,37 @@
+@* Grey shapes where the page will be, so nothing jumps when the real content arrives. Rows for lists, Article for one thing. *@
+<div class="skel" role="status" aria-busy="true">
+    <span class="sr-note">@Text</span>
+    @if (Article)
+    {
+        <div class="skel__article" aria-hidden="true">
+            <span class="skel__bar skel__bar--title"></span>
+            <span class="skel__bar"></span>
+            <span class="skel__bar"></span>
+            <span class="skel__bar skel__bar--short"></span>
+            <span class="skel__block"></span>
+        </div>
+    }
+    else
+    {
+        @for (var i = 0; i < Count; i++)
+        {
+            <div class="skel__row" aria-hidden="true">
+                <span class="skel__pic"></span>
+                <span class="skel__lines">
+                    <span class="skel__bar skel__bar--short"></span>
+                    <span class="skel__bar"></span>
+                </span>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    /// <summary>Said to screen readers instead of the grey shapes.</summary>
+    [Parameter] public string Text { get; set; } = "Loading…";
+
+    /// <summary>One piece of content (a result, a story) instead of a list.</summary>
+    [Parameter] public bool Article { get; set; }
+
+    [Parameter] public int Count { get; set; } = 3;
+}
