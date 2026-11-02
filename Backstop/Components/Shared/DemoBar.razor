@@ -1,8 +1,9 @@
-@implements IDisposable
+@implements IAsyncDisposable
 @inject DemoTour Tour
 @inject NavigationManager Nav
+@inject IJSRuntime JS
 
-@* Demo visitors only: a User / Helper switch and the guided walk-around. One compact row; the step words open on demand. *@
+@* Demo visitors only: a User / Helper switch, and a guide that lights up one thing at a time and asks them to try it. *@
 <AuthorizeView Roles="@Roles.Demo">
     <div class="demobar" role="region" aria-label="Demo guide">
         <div class="demobar__row">
@@ -10,46 +11,51 @@
                 <button type="button" class="demobar__side" aria-pressed="@(Side == TourSide.User ? "true" : "false")" @onclick="@(() => Switch(TourSide.User))">User</button>
                 <button type="button" class="demobar__side" aria-pressed="@(Side == TourSide.Helper ? "true" : "false")" @onclick="@(() => Switch(TourSide.Helper))">Helper</button>
             </div>
-            @if (Tour.Active)
-            {
-                <div class="demobar__nav">
-                    @if (!Tour.IsFirst)
-                    {
-                        <button type="button" class="btn btn-quiet" @onclick="Back" aria-label="Previous step"><Icon Name="arrow-left" /></button>
-                    }
-                    @if (!Tour.IsLast)
-                    {
-                        <button type="button" class="btn btn-primary" @onclick="Next">Next <Icon Name="arrow-right" /></button>
-                    }
-                    else
-                    {
-                        <button type="button" class="btn btn-primary" @onclick="Tour.Close">Done</button>
-                    }
-                </div>
-            }
-            else
+            @if (!Tour.Active)
             {
                 <button type="button" class="btn btn-quiet" @onclick="Tour.Restart">Start the guide</button>
             }
         </div>
-        @if (Tour.Active)
-        {
-            var s = Tour.Current;
-            <details class="demobar__step" open="@(Tour.IsFirst)">
-                <summary><span class="demobar__count">Step @(Tour.Index + 1) of @DemoTour.Steps.Count:</span> @s.Title</summary>
-                <p>@s.Text</p>
-                <button type="button" class="btn btn-text" @onclick="Tour.Close">Close guide</button>
-            </details>
-        }
     </div>
+    @if (Tour.Active)
+    {
+        var s = Tour.Current;
+        <section class="tourcard" data-pos="@_pos" role="region" aria-label="Guide" aria-live="polite">
+            <p class="demobar__count">Step @(Tour.Index + 1) of @DemoTour.Steps.Count</p>
+            <p class="tourcard__title">@s.Title</p>
+            <p>@s.Text</p>
+            <div class="tourcard__actions">
+                @if (!Tour.IsFirst)
+                {
+                    <button type="button" class="btn btn-quiet" @onclick="Back" aria-label="Previous step"><Icon Name="arrow-left" /></button>
+                }
+                @if (Tour.IsLast)
+                {
+                    <button type="button" class="btn btn-primary" @onclick="Tour.Close">Done</button>
+                }
+                else
+                {
+                    <button type="button" class="btn btn-primary" @onclick="Next">@(s.Tap ? "Show me" : "Next") <Icon Name="arrow-right" /></button>
+                }
+                <button type="button" class="btn btn-text" @onclick="Tour.Close">Close guide</button>
+            </div>
+        </section>
+    }
 </AuthorizeView>
 
 @code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private string _pos = "bottom";
+    private string _key = "";
+    private bool _isDemo;
+
     private string Here => Nav.ToBaseRelativePath(Nav.Uri);
     private TourSide Side => Here.StartsWith("helper", StringComparison.OrdinalIgnoreCase) ? TourSide.Helper : TourSide.User;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
+        _isDemo = AuthState is not null && (await AuthState).User.IsInRole(Roles.Demo);
         Tour.Changed += OnChanged;
         Nav.LocationChanged += OnMoved;
         Tour.Follow(Here);
@@ -63,6 +69,22 @@
         InvokeAsync(StateHasChanged);
     }
 
+    // Light up the thing this step is about whenever the step or the page changes.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_isDemo) return;
+        var key = Tour.Active ? $"{Tour.Index}|{Here}" : "off";
+        if (key == _key) return;
+        _key = key;
+        try
+        {
+            if (!Tour.Active) { await JS.InvokeVoidAsync("backstopTour.hide"); return; }
+            var pos = await JS.InvokeAsync<string>("backstopTour.show", Tour.Current.Selector);
+            if (pos != _pos) { _pos = pos; StateHasChanged(); }
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or InvalidOperationException or TaskCanceledException) { /* closed, or still drawing on the server */ }
+    }
+
     private void Go() => Nav.NavigateTo(Tour.Current.Path);
     private void Next() { Tour.Next(); Go(); }
     private void Back() { Tour.Back(); Go(); }
@@ -73,9 +95,11 @@
         Nav.NavigateTo(Tour.Current.Path);
     }
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
         Tour.Changed -= OnChanged;
         Nav.LocationChanged -= OnMoved;
+        if (!_isDemo) return;
+        try { await JS.InvokeVoidAsync("backstopTour.hide"); } catch (Exception) { }
     }
 }

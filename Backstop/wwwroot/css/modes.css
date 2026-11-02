@@ -553,14 +553,6 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 .demobar__side[aria-pressed="true"] { background: var(--navy); color: var(--on-navy); }
 .demobar__side:focus-visible { outline: 3px solid var(--focus); outline-offset: -3px; }
 .demobar__nav { display: flex; gap: .5rem; }
-.demobar__step { margin-top: .25rem; }
-.demobar__step summary { display: flex; flex-wrap: wrap; gap: .25rem .5rem; align-items: center; min-height: 48px; font-weight: 800; cursor: pointer; }
-.demobar__count { font-weight: 600; color: var(--text-2); }
-.demobar__step p { margin: 0 0 .25rem; max-width: 40rem; }
-
-.card--spaced { margin-block-start: 1.5rem; }
-.more-toggle { margin-block: 1rem; }
-.actions--helper .btn-primary { flex: 1 1 100
 .card--spaced { margin-block-start: 1.5rem; }
 .more-toggle { margin-block: 1rem; }
 .actions--helper .btn-primary { flex: 1 1 100%; }
@@ -571,3 +563,19 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 .walk__from { font-weight: 800; font-size: calc(1.2rem * var(--tx)); }
 .walk__subject { font-weight: 700; }
 .walk__count { font-weight: 800; }
+
+/* Demo tour: the lit-up spot and the card that talks you through it */
+.tour-spot { position: fixed; z-index: 40; pointer-events: none; border-radius: var(--radius-lg); outline: 4px solid var(--marker); box-shadow: 0 0 0 100vmax var(--scrim); }
+.framed .tour-spot, .framed .tourcard { display: none; }
+.tourcard {
+  position: fixed; z-index: 50; inset-inline: .75rem; bottom: calc(5rem + env(safe-area-inset-bottom)); max-width: 26rem; margin-inline: auto;
+  background: var(--bg); border: var(--line) solid var(--navy); border-radius: var(--radius-lg); padding: 1rem 1.25rem; box-shadow: 0 8px 24px var(--scrim);
+}
+.tourcard[data-pos="top"] { bottom: auto; top: 4.5rem; }
+.tourcard p { margin: 0 0 .5rem; }
+.tourcard__title { font-weight: 800; font-size: calc(1.15rem * var(--tx, 1)); }
+.tourcard__actions { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+@media (min-width: 960px) {
+  .tourcard { inset-inline: auto 1.5rem; bottom: 1.5rem; margin-inline: 0; }
+  .tourcard[data-pos="top"] { top: 5rem; bottom: auto; }
+}

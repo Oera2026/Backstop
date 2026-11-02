@@ -2,22 +2,24 @@ namespace Backstop.Services.Accounts;
 
 public enum TourSide { User, Helper }
 
-public sealed record TourStep(TourSide Side, string Path, string Title, string Text);
+/// <summary>Selector is the thing to light up. Tap means the visitor taps it to move on (it is a link to the next step).</summary>
+public sealed record TourStep(TourSide Side, string Path, string Title, string Text, string Selector, bool Tap = false);
 
 /// <summary>Where a demo visitor is in the guided walk-around. One per browser tab (circuit).</summary>
 public sealed class DemoTour
 {
     public static readonly IReadOnlyList<TourStep> Steps =
     [
-        new(TourSide.User, "/", "The inbox", "This is what the user sees. Mail that is still being checked is not shown here."),
-        new(TourSide.User, "ask-me", "Ask Me", "The user can ask for help, check a message, or see how to do something."),
-        new(TourSide.User, "check", "Check a message", "The user pastes in a message they are unsure about. Backstop checks it."),
-        new(TourSide.User, "explain", "Explain something", "A letter or form goes in. Plain words come out."),
-        new(TourSide.User, "remember", "Remember", "Saved notes for things the user wants to do again."),
-        new(TourSide.Helper, "/helper", "Waiting for the helper", "Now you are the helper. Anything unclear waits here for a decision."),
-        new(TourSide.Helper, "/helper/history", "History", "Every decision the helper made, in one list."),
-        new(TourSide.Helper, "/helper/messages", "Messages", "The helper can talk to the user from here."),
-        new(TourSide.User, "/demo", "Demo panel", "Send a made-up email and watch it get checked. Then try the user and helper side by side."),
+        new(TourSide.User, "/", "The inbox", "This is what the user sees. Mail still being checked is not shown. Tap Ask Me.", ".appnav__item[href='ask-me']", true),
+        new(TourSide.User, "ask-me", "Ask Me", "The user can ask for help in plain words. Try typing a question here.", ".composer textarea"),
+        new(TourSide.User, "ask-me", "Messages", "Chats with the people they know live here. Tap Messages.", ".appnav__item[href='messages']", true),
+        new(TourSide.User, "messages", "Remember", "Notes for things they want to do again. Tap Remember.", ".appnav__item[href='remember']", true),
+        new(TourSide.User, "remember", "Remember", "Saved notes appear here, with pictures and steps.", "main h1"),
+        new(TourSide.Helper, "/helper", "Waiting for the helper", "Now you are the helper. Anything unclear waits here for a decision.", "main h1"),
+        new(TourSide.Helper, "/helper", "History", "Every decision is kept. Tap History.", ".appnav__item[href='/helper/history']", true),
+        new(TourSide.Helper, "/helper/history", "Messages", "The helper can talk to the user from here. Tap Messages.", ".appnav__item[href='/helper/messages']", true),
+        new(TourSide.Helper, "/helper/messages", "Messages", "A private chat between helper and user.", "main h1"),
+        new(TourSide.User, "/demo", "Demo panel", "Pick a made-up email, then press Simulate. Watch it get checked.", "#scenario"),
     ];
 
     public bool Active { get; private set; } = true;
@@ -42,7 +44,7 @@ public sealed class DemoTour
     {
         var p = Norm(relativePath);
         var i = Steps.ToList().FindIndex(s => Norm(s.Path) == p);
-        if (i < 0 || i == Index) return;
+        if (i < 0 || Norm(Current.Path) == p) return; // already on a step for this page
         Index = i;
         _last[Steps[i].Side] = i;
         Changed?.Invoke();
