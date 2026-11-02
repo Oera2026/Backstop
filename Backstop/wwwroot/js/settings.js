@@ -62,7 +62,7 @@
 // First visit to the helper queue goes to the helper welcome. Frames (the demo panel) are left alone.
 (function () {
   var done; try { done = localStorage.getItem("backstop.helperWelcomed") === "1"; } catch (e) { done = true; }
-  if (location.pathname === "/helper" && window.self === window.top && !done) location.replace("/helper/welcome");
+  if (location.pathname === "/helper" && window.self === window.top && !done && location.search.indexOf("tour=1") < 0) location.replace("/helper/welcome");
 })();
 
 // Inside the demo panel the guide bar would repeat itself, so hide it in frames.

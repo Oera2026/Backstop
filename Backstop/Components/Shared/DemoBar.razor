@@ -9,6 +9,12 @@
     {
         var s = Tour.Current;
         <section class="tourcard" role="region" aria-label="Guide" aria-live="polite">
+            <ol class="tourcard__trail" aria-label="Where you are in the guide">
+                @foreach (var place in Tour.Sections)
+                {
+                    <li class="@(place == s.Section ? "tourcard__place tourcard__place--on" : "tourcard__place")" aria-current="@(place == s.Section ? "step" : null)">@place</li>
+                }
+            </ol>
             <div class="tourcard__head">
                 <p class="tourcard__title">@s.Title</p>
                 <span class="tourcard__count">@(Tour.Index + 1) of @Tour.Steps.Count</span>

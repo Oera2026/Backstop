@@ -1,7 +1,7 @@
 // Demo guide: lights up one thing on the page, dims the rest, and keeps the guide card next to it.
 // The page underneath stays clickable.
 (function () {
-  var spot = null, timer = null, target = null, frame = 0;
+  var spot = null, target = null, settled = null, sel = '', started = 0, frame = 0;
   var PHONE = 700, GAP = 16, M = 12;
 
   function ensure() {
@@ -33,14 +33,22 @@
   // Where the card goes. Wide screens: beside the lit-up thing. Phones: pinned at the bottom, above the tab bar,
   // with the lit-up thing scrolled into the space above it. Things that live in the tab bar get the card at the top.
   function cardPlace(c, r) {
+    c.style.width = '';
     var vw = window.innerWidth, vh = window.innerHeight, w = c.offsetWidth, h = c.offsetHeight, x, y, zone = 'free';
     if (vw >= PHONE) {
       if (r.right + GAP + w + M <= vw) { x = r.right + GAP; y = r.top + r.height / 2 - h / 2; }
       else if (r.left - GAP - w - M >= 0) { x = r.left - GAP - w; y = r.top + r.height / 2 - h / 2; }
       else {
-        x = r.left + r.width / 2 - w / 2;
-        var below = vh - r.bottom, above = r.top;
-        y = below >= h + GAP + M || below >= above ? r.bottom + GAP : r.top - GAP - h;
+        var roomL = r.left - GAP - M, roomR = vw - r.right - GAP - M, side = Math.max(roomL, roomR);
+        if (r.height > vh * 0.3 && side >= 270) {
+          // Tall thing, no room for a full card beside it: a narrower card beside it beats one on top of it.
+          w = Math.min(w, side); c.style.width = w + 'px';
+          x = roomR >= roomL ? r.right + GAP : r.left - GAP - w; y = r.top + r.height / 2 - h / 2;
+        } else {
+          x = r.left + r.width / 2 - w / 2;
+          var below = vh - r.bottom, above = r.top;
+          y = below >= h + GAP + M || below >= above ? r.bottom + GAP : r.top - GAP - h;
+        }
       }
     } else {
       x = (vw - w) / 2;
@@ -50,12 +58,38 @@
     return { x: clamp(x, M, vw - w - M), y: clamp(y, M, vh - h - M), zone: zone };
   }
 
+  // Skeleton and start-up shapes are grey stand-ins, and hidden things (the Home tab on a phone) have no size: neither can be lit up.
+  function visible(el) {
+    if (el.closest('.skel, .boot')) return false;
+    var r = el.getBoundingClientRect();
+    return r.width > 0 && r.height > 0;
+  }
+
+  // The first visible match, trying each listed selector in the order it is written.
+  function pick(selector) {
+    var parts = selector.split(',');
+    for (var i = 0; i < parts.length; i++) {
+      var list = document.querySelectorAll(parts[i].trim());
+      for (var j = 0; j < list.length; j++) if (visible(list[j])) return list[j];
+    }
+    return null;
+  }
+
   function place() {
-    if (!target || !spot) return;
-    if (!document.body.contains(target)) { hide(); return; }
+    if (!spot) return;
+    if (!target || !document.body.contains(target) || !visible(target)) target = null;
+    if (!target) target = pick(sel);
+    var c = document.querySelector('.tourcard');
+    if (!target) {
+      // Nothing to light up (yet): no dimming, and after a moment the card still has to be in view.
+      spot.style.display = 'none';
+      if (c && Date.now() - started > 3000) { c.style.left = M + 'px'; c.style.top = Math.max(M, window.innerHeight - tabBarHeight() - c.offsetHeight - M) + 'px'; c.classList.add('tourcard--placed'); }
+      return;
+    }
+    if (target !== settled) { settled = target; [0, 250, 800].forEach(function (ms) { setTimeout(function () { if (target === settled) bring(target); }, ms); }); }
+    spot.style.display = '';
     var r = target.getBoundingClientRect(), pad = 6;
     var top = r.top - pad, height = r.height + pad * 2;
-    var c = document.querySelector('.tourcard');
     if (c) {
       var p = cardPlace(c, r);
       c.style.left = p.x + 'px';
@@ -74,7 +108,7 @@
   function loop() { place(); frame = requestAnimationFrame(loop); }
 
   function hide() {
-    clearInterval(timer); timer = null; target = null;
+    target = null; settled = null; sel = '';
     cancelAnimationFrame(frame);
     document.documentElement.classList.remove('tour-on');
     if (spot) { spot.remove(); spot = null; }
@@ -85,32 +119,17 @@
     if (!document.body.contains(el)) return;
     var r = el.getBoundingClientRect(), vh = window.innerHeight;
     if (window.innerWidth >= PHONE) { try { el.scrollIntoView({ block: 'center', behavior: 'auto' }); } catch (e) { /* older browsers */ } return; }
-    if (r.top > vh * 0.6 || pinned(el)) return; // a tab bar item or pinned bar: it is already in view
+    if (pinned(el)) return; // a tab bar item or pinned bar: it is already in view
     window.scrollBy(0, r.top - 96);
   }
 
-  // Looks for the element for up to 4 seconds (the page may still be drawing).
+  // Lights up the thing the selector names. The page may still be drawing, so the search goes on every frame until it is found,
+  // and starts again if the page replaces it.
   function show(selector) {
     hide();
     document.documentElement.classList.add('tour-on');
-    var tries = 0;
-    function find() {
-      var el = document.querySelector(selector);
-      if (el) {
-        clearInterval(timer); timer = null;
-        target = el;
-        // The page can still be settling (focus, layout), so bring it into view again a moment later.
-        [0, 250, 800].forEach(function (ms) { setTimeout(function () { if (target === el) bring(el); }, ms); });
-        ensure(); cancelAnimationFrame(frame); loop();
-      } else if (++tries > 20) {
-        clearInterval(timer); timer = null;
-        // Nothing to light up on this page: keep the card in view anyway.
-        var c = document.querySelector('.tourcard');
-        if (c) { c.style.left = M + 'px'; c.style.top = Math.max(M, window.innerHeight - tabBarHeight() - c.offsetHeight - M) + 'px'; c.classList.add('tourcard--placed'); }
-      }
-    }
-    timer = setInterval(find, 200);
-    find();
+    sel = selector; started = Date.now();
+    ensure(); cancelAnimationFrame(frame); loop();
   }
 
   // "Show me" taps the lit-up link for the visitor. Says whether there was something to tap.
