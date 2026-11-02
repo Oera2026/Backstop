@@ -21,8 +21,8 @@ public sealed partial class MockBackstopApi
 
         string title;
         List<StoryPage> pages;
-        // Fail closed: a sensitive topic is held for the trusted person before the user sees a word.
-        // The local words are an immovable floor. The AI can only add to them (held), never remove them.
+        // Stories written by the AI are shown straight away (owner decision, 2 Nov 2026). Only the offline sample stories keep the hold.
+        // A story the AI could not write is never invented: there is simply no story.
         var held = StoryFixtures.IsSensitive(text);
         if (storyWriter is not null)
         {
@@ -31,7 +31,7 @@ public sealed partial class MockBackstopApi
             if (!draft.Success) throw new BackstopApiException("I could not make your story. Please try again.");
             title = draft.Title;
             pages = draft.Pages.Select(p => p with { Text = Fill(p.Text) }).ToList();
-            held |= draft.Sensitive;
+            held = false;
         }
         else
         {

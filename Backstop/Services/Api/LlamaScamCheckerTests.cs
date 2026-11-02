@@ -478,7 +478,7 @@ public class LlamaScamCheckerTests
             Assert(!MetaStoryWriter.ParseContent("not json").Success, "Rubbish is refused");
             Assert(MetaStoryWriter.ParseContent("{\"title\":\"A\",\"pages\":[{\"heading\":\"B\",\"text\":\"C.\",\"picture\":\"nope\",\"scene\":[{\"shape\":\"bad\"}]}]}").Pages[0].Scene is null, "A page with no valid items has no scene");
 
-            // Through the app: a failed writer gives no story; a sensitive word still holds it; the AI can add a hold.
+            // Through the app: a failed writer gives no story; AI-written stories are shown straight away.
             var failApi = new MockBackstopApi(new MockGuardianService(new MailStore()), new MockApiOptions(), null, null, null, null, new StubWriter(new StoryDraft(false, "", [], false)));
             var threw = false;
             try { await failApi.MakeStoryAsync(new StoryRequest("I am going to the dentist", null)); } catch (BackstopApiException) { threw = true; }
@@ -486,10 +486,10 @@ public class LlamaScamCheckerTests
             var good = new StoryDraft(true, "T", [new StoryPage("H", "Words.", "home")], false);
             var goodApi = new MockBackstopApi(new MockGuardianService(new MailStore()), new MockApiOptions(), null, null, null, null, new StubWriter(good));
             Assert((await goodApi.MakeStoryAsync(new StoryRequest("I am going to the dentist", null))).Status == StoryStatus.Ready, "A normal story is ready");
-            Assert((await goodApi.MakeStoryAsync(new StoryRequest("I owe the bank money", null))).Status == StoryStatus.Held, "A sensitive word still holds");
+            Assert((await goodApi.MakeStoryAsync(new StoryRequest("I owe the bank money", null))).Status == StoryStatus.Ready, "An AI-written story is not held");
             var aiHold = new MockBackstopApi(new MockGuardianService(new MailStore()), new MockApiOptions(), null, null, null, null, new StubWriter(good with { Sensitive = true }));
             var held = await aiHold.MakeStoryAsync(new StoryRequest("I am going to the dentist", null));
-            Assert(held.Status == StoryStatus.Held && held.Pages.Count == 0, "The AI can hold a story, and the user sees no words");
+            Assert(held.Status == StoryStatus.Ready && held.Pages.Count > 0, "The AI sensitive flag no longer holds a story");
             Console.WriteLine("PASS: Social stories are checked, clamped and fail closed.");
 
             // Anyone who may need help reaches the helper, even with no AI at all.
