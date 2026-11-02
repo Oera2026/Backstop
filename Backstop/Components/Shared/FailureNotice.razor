@@ -1,9 +1,16 @@
+@using Backstop.Services.Api
+@inject IMetaDiagnostics Diagnostics
 @* What went wrong in plain words, then a closed box with the technical detail for someone investigating. *@
 <div class="failure" role="alert">
     <p class="failure__message"><Icon Name="alert" /> <span>@(Message ?? Failure.Message)</span></p>
     <details class="failure__tech">
         <summary>Technical details</summary>
         <pre>@Failure.Technical</pre>
+        <button type="button" class="btn btn-quiet" @onclick="RunTest" disabled="@_running">@(_running ? "Testing..." : "Test the connection")</button>
+        @if (_result is not null)
+        {
+            <pre aria-live="polite">@_result</pre>
+        }
     </details>
 </div>
 
@@ -11,4 +18,16 @@
     [Parameter, EditorRequired] public FailureInfo Failure { get; set; } = default!;
     /// <summary>Wording to show instead of the failure message (for example with a helper note added).</summary>
     [Parameter] public string? Message { get; set; }
+
+    private bool _running;
+    private string? _result;
+
+    private async Task RunTest()
+    {
+        _running = true;
+        _result = null;
+        try { _result = await Diagnostics.DiagnoseAsync(CancellationToken.None); }
+        catch { _result = "The test could not run. Please try again."; }
+        _running = false;
+    }
 }

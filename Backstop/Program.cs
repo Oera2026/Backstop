@@ -91,6 +91,7 @@ builder.Services.AddTransient<IStoryWriter>(sp => sp.GetRequiredService<MetaStor
 builder.Services.AddTransient<IDocumentExplainer>(sp => sp.GetRequiredService<MetaDocumentExplainer>());
 builder.Services.AddTransient<ILlamaScamChecker>(sp => sp.GetRequiredService<MetaAiScamChecker>());
 builder.Services.AddTransient<IMetaScamChecker>(sp => sp.GetRequiredService<MetaAiScamChecker>());
+builder.Services.AddTransient<IMetaDiagnostics>(sp => sp.GetRequiredService<MetaAiScamChecker>());
 
 // Sign-in: a cookie holds the role (User, Helper or Demo). Accounts are made up and seeded (see AccountStore).
 builder.Services.AddSingleton<AccountStore>();

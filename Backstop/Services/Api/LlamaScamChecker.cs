@@ -55,13 +55,13 @@ public sealed class MetaAiOptions
         var key = options.ApiKey;
         if (string.IsNullOrWhiteSpace(key))
             key = config["META_AI_KEY"] ?? config["CHECKER_MODEL_API_KEY"];
-        options.ApiKey = key;
+        options.ApiKey = key?.Trim();
 
         var endpoint = config["META_AI_ENDPOINT_URL"];
         if (!string.IsNullOrWhiteSpace(endpoint)) options.EndpointUrl = endpoint;
 
         var model = config["META_AI_MODEL"];
-        if (!string.IsNullOrWhiteSpace(model)) options.Model = model;
+        if (!string.IsNullOrWhiteSpace(model)) options.Model = model.Trim();
         return options;
     }
 }
@@ -74,7 +74,7 @@ public sealed class MetaAiOptions
 /// 3. Prompt injection protection: Inspected text and images are strictly treated as untrusted passive data.
 /// 4. Cost conservation: Sends plain text payloads for emails/chats; only transmits image payloads when images are provided.
 /// </summary>
-public sealed class MetaAiScamChecker : ILlamaScamChecker, IMetaScamChecker
+public sealed class MetaAiScamChecker : ILlamaScamChecker, IMetaScamChecker, IMetaDiagnostics
 {
     private readonly HttpClient _http;
     private readonly IConfiguration _config;
@@ -106,29 +106,106 @@ public sealed class MetaAiScamChecker : ILlamaScamChecker, IMetaScamChecker
         _options = MetaAiOptions.Load(config);
     }
 
-    /// <summary>TEMPORARY (/diag/meta): sends "Hello" the same way every other call is sent and reports URL, status and body. Remove once the Meta 404 is solved.</summary>
+    /// <summary>
+    /// Connection test (the "Test the connection" button and /diag/meta). Checks the key, model and URL, makes one tiny
+    /// call, lists the models the key can use, and says what is most likely wrong. Never shows the key or any message.
+    /// </summary>
     public async Task<string> DiagnoseAsync(CancellationToken ct)
     {
+        var key = _options.ApiKey;
         var url = _options.ChatUrl;
-        if (string.IsNullOrWhiteSpace(_options.ApiKey)) return $"URL: {url}\nModel: {_options.Model}\nNo API key is set.";
-        if (!IsAllowedEndpoint(url)) return $"URL: {url}\nModel: {_options.Model}\nNot sent: the URL is not https://{AllowedHost}.";
+        var model = _options.Model;
+        var lines = new List<string>();
+
+        lines.Add(string.IsNullOrWhiteSpace(key) ? "Key: NOT SET" : $"Key: set ({key.Length} characters)");
+        var rawModel = _config["META_AI_MODEL"];
+        lines.Add($"Model: [{model}] ({model.Length} characters)");
+        if (rawModel is not null && rawModel != rawModel.Trim()) lines.Add("Model setting had spaces or a line break around it. They are removed before sending.");
+        if (model.Any(c => c is '"' or '\'' or ' ')) lines.Add("WARNING: the model name contains a quote or a space.");
+        lines.Add($"URL: {url}");
+
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            lines.Add("Likely cause: no key is set. Set META_AI_KEY in the host's environment variables and restart.");
+            return string.Join('\n', lines);
+        }
+        if (!IsAllowedEndpoint(url))
+        {
+            lines.Add($"Likely cause: the URL is not https://{AllowedHost}. Nothing was sent. Check META_AI_ENDPOINT_URL.");
+            return string.Join('\n', lines);
+        }
+        if (_guard is not null && !_guard.TryEnter(ClientIdentity.Current, out var wait, out _, out _))
+        {
+            lines.Add($"Not tested: too many calls just now. Try again in about {Math.Max(1, wait)} seconds.");
+            return string.Join('\n', lines);
+        }
+
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(TimeSpan.FromSeconds(25));
+        int? chatStatus = null;
+        string chatBody = "";
         try
         {
             using var req = new HttpRequestMessage(HttpMethod.Post, url);
-            req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.ApiKey);
+            req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key);
             req.Content = new StringContent(
-                JsonSerializer.Serialize(new { model = _options.Model, messages = new object[] { new { role = "user", content = "Hello" } }, max_tokens = 200 }),
+                JsonSerializer.Serialize(new { model, messages = new object[] { new { role = "user", content = "Hello" } }, max_tokens = 200 }),
                 Encoding.UTF8, "application/json");
-            using var response = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
-            var body = await MetaHttp.SnippetAsync(response, _options.ApiKey, 1000);
-            return $"URL: {response.RequestMessage?.RequestUri}\nModel: {_options.Model}\nStatus: {(int)response.StatusCode}\nBody: {body}";
+            using var response = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cts.Token);
+            chatStatus = (int)response.StatusCode;
+            chatBody = await MetaHttp.SnippetAsync(response, key, 300);
+            lines.Add($"Test call: status {chatStatus} from {response.RequestMessage?.RequestUri}");
+            lines.Add($"Reply: {chatBody}");
         }
         catch (Exception ex)
         {
-            return $"URL: {url}\nModel: {_options.Model}\nError: {ex.GetType().Name}";
+            lines.Add($"Test call: no reply ({ex.GetType().Name}).");
+            lines.Add("Likely cause: Meta could not be reached or took too long. Try again; if it repeats, check the host's network.");
+            return string.Join('\n', lines);
         }
+
+        // Which models can this key use? Same host, read-only.
+        List<string>? models = null;
+        try
+        {
+            var modelsUrl = url[..^"/chat/completions".Length] + "/models";
+            using var req = new HttpRequestMessage(HttpMethod.Get, modelsUrl);
+            req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key);
+            using var response = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cts.Token);
+            if (response.IsSuccessStatusCode)
+            {
+                var text = await MetaHttp.SnippetAsync(response, key, 8000);
+                models = System.Text.RegularExpressions.Regex.Matches(text, "\"id\"\\s*:\\s*\"([^\"]+)\"").Select(m => m.Groups[1].Value).Distinct().Take(30).ToList();
+                lines.Add(models.Count > 0 ? "Models this key can use: " + string.Join(", ", models) : "Models this key can use: the list was empty or not readable.");
+            }
+            else lines.Add($"Models list: status {(int)response.StatusCode} (not available).");
+        }
+        catch (Exception ex)
+        {
+            lines.Add($"Models list: no reply ({ex.GetType().Name}).");
+        }
+
+        lines.Add("Likely cause: " + Explain(chatStatus!.Value, chatBody, model, models));
+        return string.Join('\n', lines);
     }
 
+    private static string Explain(int status, string body, string model, List<string>? models)
+    {
+        if (status is >= 200 and < 300) return "none. The connection works. If a check still failed, the problem is in that one request, not the connection.";
+        if (status is 401 or 403) return "Meta rejected the key. Paste the key again with no spaces or quotes, and check it is the one that works in curl.";
+        if (status == 404 && body.Contains("model", StringComparison.OrdinalIgnoreCase))
+        {
+            if (models is { Count: > 0 })
+                return models.Contains(model)
+                    ? $"[{model}] is on this key's list but the call still failed. Look for hidden characters in the model setting."
+                    : $"this key cannot use [{model}]. Set META_AI_MODEL to one of the models listed above, or use the key that works in curl.";
+            return $"Meta does not know the model [{model}] for this key. Use the key that works in curl, and check META_AI_MODEL.";
+        }
+        if (status == 404) return "Meta does not know this URL. Check META_AI_ENDPOINT_URL (it should be https://api.meta.ai/v1).";
+        if (status == 429) return "Meta says too many calls. Wait a minute and try again.";
+        if (status >= 500) return "Meta had a problem on its side. Try again later.";
+        return "unexpected status. See the reply above.";
+    }
     public Task<LlamaScamAnalysis> CheckScamAsync(string text, CancellationToken ct) =>
         CheckScamAsync(text, null, null, ct).ContinueWith(t => (LlamaScamAnalysis)t.Result, ct);
 
