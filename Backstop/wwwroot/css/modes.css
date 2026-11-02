@@ -564,3 +564,10 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 .card--spaced { margin-block-start: 1.5rem; }
 .more-toggle { margin-block: 1rem; }
 .actions--helper .btn-primary { flex: 1 1 100%; }
+
+/* Welcome walkthrough: practice messages */
+.walk__card { margin-block: 1rem; }
+.walk__card p { margin: 0 0 .5rem; }
+.walk__from { font-weight: 800; font-size: calc(1.2rem * var(--tx)); }
+.walk__subject { font-weight: 700; }
+.walk__count { font-weight: 800; }

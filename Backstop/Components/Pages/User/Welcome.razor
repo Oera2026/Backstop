@@ -15,11 +15,17 @@
     <span>Step @_step of @Steps</span>
 </p>
 
+@if (_step > 1 && _step < Steps)
+{
+    <BackLink OnClick="Back" Text="Back" />
+}
+
+<h1 @ref="_heading" tabindex="-1">@Title</h1>
+
 @switch (_step)
 {
     case 1:
-        <h1>Welcome to Backstop</h1>
-        <p class="lead">How big should the words be?</p>
+        <p class="lead">How big should the words be? Pick one and watch this page change.</p>
         <ChoiceGroup Legend="Size of the words" HideLegend="true" Name="w-size" Value="@_s["size"]" OnPick="@(v => Pick("size", v))"
                      Options="@(new[] { ("normal", "Normal"), ("large", "Large"), ("xlarge", "Extra large") })" />
         <div class="actions">
@@ -29,8 +35,7 @@
         break;
 
     case 2:
-        <BackLink OnClick="Back" Text="Back" />
-        <h1>Which colours are easiest?</h1>
+        <p class="lead">Which colours are easiest to read?</p>
         <ChoiceGroup Legend="Colours" HideLegend="true" Name="w-contrast" Value="@_s["contrast"]" OnPick="@(v => Pick("contrast", v))"
                      Options="@(new[] { ("standard", "Standard"), ("high", "High contrast") })" />
         <div class="actions">
@@ -39,8 +44,81 @@
         </div>
         break;
 
+    case 3:
+        <p class="lead">Try it. A practice message has come in.</p>
+        <section class="card walk__card" aria-live="polite">
+            @if (_checked)
+            {
+                <p><StatusBadge State="MessageState.Cleared" /></p>
+                <p class="walk__from">Sam Rivers</p>
+                <p class="walk__subject">Tea on Thursday?</p>
+                <p>Hello. Shall we have tea on Thursday at three? Sam</p>
+            }
+            else
+            {
+                <p><StatusBadge State="_checking ? MessageState.Scanning : MessageState.Held" /></p>
+                <p class="walk__count">1 message is being checked by your helper.</p>
+            }
+        </section>
+        <div class="actions">
+            @if (_checked)
+            {
+                <button type="button" class="btn btn-primary" @onclick="Next">Next <Icon Name="arrow-right" /></button>
+            }
+            else
+            {
+                <button type="button" class="btn btn-primary" @onclick="Check" disabled="@_checking">
+                    <Icon Name="@(_checking ? "hourglass" : "check")" /> @(_checking ? "Checking…" : "Wait for my helper")
+                </button>
+            }
+        </div>
+        break;
+
+    case 4:
+        <p class="lead">Another practice message. What would you do?</p>
+        <section class="card walk__card">
+            <p class="walk__from">prize@example.net</p>
+            <p class="walk__subject">You won a gift card!</p>
+            <p>Reply now with your bank card number to get your prize.</p>
+        </section>
+        @if (_asked)
+        {
+            <div class="banner banner--safe" role="status">
+                <Icon Name="check" />
+                <p>Well done. When you are not sure, ask your helper.</p>
+            </div>
+            <div class="actions">
+                <button type="button" class="btn btn-primary" @onclick="Next">Next <Icon Name="arrow-right" /></button>
+            </div>
+        }
+        else
+        {
+            @if (_tried)
+            {
+                <div class="banner banner--check" role="alert">
+                    <Icon Name="hourglass" />
+                    <p>Please stop. Never send your card number. Try again.</p>
+                </div>
+            }
+            <div class="actions">
+                <button type="button" class="btn btn-primary" @onclick="AskHelper"><Icon Name="people" /> Ask my helper</button>
+                <button type="button" class="btn btn-quiet" @onclick="@(() => _tried = true)"><Icon Name="send" /> Reply</button>
+            </div>
+        }
+        break;
+
+    case 5:
+        <p class="lead">Press the button and listen.</p>
+        <section class="card walk__card">
+            <p>Backstop can read any message out loud. Look for this button on every message.</p>
+        </section>
+        <div class="actions">
+            <ReadAloudButton Text="Backstop can read any message out loud. Look for this button on every message." Primary="true" />
+            <button type="button" class="btn btn-quiet" @onclick="Next">Next <Icon Name="arrow-right" /></button>
+        </div>
+        break;
+
     default:
-        <h1>You are ready</h1>
         <p class="lead">What would you like to do first?</p>
         <div class="actions">
             <button type="button" class="btn btn-primary" @onclick="@(() => Done("/"))"><Icon Name="mail" /> Read my messages</button>
@@ -50,21 +128,41 @@
 }
 
 @code {
-    private const int Steps = 3;
+    private const int Steps = 6;
 
     private int _step = 1;
+    private bool _checking, _checked, _tried, _asked, _focus;
+    private ElementReference _heading;
     private Dictionary<string, string> _s = new() { ["size"] = "normal", ["contrast"] = "standard" };
+
+    private string Title => _step switch
+    {
+        1 => "Welcome to Backstop",
+        2 => "Your colours",
+        3 => "Your helper checks first",
+        4 => "Not sure? Ask",
+        5 => "Hear it out loud",
+        _ => "You are ready",
+    };
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender) return;
-        try
+        if (firstRender)
         {
-            var saved = await JS.InvokeAsync<Dictionary<string, string>>("backstopSettings.get");
-            _s = new Dictionary<string, string>(saved);
-            StateHasChanged();
+            try
+            {
+                var saved = await JS.InvokeAsync<Dictionary<string, string>>("backstopSettings.get");
+                _s = new Dictionary<string, string>(saved);
+                StateHasChanged();
+            }
+            catch (Exception) { /* the screens work without saved settings */ }
         }
-        catch (Exception) { /* the screens work without saved settings */ }
+        // Move the reader to the new heading so a screen reader says what the step is.
+        if (_focus)
+        {
+            _focus = false;
+            try { await _heading.FocusAsync(); } catch (Exception) { }
+        }
     }
 
     private async Task Pick(string key, string value)
@@ -73,8 +171,20 @@
         try { await JS.InvokeAsync<object>("backstopSettings.set", key, value); } catch (Exception) { }
     }
 
-    private void Next() => _step = Math.Min(Steps, _step + 1);
-    private void Back() => _step = Math.Max(1, _step - 1);
+    private void Go(int step) { _step = Math.Clamp(step, 1, Steps); _focus = true; }
+    private void Next() => Go(_step + 1);
+    private void Back() => Go(_step - 1);
+
+    // Practice only: nothing here is a real message.
+    private async Task Check()
+    {
+        _checking = true;
+        await Task.Delay(1500);
+        _checking = false;
+        _checked = true;
+    }
+
+    private void AskHelper() => _asked = true;
 
     private Task Finish() => Done("/");
 
