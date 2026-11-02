@@ -184,7 +184,7 @@ h1:focus, main:focus, h1[tabindex]:focus-visible, main[tabindex]:focus-visible {
 /* Forms */
 .field { margin-bottom: 1.25rem; }
 .field label { display: block; font-weight: 800; margin-bottom: .3rem; }
-input[type="text"], input[type="email"], textarea, select {
+input[type="text"], input[type="email"], input[type="password"], textarea, select {
   width: 100%; font: inherit; color: var(--text); background: var(--bg);
   border: var(--line) solid var(--border); border-radius: var(--radius); padding: .8rem 1rem; min-height: 56px;
 }

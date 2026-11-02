@@ -31,7 +31,7 @@ Production hygiene. Test runners, demo toggles and debug endpoints must not ship
 Persistence (Supabase)
 One generic table: entities(household_id text, kind text, id text, data jsonb, updated_at timestamptz, primary key (household_id, kind, id)). Do not create a table per model.
 IEntityRepository does load-all-by-household and upsert/delete. MailStore and the mock API load on startup and write through on every change. Keep the existing Changed events and locks.
-One seeded demo household (demo). Reset demo wipes that household and reseeds the 7 scenarios. No user auth for this release.
+One seeded demo household (demo). Reset demo wipes that household and reseeds the 7 scenarios. Sign-in (decided by the owner, 2 Nov 2026): cookie login with two made-up seeded accounts (User, Helper) and a Demo role that sees both sides with a guided tour. No sign-up; no real personal data.
 Writes must not block the UI thread. A failed write is logged (no message content in logs) and the in-memory state stays authoritative for that session.
 Never store real personal data.
 Deployment

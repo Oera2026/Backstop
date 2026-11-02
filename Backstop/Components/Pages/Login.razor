@@ -1,0 +1,33 @@
+@page "/login"
+@layout LoginLayout
+@inject NavigationManager Nav
+
+<PageTitle>Sign in – Backstop</PageTitle>
+
+<h1>Sign in</h1>
+
+@if (Error)
+{
+    <p class="form-error" role="alert">That email or password is not right. Please try again.</p>
+}
+
+<form method="post" action="/account/login" class="login">
+    <AntiforgeryToken />
+    <div class="field">
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" autocomplete="username" maxlength="200" required />
+    </div>
+    <div class="field">
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" maxlength="200" required />
+    </div>
+    <div class="actions">
+        <button type="submit" class="btn btn-primary">Sign in</button>
+        <a class="btn btn-quiet" href="/account/demo"><Icon Name="arrow-right" /> Try the demo</a>
+    </div>
+</form>
+
+@code {
+    [SupplyParameterFromQuery(Name = "error")] private string? ErrorFlag { get; set; }
+    private bool Error => ErrorFlag is not null;
+}

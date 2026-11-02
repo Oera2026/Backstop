@@ -11,9 +11,11 @@
         <a href="/demo">Demo</a>
     </nav>
 </header>
+<RoleGate Allow="@Roles.Demo" Guest="/account/demo?next=demo">
 <main id="main" class="page page--demo" tabindex="-1">
     @Body
 </main>
+</RoleGate>
 <footer class="site-footer">
     <p>Demo only. All messages are made up. Nothing is sent anywhere.</p>
 </footer>

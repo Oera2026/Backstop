@@ -2,6 +2,9 @@ using System.Globalization;
 using Backstop.Components;
 using Backstop.Services;
 using Backstop.Services.Api;
+using Backstop.Services.Accounts;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 
 // Dates read the British way ("Tuesday 27 October") whatever culture the server runs in.
 var british = CultureInfo.GetCultureInfo("en-GB");
@@ -86,6 +89,23 @@ builder.Services.AddTransient<IDocumentExplainer>(sp => sp.GetRequiredService<Me
 builder.Services.AddTransient<ILlamaScamChecker>(sp => sp.GetRequiredService<MetaAiScamChecker>());
 builder.Services.AddTransient<IMetaScamChecker>(sp => sp.GetRequiredService<MetaAiScamChecker>());
 
+// Sign-in: a cookie holds the role (User, Helper or Demo). Accounts are made up and seeded (see AccountStore).
+builder.Services.AddSingleton<AccountStore>();
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(o =>
+    {
+        o.Cookie.Name = "backstop.auth";
+        o.Cookie.HttpOnly = true;
+        o.Cookie.SameSite = SameSiteMode.Lax;
+        o.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+        o.ExpireTimeSpan = TimeSpan.FromHours(8);
+        o.SlidingExpiration = true;
+        o.LoginPath = "/login";
+    });
+builder.Services.AddAuthorization();
+builder.Services.AddCascadingAuthenticationState();
+builder.Services.AddScoped<DemoTour>();
+
 // MOCK: swap these registrations for real implementations later. No other code needs to change.
 builder.Services.AddScoped<AskSession>();
 builder.Services.AddSingleton<MailStore>();
@@ -139,6 +159,8 @@ app.UseRequestLocalization(o =>
     o.SetDefaultCulture("en-GB").AddSupportedCultures("en-GB").AddSupportedUICultures("en-GB");
     o.RequestCultureProviders.Clear();
 });
+app.UseAuthentication();
+app.UseAuthorization();
 app.UseAntiforgery();
 
 app.MapStaticAssets();
@@ -161,6 +183,28 @@ app.MapGet("/mode-photo/{id}", (string id, HttpContext http, IBackstopApi api) =
     http.Response.Headers.XContentTypeOptions = "nosniff";
     http.Response.Headers.CacheControl = "private, max-age=3600";
     return Results.File(photo.Bytes, photo.ContentType);
+});
+
+// Sign in with an email and password. Nobody is told which half was wrong.
+app.MapPost("/account/login", async (HttpContext http, AccountStore accounts, [Microsoft.AspNetCore.Mvc.FromForm] string? email, [Microsoft.AspNetCore.Mvc.FromForm] string? password) =>
+{
+    var account = accounts.Verify(email, password);
+    if (account is null) return Results.Redirect("/login?error=1");
+    await http.SignInAsync(AccountStore.Principal(account.DisplayName, account.Role));
+    return Results.Redirect(account.Role == Roles.Helper ? "/helper" : "/");
+});
+
+// Demo mode: one click, both sides, with the guided tour. Only two places can be asked for.
+app.MapGet("/account/demo", async (HttpContext http, string? next) =>
+{
+    await http.SignInAsync(AccountStore.Principal("Demo visitor", Roles.Demo));
+    return Results.Redirect(next == "demo" ? "/demo" : "/?tour=1");
+});
+
+app.MapGet("/account/logout", async (HttpContext http) =>
+{
+    await http.SignOutAsync();
+    return Results.Redirect("/login");
 });
 
 app.MapRazorComponents<App>()

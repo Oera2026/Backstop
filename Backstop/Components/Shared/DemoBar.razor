@@ -1,0 +1,70 @@
+@implements IDisposable
+@inject DemoTour Tour
+@inject NavigationManager Nav
+
+@* Demo visitors only: a User / Helper switch and the guided walk-around. *@
+<AuthorizeView Roles="@Roles.Demo">
+    <div class="demobar" role="region" aria-label="Demo guide">
+        <div class="demobar__switch" role="group" aria-label="View as">
+            <button type="button" class="demobar__side" aria-pressed="@(Side == TourSide.User ? "true" : "false")" @onclick="@(() => Switch(TourSide.User))">User</button>
+            <button type="button" class="demobar__side" aria-pressed="@(Side == TourSide.Helper ? "true" : "false")" @onclick="@(() => Switch(TourSide.Helper))">Helper</button>
+        </div>
+        @if (Tour.Active)
+        {
+            var s = Tour.Current;
+            <div class="demobar__step" role="status">
+                <p class="demobar__count">Step @(Tour.Index + 1) of @DemoTour.Steps.Count</p>
+                <p class="demobar__title">@s.Title</p>
+                <p>@s.Text</p>
+                <div class="demobar__actions">
+                    @if (!Tour.IsFirst)
+                    {
+                        <button type="button" class="btn btn-quiet" @onclick="Back">Back</button>
+                    }
+                    @if (!Tour.IsLast)
+                    {
+                        <button type="button" class="btn btn-primary" @onclick="Next">Next <Icon Name="arrow-right" /></button>
+                    }
+                    else
+                    {
+                        <button type="button" class="btn btn-primary" @onclick="Tour.Close">Done</button>
+                    }
+                    <button type="button" class="btn btn-text" @onclick="Tour.Close">Close guide</button>
+                </div>
+            </div>
+        }
+        else
+        {
+            <button type="button" class="btn btn-quiet demobar__restart" @onclick="Tour.Restart">Start the guide</button>
+        }
+    </div>
+</AuthorizeView>
+
+@code {
+    private TourSide Side => Nav.ToBaseRelativePath(Nav.Uri).StartsWith("helper", StringComparison.OrdinalIgnoreCase) ? TourSide.Helper : TourSide.User;
+
+    protected override void OnInitialized()
+    {
+        Tour.Changed += OnChanged;
+        Nav.LocationChanged += OnMoved;
+    }
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+    private void OnMoved(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e) => InvokeAsync(StateHasChanged);
+
+    private void Go() => Nav.NavigateTo(Tour.Current.Path);
+    private void Next() { Tour.Next(); Go(); }
+    private void Back() { Tour.Back(); Go(); }
+
+    private void Switch(TourSide side)
+    {
+        Tour.GoToSide(side);
+        Nav.NavigateTo(side == TourSide.Helper ? "/helper" : "/");
+    }
+
+    public void Dispose()
+    {
+        Tour.Changed -= OnChanged;
+        Nav.LocationChanged -= OnMoved;
+    }
+}

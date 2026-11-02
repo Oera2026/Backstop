@@ -65,6 +65,7 @@ Set these as environment variables (locally in the untracked `.env`, in producti
 | `META_AI_MAX_CALLS_PER_IP_PER_MINUTE` | Cap on calls to Meta per visitor per minute. Default 15. |
 | `CLIENT_IP_HEADER` | Optional. A header the host sets to the visitor address (for example `CF-Connecting-IP`). Empty uses `X-Forwarded-For`. |
 | `DEMO_RESET_SECRET` | The code needed for "Reset demo" on `/demo`. With no value, reset is switched off. |
+| `ACCOUNT_USER_PASSWORD`, `ACCOUNT_HELPER_PASSWORD` | Passwords for the made-up accounts `sam@example.com` (user side) and `alex@example.com` (helper side). With no value, that account cannot sign in. |
 | `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` | Supabase project URL and service key (server only). Not used yet. |
 
 ## Docker deployment
@@ -96,6 +97,7 @@ Notes for the host:
 | `/explain`, `/check`, `/ask-me` | User | Explain a letter, check a message, Ask Me |
 | `/helper` | Helper | Queue of held messages and recent decisions |
 | `/helper/{id}` | Helper | Evidence card: Approve, Block, Call them first |
+| `/login` | Public | Sign in, or "Try the demo" (both sides, with a User / Helper switch and a guided walk-around) |
 | `/demo` | Demo | Simulate incoming email, watch the four checks, split-screen user and helper |
 
 ## Try it

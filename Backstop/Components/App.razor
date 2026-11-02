@@ -22,7 +22,7 @@
 </head>
 
 <body>
-    <Routes @rendermode="InteractiveServer" TimeZone="@HttpContext?.Request.Cookies["backstop.tz"]" />
+    <Routes @rendermode="PageRenderMode" TimeZone="@HttpContext?.Request.Cookies["backstop.tz"]" />
     <ReconnectModal />
     <script src="@Assets["js/backstop.js"]"></script>
     <script src="@Assets["js/camera.js"]"></script>
@@ -33,4 +33,8 @@
 
 @code {
     [CascadingParameter] private HttpContext? HttpContext { get; set; }
+
+    // The sign-in page is plain server-rendered HTML (its form posts to /account/login); everything else is interactive.
+    private IComponentRenderMode? PageRenderMode =>
+        HttpContext?.Request.Path.StartsWithSegments("/login") == true ? null : InteractiveServer;
 }
