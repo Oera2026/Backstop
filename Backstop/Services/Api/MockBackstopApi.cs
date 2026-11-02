@@ -16,7 +16,7 @@ public sealed class MockApiOptions
 /// trusted-person views see each other's changes live. Each call waits a little, like a real network call.
 /// Replace this class (and its registration in Program.cs) to wire the real back end.
 /// </summary>
-public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOptions options, ILlamaScamChecker? llamaChecker = null, IAssistant? assistant = null, IMailService? mail = null) : IBackstopApi
+public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOptions options, ILlamaScamChecker? llamaChecker = null, IAssistant? assistant = null, IDocumentExplainer? documentExplainer = null, IMailService? mail = null) : IBackstopApi
 {
     private sealed record StoredCheck(CheckResult Result, string Original, DateTimeOffset? AskedAt);
 
@@ -30,6 +30,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
     private List<ActivityEntry> _activity = SeedActivity();
 
     private const int MaxCheckLength = 20000;
+    private const int MaxExplainImageBytes = 8 * 1024 * 1024;
 
     public event Action? Changed;
 
@@ -61,18 +62,30 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
 
         // Simple local checks as the floor:
         var floor = MockRiskRules.Scan(display);
-        var floorVerdict = MockRiskRules.VerdictFor(floor.Score);
+        // The text shown has its links taken out, so the addresses are judged from the text as written.
+        var links = LinkFinder.Inspect(text);
+        var floorScore = floor.Score + (links.Problems > 0 ? 1 : 0);
+        var floorVerdict = MockRiskRules.VerdictFor(floorScore);
         var combinedFlags = new List<RiskFlag>(floor.Flags);
+        var floorBecause = floor.TopBecause;
+        if (links.Problems > 0)
+        {
+            combinedFlags.Add(links.Deceptive
+                ? new RiskFlag("link-hidden", "link", "The link hides where it goes", "The address is disguised or shortened, so you cannot tell which website it leads to.")
+                : new RiskFlag("link-odd", "link", "The link looks unusual", "The address has words or a form that real senders rarely use."));
+            if (floorBecause is null || floorBecause == MockRiskRules.BecauseFor("link"))
+                floorBecause = links.Deceptive ? "its link hides where it goes" : "its link looks unusual";
+        }
 
         // If checking a picture, send image bytes to the multimodal AI endpoint;
         // otherwise, send text only to save vision processing costs.
-        var (finalVerdict, finalReason, reviewStatus) = await ApplyAiAsync(
+        var (finalVerdict, finalReason, reviewStatus, failure) = await ApplyAiAsync(
             isPicture ? c => c.CheckScamAsync(null, request.Picture, imgType, ct) : c => c.CheckScamAsync(display, null, null, ct),
-            aiRequired: isPicture, floorVerdict, MockRiskRules.ReasonFor(floorVerdict, floor.TopBecause), combinedFlags);
+            aiRequired: isPicture, floorVerdict, MockRiskRules.ReasonFor(floorVerdict, floorBecause), combinedFlags);
 
         var flags = combinedFlags.Take(4).ToList();
         var result = new CheckResult(NewId("chk"), request.Kind, finalVerdict, finalReason, flags,
-            display, floor.Highlights.Where(h => flags.Any(f => f.Id == h.FlagId)).ToList(), null, reviewStatus, false, DateTimeOffset.Now);
+            display, floor.Highlights.Where(h => flags.Any(f => f.Id == h.FlagId)).ToList(), null, reviewStatus, false, DateTimeOffset.Now, failure);
         lock (_gate) _checks[result.Id] = new(result, text.Trim(), reviewStatus == ReviewStatus.Held ? DateTimeOffset.Now : null);
         return result;
     }
@@ -82,7 +95,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
     /// Any failure, exception or odd answer holds the item. When <paramref name="aiRequired"/> is set
     /// (pictures, which local rules cannot read) a missing checker also holds it.
     /// </summary>
-    private async Task<(Verdict Verdict, string Reason, ReviewStatus Status)> ApplyAiAsync(
+    private async Task<(Verdict Verdict, string Reason, ReviewStatus Status, FailureInfo? Failure)> ApplyAiAsync(
         Func<ILlamaScamChecker, Task<MetaScamAnalysis>> ask, bool aiRequired,
         Verdict floorVerdict, string floorReason, List<RiskFlag> flags)
     {
@@ -91,26 +104,26 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         // Someone may be in danger, or the checker wants a human: the helper is always told, whatever else was decided.
         // The local rules and the AI can both raise this. Nothing can lower it.
         if (r.Status != ReviewStatus.Held && flags.Any(f => f.Id is "at-risk" or "review-needed"))
-            return (IsStricter(Verdict.BeCareful, r.Verdict) ? Verdict.BeCareful : r.Verdict, r.Reason, ReviewStatus.Held);
+            return (IsStricter(Verdict.BeCareful, r.Verdict) ? Verdict.BeCareful : r.Verdict, r.Reason, ReviewStatus.Held, r.Failure);
         return r;
     }
 
-    private async Task<(Verdict Verdict, string Reason, ReviewStatus Status)> ApplyAiCoreAsync(
+    private async Task<(Verdict Verdict, string Reason, ReviewStatus Status, FailureInfo? Failure)> ApplyAiCoreAsync(
         Func<ILlamaScamChecker, Task<MetaScamAnalysis>> ask, bool aiRequired,
         Verdict floorVerdict, string floorReason, List<RiskFlag> flags)
     {
         if (llamaChecker is null)
         {
-            if (!aiRequired) return (floorVerdict, floorReason, ReviewStatus.NotAsked);
-            return HoldForReview(flags, floorVerdict, "We could not check this picture, so your helper will look at it.");
+            if (!aiRequired) return (floorVerdict, floorReason, ReviewStatus.NotAsked, null);
+            return HoldForReview(flags, floorVerdict, "We could not check this picture, so your helper will look at it.", new("The picture checker is not switched on yet. Please tell the person who looks after this app.", "Code: NO_CHECKER\nWhat: No IMetaScamChecker is registered."));
         }
 
         MetaScamAnalysis ai;
         try { ai = await ask(llamaChecker); }
         catch (OperationCanceledException) { throw; }
-        catch (Exception)
+        catch (Exception ex)
         {
-            return HoldForReview(flags, floorVerdict, "We could not finish checking this, so your helper will look at it.");
+            return HoldForReview(flags, floorVerdict, "We could not finish checking this, so your helper will look at it.", new("Something went wrong while checking. Please try again in a minute.", $"Code: CHECK_EXCEPTION\nWhat: {ex.GetType().Name}\nTime: {DateTimeOffset.UtcNow:yyyy-MM-dd HH:mm:ss} UTC"));
         }
 
         foreach (var flag in ai.Flags)
@@ -119,18 +132,18 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         if (!ai.Success)
         {
             var stricter = IsStricter(Verdict.BeCareful, floorVerdict) ? Verdict.BeCareful : floorVerdict;
-            return (stricter, ai.Reason, ReviewStatus.Held);
+            return (stricter, ai.Reason, ReviewStatus.Held, ai.Failure);
         }
         return IsStricter(ai.Verdict, floorVerdict)
-            ? (ai.Verdict, ai.Reason, ReviewStatus.NotAsked)
-            : (floorVerdict, floorReason, ReviewStatus.NotAsked);
+            ? (ai.Verdict, ai.Reason, ReviewStatus.NotAsked, null)
+            : (floorVerdict, floorReason, ReviewStatus.NotAsked, null);
     }
 
-    private static (Verdict, string, ReviewStatus) HoldForReview(List<RiskFlag> flags, Verdict floorVerdict, string reason)
+    private static (Verdict, string, ReviewStatus, FailureInfo?) HoldForReview(List<RiskFlag> flags, Verdict floorVerdict, string reason, FailureInfo? failure)
     {
         if (flags.All(f => f.Id != "review-needed"))
             flags.Add(new("review-needed", "hourglass", "Needs helper check", "The automatic check could not finish, so your helper will check this."));
-        return (IsStricter(Verdict.BeCareful, floorVerdict) ? Verdict.BeCareful : floorVerdict, reason, ReviewStatus.Held);
+        return (IsStricter(Verdict.BeCareful, floorVerdict) ? Verdict.BeCareful : floorVerdict, reason, ReviewStatus.Held, failure);
     }
 
     private static bool IsStricter(Verdict a, Verdict b)
@@ -173,7 +186,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         var floorVerdict = MockRiskRules.VerdictFor(seen.Sum(f => MockRiskRules.Weight(f.Id)));
         var combinedFlags = new List<RiskFlag>(seen.OrderByDescending(f => MockRiskRules.Weight(f.Id)));
 
-        var (finalVerdict, finalReason, reviewStatus) = await ApplyAiAsync(
+        var (finalVerdict, finalReason, reviewStatus, failure) = await ApplyAiAsync(
             c => c.CheckScamAsync(display, null, null, ct), aiRequired: false, floorVerdict,
             MockRiskRules.ReasonFor(floorVerdict, MockRiskRules.BecauseFor(combinedFlags.FirstOrDefault()?.Id), startedFriendly: firstFlagged > 0),
             combinedFlags);
@@ -181,7 +194,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         var flags = combinedFlags.Take(4).ToList();
         var result = new CheckResult(NewId("chk"), CheckKind.Conversation, finalVerdict,
             finalReason,
-            flags, display, [], thread, reviewStatus, false, DateTimeOffset.Now);
+            flags, display, [], thread, reviewStatus, false, DateTimeOffset.Now, failure);
         lock (_gate) _checks[result.Id] = new(result, conversation.Trim(), reviewStatus == ReviewStatus.Held ? DateTimeOffset.Now : null);
         return result;
     }
@@ -268,19 +281,30 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
 
     public async Task<Explanation> ExplainContentAsync(ExplainRequest request, CancellationToken ct = default)
     {
-        await Wait(1100, ct);
-        var text = request.Text;
+        string? typed = null, mime = null;
         if (request.File is not null)
         {
-            if (ImageSniff.ImageType(request.File) is null && !ImageSniff.IsPdf(request.File))
-                throw new BackstopApiException("We could not read that file. Please choose a photo or a PDF of the letter.");
-            text = ExplainFixtures.CouncilLetter; // MOCK: a real back end reads the words in the photo or PDF
+            if (ImageSniff.IsPdf(request.File))
+                throw new BackstopApiException("We cannot read PDFs yet. Please take a photo of the page, or type the words.");
+            mime = ImageSniff.ImageType(request.File);
+            if (mime is null) throw new BackstopApiException("We could not read that file. Please choose a photo of the letter.");
+            if (request.File.Length > MaxExplainImageBytes) throw new BackstopApiException("That photo is too big. Please take it again.");
         }
-        if (string.IsNullOrWhiteSpace(text)) throw new BackstopApiException("Please paste the words first.");
+        else
+        {
+            if (string.IsNullOrWhiteSpace(request.Text)) throw new BackstopApiException("Please paste the words first.");
+            // Links come out first, so nothing clickable or hidden is sent on or shown.
+            typed = Defang.ForUser(request.Text.Trim());
+            if (typed.Length > MaxCheckLength) throw new BackstopApiException("That is too long to explain. Please paste a shorter part.");
+        }
 
-        var explanation = ExplainFixtures.IsCouncilLetter(text)
-            ? ExplainCouncilLetter(text.Trim(), request.Level, request.Format)
-            : ExplainAnything(Defang.ForUser(text.Trim()), request.Level, request.Format);
+        if (documentExplainer is null)
+            throw new BackstopApiException("Explain is not switched on yet. Please tell the person who looks after this app.");
+        var reading = await documentExplainer.ExplainAsync(typed, request.File, mime, request.Level, request.Format, ct);
+        if (!reading.Success)
+            throw new BackstopApiException(reading.Failure?.Message ?? "Something went wrong. Please try again in a minute.");
+
+        var explanation = BuildExplanation(reading, typed ?? Defang.ForUser(reading.Text), request.Level, request.Format);
         lock (_gate) _explanations[explanation.Id] = explanation;
         return explanation;
     }
@@ -293,29 +317,20 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
 
     public async Task<ChatAnswer> AskAboutAsync(string explanationId, string question, CancellationToken ct = default)
     {
-        await Wait(800, ct);
         if (string.IsNullOrWhiteSpace(question)) throw new BackstopApiException("Please type your question first.");
+        if (question.Length > 500) throw new BackstopApiException("That is a bit long. Please make your question shorter.");
         Explanation? e;
         lock (_gate) e = _explanations.GetValueOrDefault(explanationId);
         if (e is null) throw new BackstopApiException("We could not find that page. Please explain it again.");
+        if (documentExplainer is null)
+            throw new BackstopApiException("Questions are not switched on yet. Please tell the person who looks after this app.");
 
-        var q = question.ToLowerInvariant();
-        string answer;
-        if (ExplainFixtures.IsCouncilLetter(e.OriginalText))
-        {
-            answer = ExplainFixtures.Answers.FirstOrDefault(a => a.Words.Any(w => Regex.IsMatch(q, $@"\b{w}\b"))).Answer
-                ?? $"I am not sure about that. You could ask {Helper} to look at the letter with you.";
-        }
-        else if (Regex.IsMatch(q, @"\b(when|date|deadline|by)\b"))
-            answer = e.Deadline is null ? "I could not find a date in it." : $"{e.Deadline}.";
-        else if (Regex.IsMatch(q, @"\b(safe|scam|real|trust)\b"))
-            answer = MockRiskRules.VerdictFor(MockRiskRules.Scan(e.OriginalText).Score) == Verdict.LooksSafe
-                ? "We did not find warning signs. You can tap \"Is this safe?\" to check it properly."
-                : "It has some warning signs. Please tap \"Is this safe?\" before you do anything.";
-        else if (Regex.IsMatch(q, @"\b(do|need|must|should)\b"))
-            answer = e.Actions.Count == 0 ? "You do not need to do anything." : "It asks you to: " + string.Join("; ", e.Actions).ToLowerInvariant() + ".";
-        else
-            answer = $"I am not sure about that. You could ask {Helper} to look at it with you.";
+        var reply = await documentExplainer.AnswerAsync(e.OriginalText, Defang.ForUser(question.Trim()), ct);
+        if (!reply.Success)
+            throw new BackstopApiException(reply.Failure?.Message ?? "Something went wrong. Please try again in a minute.");
+        var answer = reply.Text;
+        if (reply.NeedsHelper && !answer.Contains("helper", StringComparison.OrdinalIgnoreCase) && !answer.Contains(Helper, StringComparison.OrdinalIgnoreCase))
+            answer += $" {Helper} can look at it with you.";
         return new ChatAnswer(question.Trim(), answer);
     }
 
@@ -551,6 +566,9 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
 
     private async Task Wait(int ms, CancellationToken ct)
     {
+#if !DEBUG
+        ms = Math.Min(ms, 150); // the pauses imitate a slow back end. Release keeps them short.
+#endif
         await Task.Delay(ms, ct);
         if (options.FailRequests) throw new BackstopApiException("We could not reach Backstop just now. Please try again in a moment.");
     }

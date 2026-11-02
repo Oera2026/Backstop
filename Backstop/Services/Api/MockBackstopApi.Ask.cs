@@ -27,12 +27,14 @@ public sealed partial class MockBackstopApi
         var openMessage = string.IsNullOrWhiteSpace(context?.MessageId) ? null : mail?.GetClearedMessage(context.MessageId);
 
         AssistantReply reply;
-        if (assistant is null) reply = new("", false, FailureNote: "No assistant configured");
+        if (assistant is null) reply = new("", false, FailureNote: "No assistant configured",
+            Failure: new("Ask Me is not switched on yet. Please tell the person who looks after this app.", "Code: NO_ASSISTANT\nWhat: No IAssistant is registered."));
         else
         {
             try { reply = await assistant.ReplyAsync([.. history.Select(t => new AssistantTurn(t.FromUser, t.Text))], text, material, ct); }
             catch (OperationCanceledException) { throw; }
-            catch (Exception) { reply = new("", false, FailureNote: "Assistant failed"); }
+            catch (Exception ex) { reply = new("", false, FailureNote: "Assistant failed",
+                Failure: new("Something went wrong. Please try again in a minute.", $"Code: ASSISTANT_EXCEPTION\nWhat: {ex.GetType().Name}\nTime: {DateTimeOffset.UtcNow:yyyy-MM-dd HH:mm:ss} UTC")); }
         }
 
         // Someone may be in danger, or the assistant wants a human: the helper is always told.
@@ -46,9 +48,12 @@ public sealed partial class MockBackstopApi
             if (told && !answer.Contains("helper", StringComparison.OrdinalIgnoreCase) && !answer.Contains(Helper, StringComparison.OrdinalIgnoreCase))
                 answer += $" I have told {Helper}.";
         }
-        else answer = told
-            ? $"I could not answer that properly, so I have asked {Helper} to look at it."
-            : "Sorry, I could not think of an answer just now. Please try again in a moment.";
+        else
+        {
+            // Say what went wrong, in plain words. The technical detail travels separately.
+            var plain = reply.Failure?.Message ?? "Sorry, I could not think of an answer just now. Please try again in a moment.";
+            answer = told ? $"{plain} I have asked {Helper} to look at your message." : plain;
+        }
 
         // Only fixed pages of the app can be suggested, never anything taken from the message or the reply.
         // An email that itself looks like a scam is never helped with: no draft, and the person is pointed to Check.
@@ -68,7 +73,7 @@ public sealed partial class MockBackstopApi
         var found = reply.Success
             ? (reply.Uses ?? []).Where(links.ContainsKey).Distinct().Take(3).Select(id => links[id]).ToList()
             : [];
-        return new AskReply(answer, href, link, told, draft, evt, found.Count > 0 ? found : null);
+        return new AskReply(answer, href, link, told, draft, evt, found.Count > 0 ? found : null, reply.Success ? null : reply.Failure);
     }
 
     // ---------------- Material for the assistant: the open email, earlier mail, sent mail and notes ----------------

@@ -30,6 +30,13 @@ if (File.Exists(rootEnv))
 }
 builder.Configuration.AddEnvironmentVariables();
 
+// Hosts like Render give the port in PORT. Without it, local development uses 5106.
+var portText = Environment.GetEnvironmentVariable("PORT");
+if (int.TryParse(portText, out var port) && port is > 0 and < 65536)
+    builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+else if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("ASPNETCORE_URLS")))
+    builder.WebHost.UseUrls("http://localhost:5106");
+
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
@@ -42,10 +49,40 @@ static SocketsHttpHandler NoRedirectHandler() => new()
     MaxResponseHeadersLength = 16,
     ConnectTimeout = TimeSpan.FromSeconds(10),
 };
-builder.Services.AddHttpClient<MetaAiScamChecker>().ConfigurePrimaryHttpMessageHandler(NoRedirectHandler);
+// Meta can rate-limit us (429), fail (5xx) or go quiet. Retry twice with backoff (Retry-After is honoured), pause calls
+// when most of them are failing, and cap each try. When all of that fails, callers fail closed: held, never cleared.
+static void Resilience(Microsoft.Extensions.Http.Resilience.HttpStandardResilienceOptions o)
+{
+    o.Retry.MaxRetryAttempts = 2;
+    o.Retry.Delay = TimeSpan.FromSeconds(2);
+    o.Retry.UseJitter = true;
+    o.AttemptTimeout.Timeout = TimeSpan.FromSeconds(15);
+    o.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(40);
+    o.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(60);
+    o.CircuitBreaker.MinimumThroughput = 5;
+    o.CircuitBreaker.FailureRatio = 0.6;
+    o.CircuitBreaker.BreakDuration = TimeSpan.FromSeconds(20);
+}
+// One shared cap on calls to Meta (single instance, so in memory is enough).
+builder.Services.AddSingleton<MetaCallGuard>();
+builder.Services.AddHttpClient<MetaAiScamChecker>().ConfigurePrimaryHttpMessageHandler(NoRedirectHandler).AddStandardResilienceHandler(Resilience);
 // Ask Me: the same Meta endpoint, the same rules.
-builder.Services.AddHttpClient<MetaAssistant>().ConfigurePrimaryHttpMessageHandler(NoRedirectHandler);
+builder.Services.AddHttpClient<MetaAssistant>().ConfigurePrimaryHttpMessageHandler(NoRedirectHandler).AddStandardResilienceHandler(Resilience);
+// Explain and questions about a document: the same Meta endpoint, the same rules.
+builder.Services.AddHttpClient<MetaDocumentExplainer>().ConfigurePrimaryHttpMessageHandler(NoRedirectHandler).AddStandardResilienceHandler(Resilience);
+
+// Behind the host's load balancer: read the real client address and scheme from X-Forwarded-*.
+// The app runs as a single instance behind one proxy, so the proxy lists are cleared.
+builder.Services.Configure<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>(o =>
+{
+    o.ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor
+                       | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto;
+    o.KnownIPNetworks.Clear();
+    o.KnownProxies.Clear();
+    o.ForwardLimit = 1;
+});
 builder.Services.AddTransient<IAssistant>(sp => sp.GetRequiredService<MetaAssistant>());
+builder.Services.AddTransient<IDocumentExplainer>(sp => sp.GetRequiredService<MetaDocumentExplainer>());
 builder.Services.AddTransient<ILlamaScamChecker>(sp => sp.GetRequiredService<MetaAiScamChecker>());
 builder.Services.AddTransient<IMetaScamChecker>(sp => sp.GetRequiredService<MetaAiScamChecker>());
 
@@ -58,6 +95,11 @@ builder.Services.AddSingleton<IGuardianService, MockGuardianService>();
 // The Check, Show me, Explain, Remember and trusted-person modes.
 builder.Services.AddSingleton<MockApiOptions>();
 builder.Services.AddSingleton<IBackstopApi, MockBackstopApi>();
+builder.Services.AddSingleton<IDemoControl, DemoControl>();
+
+// The visitor's address, taken when a circuit opens, for the per-visitor cap on Meta calls.
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<Microsoft.AspNetCore.Components.Server.Circuits.CircuitHandler, ClientIpCircuitHandler>();
 
 if (args.Contains("--test-llama"))
 {
@@ -66,6 +108,9 @@ if (args.Contains("--test-llama"))
 }
 
 var app = builder.Build();
+
+// First in the pipeline, so everything after it sees the real client address and https.
+app.UseForwardedHeaders();
 
 if (!app.Environment.IsDevelopment())
 {

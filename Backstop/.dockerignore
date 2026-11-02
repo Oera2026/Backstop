@@ -1,0 +1,8 @@
+bin/
+obj/
+bin-preview/
+graphify-out/
+.env
+.vs/
+Dockerfile
+.dockerignore

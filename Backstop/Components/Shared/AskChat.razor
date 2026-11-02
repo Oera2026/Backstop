@@ -32,7 +32,15 @@
                             @(v == Verdict.LooksSafe ? "Looks safe" : v == Verdict.BeCareful ? "Be careful" : "Do not reply")
                         </span>
                     }
-                    <span class="bubble__text">@t.Text</span>
+                    @if (t.Failure is { } failure)
+                    {
+                        // Plain words and a closed technical box. For a held check the verdict wording would repeat itself.
+                        <FailureNotice Failure="failure" Message="@(t.Verdict is null ? t.Text : null)" />
+                    }
+                    else
+                    {
+                        <span class="bubble__text">@t.Text</span>
+                    }
                     @if (t.Lines.Count > 0)
                     {
                         <ul class="bubble__list">
@@ -233,13 +241,13 @@
             var result = picture is not null
                 ? await Api.CheckContentAsync(new CheckRequest(CheckKind.Picture, null, picture.Bytes, picture.Name))
                 : await Api.CheckContentAsync(new CheckRequest(CheckKind.Message, open is not null ? $"{open.Subject}\n{open.Body}" : text));
-            return new AskLine(false, result.Reason, Verdict: result.Verdict, Href: $"check/{result.Id}", LinkText: "See the whole check");
+            return new AskLine(false, result.Reason, Verdict: result.Verdict, Href: $"check/{result.Id}", LinkText: "See the whole check", Failure: result.Failure);
         }
 
         // The turns so far, without the message just added: the API adds that one itself.
         var history = Session.Turns.SkipLast(1).Select(t => new AskTurn(t.FromUser, t.Text)).ToList();
         var reply = await Api.AskAsync(history, text, context);
-        return new AskLine(false, reply.Text, Href: reply.Href, LinkText: reply.LinkText, Draft: reply.Draft, Event: reply.Event, Found: reply.Found);
+        return new AskLine(false, reply.Text, Href: reply.Href, LinkText: reply.LinkText, Draft: reply.Draft, Event: reply.Event, Found: reply.Found, Failure: reply.Failure);
     }
 
     private async Task ScrollDown()

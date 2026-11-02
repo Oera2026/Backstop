@@ -1,0 +1,14 @@
+@* What went wrong in plain words, then a closed box with the technical detail for someone investigating. *@
+<div class="failure" role="alert">
+    <p class="failure__message"><Icon Name="alert" /> <span>@(Message ?? Failure.Message)</span></p>
+    <details class="failure__tech">
+        <summary>Technical details</summary>
+        <pre>@Failure.Technical</pre>
+    </details>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public FailureInfo Failure { get; set; } = default!;
+    /// <summary>Wording to show instead of the failure message (for example with a helper note added).</summary>
+    [Parameter] public string? Message { get; set; }
+}

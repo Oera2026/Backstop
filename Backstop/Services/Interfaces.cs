@@ -47,10 +47,13 @@ public interface IMailService
     IReadOnlyList<Scenario> Scenarios { get; }
 
     /// <summary>
-    /// Runs the mock pipeline for a scenario. <paramref name="onTier"/> is called when a tier starts
+    /// Runs the checking pipeline for a demo scenario. <paramref name="onTier"/> is called when a tier starts
     /// (status Running) and when it finishes. Any error ends in Failed -> Held.
     /// </summary>
     Task<MailMessage?> ReceiveAsync(string scenarioId, bool simulateFailure, Action<int, TierResult>? onTier = null);
+
+    /// <summary>Same pipeline for any email, not only the scenarios. The outcome comes from the email's own text.</summary>
+    Task<MailMessage?> ReceiveAsync(InboundMail mail, bool simulateFailure, Action<int, TierResult>? onTier = null);
 
     void Reset();
 }

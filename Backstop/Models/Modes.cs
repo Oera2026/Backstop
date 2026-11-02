@@ -49,7 +49,9 @@ public sealed record CheckResult(
     IReadOnlyList<ThreadMessage>? Thread,
     ReviewStatus Status,
     bool CallRequested,
-    DateTimeOffset CheckedAt);
+    DateTimeOffset CheckedAt,
+    // Set when the automatic check could not finish: plain words plus technical detail.
+    FailureInfo? Failure = null);
 
 // ---------- Show me ----------
 

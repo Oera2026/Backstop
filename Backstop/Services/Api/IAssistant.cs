@@ -29,7 +29,8 @@ public sealed record AssistantReply(
     string? FailureNote = null,
     AssistantDraft? Draft = null,
     AssistantEvent? Event = null,
-    IReadOnlyList<string>? Uses = null);
+    IReadOnlyList<string>? Uses = null,
+    Backstop.Models.FailureInfo? Failure = null);
 
 /// <summary>Talks with the user in Ask Me. The only implementation talks to Meta's Muse models.</summary>
 public interface IAssistant

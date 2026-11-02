@@ -31,15 +31,10 @@ public sealed partial class MockMailService(MailStore store, IMetaScamChecker? m
 
     [GeneratedRegex(@"\b(?:\d[ -]?){13,19}\b")]
     private static partial Regex CardNumber();
-    [GeneratedRegex(@"\b(?:sort code|account number|account no|iban|bank details)\b", RegexOptions.IgnoreCase)]
-    private static partial Regex BankWords();
     [GeneratedRegex(@"\b(\d{2})-(\d{2})-(\d{2})\b")]
     private static partial Regex SixDigitsDashed();
     [GeneratedRegex(@"\b\d{8}\b")]
     private static partial Regex AccountNumber();
-    // "pin" alone is an everyday word (a safety pin), so it only counts beside a number or as "my/your/card/bank PIN".
-    [GeneratedRegex(@"\b(?:password|passcode|security code|cvv|cvc)\b|\b(?:my|your|card|bank) pin\b|\bpin (?:number|code)\b|\bpin\W{0,4}(?:is\W{0,4})?\d{4,6}\b", RegexOptions.IgnoreCase)]
-    private static partial Regex Secret();
 
     // MOCK: replace with the real outgoing data-loss check.
     public OutgoingCheck CheckOutgoing(string to, string subject, string body)
@@ -49,7 +44,7 @@ public sealed partial class MockMailService(MailStore store, IMetaScamChecker? m
         var reasons = new List<string>();
         if (HasCardNumber(text)) reasons.Add("It looks like a card number.");
         if (HasBankCode(text)) reasons.Add("It looks like a bank code.");
-        if (Secret().IsMatch(text)) reasons.Add("It looks like a password or secret code.");
+        if (SensitivePatterns.Secret.IsMatch(text)) reasons.Add("It looks like a password or secret code.");
         return new OutgoingCheck(reasons.Count > 0, reasons);
     }
 
@@ -74,7 +69,7 @@ public sealed partial class MockMailService(MailStore store, IMetaScamChecker? m
     // when an account number or bank words are there too.
     private static bool HasBankCode(string text)
     {
-        if (BankWords().IsMatch(text)) return true;
+        if (SensitivePatterns.Bank.IsMatch(text)) return true;
         var hasAccount = AccountNumber().IsMatch(text);
         return SixDigitsDashed().Matches(text).Any(m => hasAccount || !ReadsAsDate(m));
     }
@@ -182,118 +177,134 @@ public sealed partial class MockMailService(MailStore store, IMetaScamChecker? m
             Place = place.Trim(),
         });
 
-    public async Task<MailMessage?> ReceiveAsync(string scenarioId, bool simulateFailure, Action<int, TierResult>? onTier = null)
+    public Task<MailMessage?> ReceiveAsync(string scenarioId, bool simulateFailure, Action<int, TierResult>? onTier = null)
     {
         var scenario = MockData.Scenarios.FirstOrDefault(s => s.Id == scenarioId);
-        if (scenario is null) return null;
+        return scenario is null ? Task.FromResult<MailMessage?>(null) : ReceiveAsync(scenario.Mail, simulateFailure, onTier);
+    }
 
-        var msg = MockData.CreateMessage(scenario);
+    /// <summary>
+    /// The real pipeline, in order: Rules, Meta AI, Link check, Policy. What happens to the message is worked out
+    /// from its own text. Cleared needs every check to pass AND Meta AI to answer. Any error ends in Failed -> Held.
+    /// </summary>
+    public async Task<MailMessage?> ReceiveAsync(InboundMail mail, bool simulateFailure, Action<int, TierResult>? onTier = null)
+    {
+        var msg = MockData.CreateMessage(mail);
         store.Add(msg); // state Received: invisible to the user
 
         var done = new List<TierResult>();
-        MetaScamAnalysis? ai = null;
+        MailAnalyzer.Analysis? analysis = null;
         try
         {
             store.Update(() => msg.State = MessageState.Scanning);
+            // The local result is worked out first and kept, so a failure later still leaves the helper the evidence.
+            analysis = MailAnalyzer.Analyze(mail);
 
-            for (var i = 0; i < scenario.Tiers.Count; i++)
-            {
-                var name = scenario.Tiers[i].Name;
-                onTier?.Invoke(i, new TierResult(name, 0, TierStatus.Running, "Checking…"));
-                await Task.Delay(StepDelayMs);
+            // Tier 0: Rules.
+            await Step(0, onTier);
+            done.Add(analysis.RulesTier);
+            onTier?.Invoke(0, analysis.RulesTier);
 
-                var result = scenario.Tiers[i];
+            // Tier 1: Meta AI reads the email (text only, to save cost). A failure, a timeout, an odd answer or no
+            // key all throw, and the catch below holds the message. Nothing is cleared without this answer.
+            await Step(1, onTier);
+            if (simulateFailure) throw new InvalidOperationException("Simulated checker failure");
+            if (metaChecker is null) throw new InvalidOperationException("No Meta AI checker is configured");
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            var ai = await metaChecker.CheckScamAsync($"{mail.Subject}\n\n{mail.Body}", null, null);
+            if (!ai.Success)
+                throw new InvalidOperationException("Meta AI check failed or timed out: " + (ai.FailureNote ?? "Unknown error"));
+            var aiTier = new TierResult("Meta AI", (int)clock.ElapsedMilliseconds,
+                ai.Verdict == Verdict.LooksSafe && !ai.NeedsHuman && !ai.AtRisk ? TierStatus.Passed : TierStatus.Flagged, ai.Reason);
+            done.Add(aiTier);
+            onTier?.Invoke(1, aiTier);
 
-                // MOCK: the "Small model" is the tier we pretend crashes. Real code: any exception or timeout.
-                if (simulateFailure && i == 1)
-                    throw new InvalidOperationException("Simulated checker failure");
+            // Tier 2: Link check (by address only).
+            await Step(2, onTier);
+            done.Add(analysis.LinkTier);
+            onTier?.Invoke(2, analysis.LinkTier);
 
-                // Tier 1 is the "Small model": Meta AI reads the email (text only, to save cost).
-                // Any failure, timeout or odd answer throws, and the catch below holds the message.
-                if (i == 1 && metaChecker is not null)
-                {
-                    var clock = System.Diagnostics.Stopwatch.StartNew();
-                    ai = await metaChecker.CheckScamAsync($"{scenario.Subject}\n\n{scenario.Body}", null, null);
-                    if (!ai.Success)
-                        throw new InvalidOperationException("Meta AI check failed or timed out: " + (ai.FailureNote ?? "Unknown error"));
-
-                    result = new TierResult("Meta AI", (int)clock.ElapsedMilliseconds,
-                        ai.Verdict == Verdict.LooksSafe ? TierStatus.Passed : TierStatus.Flagged, ai.Reason);
-                }
-
-                done.Add(result);
-                onTier?.Invoke(i, result);
-            }
-
-            // Fail closed: only an explicit Cleared or Blocked outcome is honoured. Everything else is Held.
-            var final = scenario.Outcome switch
-            {
-                MessageState.Cleared => MessageState.Cleared,
-                MessageState.Blocked => MessageState.Blocked,
-                _ => MessageState.Held,
-            };
-
-            // Floor rule: the AI can only make the outcome stricter. If it is worried about a message
-            // the script would clear, a helper looks first. It never clears or unblocks anything.
-            var aiWorried = ai is { Verdict: not Verdict.LooksSafe } || ai is { NeedsHuman: true } || ai is { AtRisk: true };
-            var downgraded = aiWorried && final == MessageState.Cleared;
-            if (downgraded) final = MessageState.Held;
+            // Tier 3: Policy. The local checks set a floor. Meta AI can only make the result stricter.
+            await Step(3, onTier);
+            var decision = MailAnalyzer.Decide(analysis, ai);
+            done.Add(decision.PolicyTier);
+            onTier?.Invoke(3, decision.PolicyTier);
 
             store.Update(() =>
             {
-                if (aiWorried)
-                {
-                    foreach (var f in ai!.Flags)
-                        if (msg.Flags.All(x => x.Title != f.Title))
-                            msg.Flags.Add(new Flag(f.Icon, f.Title, f.Explanation));
-                    if (downgraded)
-                    {
-                        msg.Summary = ai!.Reason;
-                        msg.Confidence = Confidence.Low;
-                    }
-                }
+                msg.Flags = [.. decision.Flags];
+                msg.Links = [.. analysis.Links];
+                msg.Summary = decision.Summary;
+                msg.Confidence = decision.Confidence;
                 msg.Tiers = done;
-                msg.State = final;
+                msg.State = decision.State;
                 msg.ReceivedAt = DateTimeOffset.Now;
             });
         }
         catch (Exception)
         {
-            FailClosed(msg, scenario, done, onTier);
+            try { FailClosed(msg, done, analysis, onTier); }
+            catch (Exception)
+            {
+                // Last resort: even if recording the failure goes wrong, the message must not stay in Received or Scanning.
+                try { store.Update(() => { msg.State = MessageState.Held; msg.ReceivedAt = DateTimeOffset.Now; }); }
+                catch (Exception) { msg.State = MessageState.Held; }
+            }
         }
         return msg;
     }
 
-    /// <summary>Failed -> Held. An error never lets a message through.</summary>
-    private void FailClosed(MailMessage msg, Scenario scenario, List<TierResult> done, Action<int, TierResult>? onTier)
+    private static async Task Step(int i, Action<int, TierResult>? onTier)
     {
+        onTier?.Invoke(i, new TierResult(MockData.TierNames[i], 0, TierStatus.Running, "Checking…"));
+        // Pause only when something is watching the timeline (the demo panel). Other callers do not wait.
+        if (onTier is not null) await Task.Delay(StepDelayMs);
+    }
+
+    /// <summary>
+    /// Failed -> Held. An error never lets a message through. The local result (flags, links, at-risk signal)
+    /// is kept, so the helper still sees what the local checks found.
+    /// </summary>
+    private void FailClosed(MailMessage msg, List<TierResult> done, MailAnalyzer.Analysis? analysis, Action<int, TierResult>? onTier)
+    {
+        var names = MockData.TierNames;
         var failedAt = done.Count;
-        if (failedAt < scenario.Tiers.Count)
+        if (failedAt < names.Length)
         {
-            var failed = new TierResult(scenario.Tiers[failedAt].Name, 0, TierStatus.Failed, "The checker had a problem.");
+            var failed = new TierResult(names[failedAt], 0, TierStatus.Failed, "The checker had a problem.");
             done.Add(failed);
             onTier?.Invoke(failedAt, failed);
         }
 
-        for (var i = failedAt + 1; i < scenario.Tiers.Count; i++)
+        const int linkTier = 2;
+        for (var i = failedAt + 1; i < names.Length; i++)
         {
-            var isPolicy = i == scenario.Tiers.Count - 1;
+            var isPolicy = i == names.Length - 1;
+            // The link check is local, so when the analysis exists its real result is shown, not "Not run".
             var r = isPolicy
-                ? new TierResult(scenario.Tiers[i].Name, 2, TierStatus.Flagged, "Something went wrong, so a helper looks first.")
-                : new TierResult(scenario.Tiers[i].Name, 0, TierStatus.Skipped, "Not run.");
+                ? new TierResult(names[i], 2, TierStatus.Flagged, analysis?.AtRisk == true
+                    ? "Someone may need help, so a helper looks first."
+                    : "Something went wrong, so a helper looks first.")
+                : i == linkTier && analysis is not null
+                    ? analysis.LinkTier
+                    : new TierResult(names[i], 0, TierStatus.Skipped, "Not run.");
             done.Add(r);
             onTier?.Invoke(i, r);
         }
 
+        var local = analysis is null ? null : MailAnalyzer.Decide(analysis, null);
         store.Update(() =>
         {
             msg.State = MessageState.Failed;
             msg.Tiers = done;
-            msg.Flags = [new Flag("alert", "The checker had a problem", "We could not finish checking this message, so it is held until a person looks at it."), .. msg.Flags];
-            msg.Summary = "The automatic check did not finish. Please look at this message with care.";
+            msg.Flags = [new Flag("alert", "The checker had a problem", "We could not finish checking this message, so it is held until a person looks at it."), .. local?.Flags ?? []];
+            msg.Links = analysis is null ? [] : [.. analysis.Links];
+            msg.Summary = local is not null && (analysis!.RulesScore + analysis.LinkProblems > 0 || analysis.AtRisk || analysis.SenderProblem)
+                ? local.Summary
+                : "The automatic check did not finish. Please look at this message with care.";
             msg.Confidence = Confidence.Low;
             msg.ReceivedAt = DateTimeOffset.Now;
-            msg.State = MessageState.Held; // explicit Failed -> Held transition
+            msg.State = MessageState.Held; // explicit Failed -> Held transition, never Blocked or Cleared
         });
     }
 

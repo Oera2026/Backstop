@@ -32,4 +32,5 @@ public sealed record AskReply(
     bool HelperTold = false,
     AskDraft? Draft = null,
     AskEvent? Event = null,
-    IReadOnlyList<AskLink>? Found = null);
+    IReadOnlyList<AskLink>? Found = null,
+    FailureInfo? Failure = null);
