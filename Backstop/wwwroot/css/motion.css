@@ -154,7 +154,8 @@ body { transition: background-color .3s ease, color .3s ease; }
 :root[data-motion="calm"] .skel__pic::after, :root[data-motion="calm"] .skel__bar::after { animation: none; }
 
 /* Shown while the app starts, so the first look is a page shape and not a blank screen. Hidden once a page is drawn. */
-.boot { padding: 1.25rem max(.75rem, env(safe-area-inset-left)); max-width: 52rem; margin: 0 auto; }
+.boot { width: 100%; box-sizing: border-box; padding: 1.25rem max(.75rem, env(safe-area-inset-left)); max-width: 52rem; margin: 0 auto; }
+.boot .rows { margin: 0; }
 .boot .skel__bar--title { margin-bottom: 1rem; }
 body:has(#main) .boot { display: none; }
 

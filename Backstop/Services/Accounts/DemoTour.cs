@@ -22,18 +22,42 @@ public sealed class DemoTour
         new("/", "Write", "Start a new message here.", ".home__side .btn-primary"),
         new("/", "Shortcuts", "Contacts, sent mail, calendar and search.", ".tiles"),
         new("/", "A message", "Tap a message to read it.", ".home__list .row, .emptystate"),
+
+        new("home", "Home", "Your home screen.", "main h1"),
+
+        new("compose", "Write a message", "Say who it is for.", "#to"),
+        new("compose", "The subject", "A few words about what it is.", "#subject"),
+        new("compose", "Send", "Mail you send is checked before it goes.", ".form button[type='submit']"),
+
+        new("contacts", "Contacts", "The people you write to.", "main h1"),
+        new("contacts", "A person", "Tap a person to write to them.", ".rows .row, .empty"),
+
+        new("sent", "Sent", "Messages you sent are kept here.", "main h1"),
+        new("calendar", "Calendar", "Things that are coming up.", "main h1"),
+        new("calendar", "Today", "Today has a mark. Tap a day to see it.", ".day--today, .monthbar__title"),
+        new("search", "Search", "Look for a message or a person.", "main h1"),
+
         new("/", "Next: Ask Me", "Tap Ask Me.", ".appnav__item[href='ask-me']", true),
 
         new("ask-me", "Ask Me", "Type a question here.", ".composer textarea"),
         new("ask-me", "Send", "Press Send. Ask Me answers in plain words.", ".composer button[type='submit']"),
-        new("ask-me", "Next: Messages", "Tap Messages.", ".appnav__item[href='messages']", true),
+
+        new("check", "Check a message", "Not sure about a message? Paste it here.", "#check-text"),
+        new("check", "Check it", "Backstop looks for signs of a scam.", ".actions .btn-primary"),
+        new("explain", "Explain something", "Paste hard words. Get easy ones back.", "#explain-text"),
+        new("show-me", "Show me how", "Say what you want to do. You get steps.", "#goal"),
+        new("make-sense", "What happened?", "Tell it what happened. It helps you make sense of it.", "#sense-what"),
+        new("stories", "Stories", "A short story about something coming up.", "main h1"),
+        new("stories/new", "A new story", "Say what is coming up.", "#story-what"),
 
         new("messages", "Messages", "Chats with the people you know. Tap one to open it.", ".rows .row"),
         new("messages", "Next: Remember", "Tap Remember.", ".appnav__item[href='remember']", true),
 
         new("remember", "Remember", "Ask how you did something before.", ".askbox .askrow"),
         new("remember", "Ideas", "Tap an idea if you are not sure what to ask.", ".chips"),
-        new("remember", "Next: Settings", "Tap Settings.", ".site-nav a[href='/settings']", true),
+
+        new("help", "Help", "Answers to common questions.", "#h-read"),
+        new("help", "Stuck?", "What to do if you are stuck.", "#h-stuck"),
 
         new("settings", "Reading", "Make the words bigger. Slow the voice down.", "#set-read"),
         new("settings", "Colours", "Light or dark. Stronger contrast. Less movement.", "#set-look"),
@@ -43,6 +67,7 @@ public sealed class DemoTour
     public static readonly IReadOnlyList<TourStep> HelperSteps =
     [
         new("/helper", "Waiting for you", "Mail the checker was unsure about waits here.", "main h1"),
+        new("/helper", "The count", "The number shows how many are waiting.", ".appnav__item[href='/helper']"),
         new("/helper", "Next up", "The most urgent message comes first.", ".hero, .rows a.row"),
         new("/helper", "Review it", "Tap Review it to see why it was held.", ".hero__go, .rows a.row", true),
 
@@ -53,9 +78,11 @@ public sealed class DemoTour
         new("helper/:id", "Next: History", "Tap History.", ".appnav__item[href='/helper/history']", true),
 
         new("helper/history", "History", "Every decision is kept here.", "main h1"),
+        new("helper/history", "Past decisions", "What was approved, blocked or called about.", ".rows"),
         new("helper/history", "Next: Messages", "Tap Messages.", ".appnav__item[href='/helper/messages']", true),
 
         new("helper/messages", "Messages", "Chats with the user and others.", ".msgs__list, main h1"),
+        new("helper/messages", "A chat", "Tap a person to read and reply.", ".msgs__list .row"),
         new("helper/messages", "Next: Settings", "Tap Settings.", ".appnav__item[href='/helper/settings']", true),
 
         new("helper/settings", "Settings", "The same reading and colour choices as the user.", "#set-read"),
