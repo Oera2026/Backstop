@@ -54,7 +54,7 @@
   } catch (e) { /* the server's zone is used instead */ }
 
   // First visit to the home page goes to the welcome screens. The demo panel shows pages in frames, so frames are left alone.
-  if (location.pathname === "/" && window.self === window.top && !welcomed()) location.replace("/welcome");
+  if (location.pathname === "/" && window.self === window.top && !welcomed() && location.search.indexOf("tour=1") < 0) location.replace("/welcome");
 })();
 
 // Inside the demo panel the guide bar would repeat itself, so hide it in frames.
