@@ -5,6 +5,7 @@
 <PageTitle>Sign in – Backstop</PageTitle>
 
 <h1>Sign in</h1>
+<p class="lead">Type the email and password you were given.</p>
 
 @if (Error)
 {
@@ -20,6 +21,10 @@
     <div class="field">
         <label for="password">Password</label>
         <input id="password" name="password" type="password" autocomplete="current-password" maxlength="200" required />
+    </div>
+    <div class="field field--check">
+        <input id="show-pw" type="checkbox" data-show-password="password" />
+        <label for="show-pw">Show my password</label>
     </div>
     <div class="actions">
         <button type="submit" class="btn btn-primary">Sign in</button>

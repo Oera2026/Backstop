@@ -59,7 +59,7 @@ else
 
         @if (_check?.Thread is { Count: > 0 } thread)
         {
-            <details class="card fold" open>
+            <details class="card fold" open="@(thread.Count <= 3)">
                 <summary>The conversation, with the risk at each message</summary>
                 <RiskThread Thread="thread" Flags="_item.Flags" />
             </details>
@@ -89,7 +89,7 @@ else
                         <Icon Name="cross" /> Block
                     </button>
                     <button type="button" class="btn btn-quiet" @onclick="Release" disabled="@_working"><Icon Name="check" /> Safe – release</button>
-                    <button type="button" class="btn btn-text" @onclick="() => Decide(ReviewDecision.CallFirst)" disabled="@_working"><Icon Name="phone" /> Call them first</button>
+                    <button type="button" class="btn @(_item.Verdict == Verdict.BeCareful ? "btn-primary" : "btn-text")" @onclick="() => Decide(ReviewDecision.CallFirst)" disabled="@_working"><Icon Name="phone" /> Call them first</button>
                 </div>
             }
             <p class="call-note" role="status">

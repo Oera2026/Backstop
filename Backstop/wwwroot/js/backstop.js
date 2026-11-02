@@ -40,3 +40,11 @@ window.backstop = {
     if (document.title !== want) document.title = want;
   }
 };
+
+// Sign in: "Show my password" turns the password box into a plain text box and back.
+document.addEventListener('change', function (e) {
+  var box = e.target;
+  if (!box || !box.dataset || !box.dataset.showPassword) return;
+  var field = document.getElementById(box.dataset.showPassword);
+  if (field) field.type = box.checked ? 'text' : 'password';
+});

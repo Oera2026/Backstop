@@ -19,6 +19,16 @@
 @Section("Needs you now", "alert", digest.In(HelperGroup.Urgent))
 @Section("To decide", "hourglass", digest.In(HelperGroup.Decide))
 @Section("Calls to make", "phone", digest.In(HelperGroup.Calls))
+@{ var rest = digest.In(HelperGroup.Info).Count; }
+@if (rest > 0 || Guardian.Allows(HelperCapability.SeeSharedMemories) || Guardian.Allows(HelperCapability.SeeActivitySummary))
+{
+    <button type="button" class="btn btn-quiet more-toggle" aria-expanded="@(_more ? "true" : "false")" aria-controls="more-block" @onclick="() => _more = !_more">
+        <Icon Name="@(_more ? "arrow-left" : "arrow-right")" /> @(_more ? "Show less" : rest > 0 ? $"Show more ({rest} to know)" : "Show more")
+    </button>
+}
+<div id="more-block">
+@if (_more)
+{
 @Section("To know", "eye", digest.In(HelperGroup.Info))
 
 @if (Guardian.Allows(HelperCapability.SeeSharedMemories))
@@ -29,11 +39,13 @@
 {
     <ActivityLog Entries="_activity" />
 }
+}
+</div>
 
 @code {
     private IReadOnlyList<MemoryCard> _memories = [];
     private IReadOnlyList<ActivityEntry> _activity = [];
-    private bool _scanning;
+    private bool _scanning, _more;
 
     protected override Task OnInitializedAsync() => Load();
     protected override Task OnApiChangedAsync() => Load();
@@ -70,19 +82,19 @@
                 <li>
                     @if (i.Href is not null && !i.CallRequested)
                     {
-                        <a class="row" href="@i.Href">@Body(i)</a>
+                        <a class="row" href="@i.Href">@Body(i, true)</a>
                     }
                     else if (i.Href is not null)
                     {
                         <div class="row row--static">
-                            <a class="row__link" href="@i.Href">@Body(i)</a>
+                            <a class="row__link" href="@i.Href">@Body(i, true)</a>
                             <button type="button" class="btn btn-quiet" @onclick="@(() => Called(i.Id))"><Icon Name="phone" /> I called</button>
                         </div>
                     }
                     else
                     {
                         <div class="row row--static @(i.Kind == HelperItemKind.NewPerson ? "row--notice" : "")">
-                            @Body(i)
+                            @Body(i, false)
                             @Actions(i)
                         </div>
                     }
@@ -93,14 +105,14 @@
 
     private static string SectionId(string heading) => "g-" + heading.Replace(' ', '-').ToLowerInvariant();
 
-    private RenderFragment Body(HelperItem i) =>
+    private RenderFragment Body(HelperItem i, bool linked) =>
     @<text>
         <span class="pic @Pic(i.Tone)" aria-hidden="true"><Icon Name="@i.Icon" /></span>
         <span class="row__main">
             <span class="row__kind">@i.Label</span>
             <span class="row__from">@i.Title</span>
             <span class="row__subject">@i.Detail</span>
-            @if (i.Preview.Length > 0)
+            @if (i.Preview.Length > 0 && !linked)
             {
                 <span class="row__preview">@i.Preview</span>
             }

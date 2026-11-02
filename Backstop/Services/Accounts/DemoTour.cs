@@ -28,15 +28,30 @@ public sealed class DemoTour
 
     public event Action? Changed;
 
-    public void Next() { if (!IsLast) { Index++; Changed?.Invoke(); } }
-    public void Back() { if (!IsFirst) { Index--; Changed?.Invoke(); } }
+    public void Next() { if (!IsLast) { Index++; _last[Current.Side] = Index; Changed?.Invoke(); } }
+    public void Back() { if (!IsFirst) { Index--; _last[Current.Side] = Index; Changed?.Invoke(); } }
     public void Close() { Active = false; Changed?.Invoke(); }
     public void Restart() { Index = 0; Active = true; Changed?.Invoke(); }
 
-    /// <summary>Jumps to the first step on a side, for the User / Helper switch.</summary>
+    private readonly Dictionary<TourSide, int> _last = new() { [TourSide.User] = 0, [TourSide.Helper] = Steps.ToList().FindIndex(s => s.Side == TourSide.Helper) };
+
+    private static string Norm(string path) => path.Split('?', '#')[0].Trim('/').ToLowerInvariant();
+
+    /// <summary>The visitor moved by hand: if that page is a step, the guide follows them.</summary>
+    public void Follow(string relativePath)
+    {
+        var p = Norm(relativePath);
+        var i = Steps.ToList().FindIndex(s => Norm(s.Path) == p);
+        if (i < 0 || i == Index) return;
+        Index = i;
+        _last[Steps[i].Side] = i;
+        Changed?.Invoke();
+    }
+
+    /// <summary>Jumps back to where the visitor last was on a side, for the User / Helper switch.</summary>
     public void GoToSide(TourSide side)
     {
-        var i = Steps.ToList().FindIndex(s => s.Side == side);
-        if (i >= 0) { Index = i; Changed?.Invoke(); }
+        Index = _last[side];
+        Changed?.Invoke();
     }
 }

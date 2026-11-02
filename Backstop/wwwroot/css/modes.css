@@ -544,15 +544,23 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 .login .actions { display: flex; flex-direction: column; gap: .75rem; }
 .login .actions .btn { width: 100%; justify-content: center; }
 
-/* Demo guide: User / Helper switch and the walk-around */
-.demobar { background: var(--surface); border-bottom: var(--line) solid var(--rule); padding: .75rem 1rem; display: flex; flex-wrap: wrap; gap: .75rem 1.5rem; align-items: flex-start; }
+/* Demo guide: User / Helper switch and the walk-around. One compact row; the step words fold away. */
+.demobar { background: var(--surface); border-bottom: var(--line) solid var(--rule); padding: .5rem max(.75rem, env(safe-area-inset-left)); }
 .framed .demobar { display: none; }
+.demobar__row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem .75rem; }
 .demobar__switch { display: inline-flex; border: var(--line) solid var(--navy); border-radius: var(--radius-lg); overflow: hidden; }
-.demobar__side { min-height: 56px; min-width: 7rem; padding: 0 1.25rem; font: inherit; font-weight: 700; background: var(--bg); color: var(--navy); border: 0; cursor: pointer; }
+.demobar__side { min-height: 56px; min-width: 5.5rem; padding: 0 1rem; font: inherit; font-weight: 700; background: var(--bg); color: var(--navy); border: 0; cursor: pointer; }
 .demobar__side[aria-pressed="true"] { background: var(--navy); color: var(--on-navy); }
-.demobar__side:focus-visible, .demobar .btn:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
-.demobar__step { flex: 1 1 22rem; max-width: 40rem; }
-.demobar__step p { margin: 0 0 .25rem; }
+.demobar__side:focus-visible { outline: 3px solid var(--focus); outline-offset: -3px; }
+.demobar__nav { display: flex; gap: .5rem; }
+.demobar__step { margin-top: .25rem; }
+.demobar__step summary { display: flex; flex-wrap: wrap; gap: .25rem .5rem; align-items: center; min-height: 48px; font-weight: 800; cursor: pointer; }
 .demobar__count { font-weight: 600; color: var(--text-2); }
-.demobar__title { font-weight: 800; font-size: 1.15rem; }
-.demobar__actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .5rem; }
+.demobar__step p { margin: 0 0 .25rem; max-width: 40rem; }
+
+.card--spaced { margin-block-start: 1.5rem; }
+.more-toggle { margin-block: 1rem; }
+.actions--helper .btn-primary { flex: 1 1 100
+.card--spaced { margin-block-start: 1.5rem; }
+.more-toggle { margin-block: 1rem; }
+.actions--helper .btn-primary { flex: 1 1 100%; }

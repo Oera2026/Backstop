@@ -2,24 +2,20 @@
 @inject DemoTour Tour
 @inject NavigationManager Nav
 
-@* Demo visitors only: a User / Helper switch and the guided walk-around. *@
+@* Demo visitors only: a User / Helper switch and the guided walk-around. One compact row; the step words open on demand. *@
 <AuthorizeView Roles="@Roles.Demo">
     <div class="demobar" role="region" aria-label="Demo guide">
-        <div class="demobar__switch" role="group" aria-label="View as">
-            <button type="button" class="demobar__side" aria-pressed="@(Side == TourSide.User ? "true" : "false")" @onclick="@(() => Switch(TourSide.User))">User</button>
-            <button type="button" class="demobar__side" aria-pressed="@(Side == TourSide.Helper ? "true" : "false")" @onclick="@(() => Switch(TourSide.Helper))">Helper</button>
-        </div>
-        @if (Tour.Active)
-        {
-            var s = Tour.Current;
-            <div class="demobar__step" role="status">
-                <p class="demobar__count">Step @(Tour.Index + 1) of @DemoTour.Steps.Count</p>
-                <p class="demobar__title">@s.Title</p>
-                <p>@s.Text</p>
-                <div class="demobar__actions">
+        <div class="demobar__row">
+            <div class="demobar__switch" role="group" aria-label="View as">
+                <button type="button" class="demobar__side" aria-pressed="@(Side == TourSide.User ? "true" : "false")" @onclick="@(() => Switch(TourSide.User))">User</button>
+                <button type="button" class="demobar__side" aria-pressed="@(Side == TourSide.Helper ? "true" : "false")" @onclick="@(() => Switch(TourSide.Helper))">Helper</button>
+            </div>
+            @if (Tour.Active)
+            {
+                <div class="demobar__nav">
                     @if (!Tour.IsFirst)
                     {
-                        <button type="button" class="btn btn-quiet" @onclick="Back">Back</button>
+                        <button type="button" class="btn btn-quiet" @onclick="Back" aria-label="Previous step"><Icon Name="arrow-left" /></button>
                     }
                     @if (!Tour.IsLast)
                     {
@@ -29,28 +25,43 @@
                     {
                         <button type="button" class="btn btn-primary" @onclick="Tour.Close">Done</button>
                     }
-                    <button type="button" class="btn btn-text" @onclick="Tour.Close">Close guide</button>
                 </div>
-            </div>
-        }
-        else
+            }
+            else
+            {
+                <button type="button" class="btn btn-quiet" @onclick="Tour.Restart">Start the guide</button>
+            }
+        </div>
+        @if (Tour.Active)
         {
-            <button type="button" class="btn btn-quiet demobar__restart" @onclick="Tour.Restart">Start the guide</button>
+            var s = Tour.Current;
+            <details class="demobar__step" open="@(Tour.IsFirst)">
+                <summary><span class="demobar__count">Step @(Tour.Index + 1) of @DemoTour.Steps.Count:</span> @s.Title</summary>
+                <p>@s.Text</p>
+                <button type="button" class="btn btn-text" @onclick="Tour.Close">Close guide</button>
+            </details>
         }
     </div>
 </AuthorizeView>
 
 @code {
-    private TourSide Side => Nav.ToBaseRelativePath(Nav.Uri).StartsWith("helper", StringComparison.OrdinalIgnoreCase) ? TourSide.Helper : TourSide.User;
+    private string Here => Nav.ToBaseRelativePath(Nav.Uri);
+    private TourSide Side => Here.StartsWith("helper", StringComparison.OrdinalIgnoreCase) ? TourSide.Helper : TourSide.User;
 
     protected override void OnInitialized()
     {
         Tour.Changed += OnChanged;
         Nav.LocationChanged += OnMoved;
+        Tour.Follow(Here);
     }
 
     private void OnChanged() => InvokeAsync(StateHasChanged);
-    private void OnMoved(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e) => InvokeAsync(StateHasChanged);
+
+    private void OnMoved(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        Tour.Follow(Here);
+        InvokeAsync(StateHasChanged);
+    }
 
     private void Go() => Nav.NavigateTo(Tour.Current.Path);
     private void Next() { Tour.Next(); Go(); }
@@ -59,7 +70,7 @@
     private void Switch(TourSide side)
     {
         Tour.GoToSide(side);
-        Nav.NavigateTo(side == TourSide.Helper ? "/helper" : "/");
+        Nav.NavigateTo(Tour.Current.Path);
     }
 
     public void Dispose()
