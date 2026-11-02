@@ -12,12 +12,7 @@ public sealed class MetaAiOptions
     public const string SectionName = "MetaAI";
 
     /// <summary>API key for Meta AI Dev API (META_AI_KEY or MODEL_API_KEY).</summary>
-    public string? ApiKey
-    {
-        get => string.IsNullOrWhiteSpace(_apiKey) ? MetaKeyStore.Key : _apiKey;
-        set => _apiKey = value;
-    }
-    private string? _apiKey;
+    public string? ApiKey { get; set; }
 
     /// <summary>Endpoint URL for Meta AI Dev API completions.</summary>
     public string EndpointUrl { get; set; } = "https://api.meta.ai/v1/chat/completions";
