@@ -446,14 +446,6 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 .dock .bubble { max-width: 92%; font-size: calc(1rem * var(--tx)); padding: .7rem 1rem; }
 .dock .composer { position: static; padding-bottom: .75rem; }
 
-@media (min-width: 960px) {
-  .dock {
-    position: sticky; inset: auto; top: 4.5rem; z-index: auto; align-self: flex-start;
-    flex: 0 0 24rem; height: calc(100vh - 4.5rem); border-left: var(--line) solid var(--border);
-  }
-}
-@media (min-width: 960px) and (max-width: 1279px) { .dock { flex-basis: 20rem; } }
-
 /* ---------- Ask Me cards: a draft, a calendar entry, things it found ---------- */
 .askcard { margin-top: .8rem; padding: .9rem 1rem; background: var(--bg); border: var(--line) solid var(--border); border-radius: var(--radius); display: grid; gap: .5rem; }
 .askcard__title { display: flex; align-items: center; gap: .5rem; margin: 0; font-weight: 800; }
@@ -462,11 +454,17 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 .askfound { margin: .8rem 0 0; padding-left: 1.2rem; display: grid; gap: .3rem; }
 .askfound a { font-weight: 700; }
 
-/* The dock sits beside the page on wide screens. On mid-width screens it floats over the page instead,
-   so the side bar, the page and the dock never squeeze each other. */
-@media (min-width: 960px) and (max-width: 1279px) {
+/* From 960px the dock floats over the page. The page layouts answer to the width of the window, so
+   squeezing them would cut them off behind the dock. Only very wide screens push the page aside. */
+@media (min-width: 960px) {
   .dock {
-    position: fixed; top: 4.5rem; right: 0; bottom: 0; height: auto; z-index: 40;
+    position: fixed; top: 4.5rem; right: 0; bottom: auto; left: auto; height: calc(100vh - 4.5rem); z-index: 40;
     flex: none; width: 24rem; max-width: 90vw; box-shadow: -8px 0 24px rgb(0 0 0 / .18);
+  }
+}
+@media (min-width: 1600px) {
+  .shell > .dock {
+    position: sticky; z-index: auto; align-self: flex-start; flex: 0 0 24rem; box-shadow: none;
+    border-left: var(--line) solid var(--border);
   }
 }
