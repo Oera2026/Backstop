@@ -145,7 +145,7 @@ public sealed class MetaAssistant : IAssistant
             using var response = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cts.Token);
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogError("Meta AI (Ask Me) returned status {StatusCode}", (int)response.StatusCode);
+                _logger.LogError("Meta AI (Ask Me) returned status {StatusCode} for {Url} (model {Model})", (int)response.StatusCode, _options.EndpointUrl, _options.Model);
                 return Fail("Status " + (int)response.StatusCode, MetaFailures.Status(response.StatusCode, response.Headers.RetryAfter?.Delta is { } d ? (int?)Math.Ceiling(d.TotalSeconds) : null, _options));
             }
             if (response.Content.Headers.ContentLength is > MaxResponseBytes) return Fail("Response too large");

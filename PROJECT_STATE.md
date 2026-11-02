@@ -8,7 +8,7 @@ Generated 2026-11-01 from commit `2dc315c` (branch `main`, clean tree, 21 commit
 - **Tech Stack:**
   - Frontend and backend: .NET 10 Blazor Server (interactive server render mode), Razor components, plain CSS (no UI framework), small vanilla JS (`wwwroot/js`).
   - Database: none. All state is in memory (`MailStore`, `MockBackstopApi`). Data is synthetic.
-  - Third-party API: Meta Dev API (`https://api.meta.ai/v1/chat/completions`) with Muse models (default `muse-spark-1.3-contributor`). It is the only permitted external call.
+  - Third-party API: Meta Dev API (`https://api.meta.ai/v1/chat/completions`) with Muse models (default `muse-spark-1.3`). It is the only permitted external call.
   - Deployment: none yet. Local `dotnet run` on port 5106. PWA manifest is present.
   - Tooling noise: root `package.json` holds Astryx (`@astryxdesign/*`, stylex) deps left from a React template. AGENTS.md says they do not apply. Graphify and Impeccable skills are used for code navigation and design critique.
 - **Current Development Phase:** Feature-complete front-end MVP with a mock backend, plus a real Meta AI integration for scam checking and Ask Me. Now in UX polish and hardening (layout critique, phone fixes, motion). Helper permission tiers are partly built (model and API in place, setup UI and enforcement not yet).
@@ -109,7 +109,7 @@ Roughly 4,000 lines of C# in `Services/` and `Models/`, about 100 Razor componen
 - **Environment variables (names only):**
   - `META_AI_KEY` (alternates: `MODEL_API_KEY`, `LLAMA_API_KEY`, `CHECKER_MODEL_API_KEY`)
   - `META_AI_ENDPOINT_URL` (default `https://api.meta.ai/v1/chat/completions`)
-  - `META_AI_MODEL` (default `muse-spark-1.3-contributor`; alternates `LLAMA_MODEL`, `muse-spark-1.3`, `muse-wonder-1.0`)
+  - `META_AI_MODEL` (default `muse-spark-1.3`; alternates `LLAMA_MODEL`, `muse-spark-1.3`, `muse-wonder-1.0`)
   - `META_AI_TIMEOUT_SECONDS` (placeholder in `.env.example`; code default 30)
   - Unused placeholders: `MAIL_PROVIDER_CLIENT_ID`, `MAIL_PROVIDER_CLIENT_SECRET`, `LINK_CHECK_API_KEY`
   - `.env` is read from the repo root (`Backstop/../.env`) at startup and is git-ignored. Config section `MetaAI` is also supported.

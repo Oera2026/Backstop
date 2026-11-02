@@ -17,8 +17,8 @@ public sealed class MetaAiOptions
     /// <summary>Endpoint URL for Meta AI Dev API completions.</summary>
     public string EndpointUrl { get; set; } = "https://api.meta.ai/v1/chat/completions";
 
-    /// <summary>Model identifier (e.g. muse-spark-1.3, muse-wonder, muse-spark).</summary>
-    public string Model { get; set; } = "muse-spark-1.3-contributor";
+    /// <summary>Model identifier (e.g. muse-spark-1.3, muse-wonder-1.0).</summary>
+    public string Model { get; set; } = "muse-spark-1.3";
 
     /// <summary>Timeout in seconds. If exceeded, fail-closed kicks in.</summary>
     public int TimeoutSeconds { get; set; } = 30;
@@ -199,7 +199,7 @@ public sealed class MetaAiScamChecker : ILlamaScamChecker, IMetaScamChecker
             if (!response.IsSuccessStatusCode)
             {
                 // Status only. The body could echo the inspected message, so it is never logged.
-                _logger.LogError("Meta AI API returned non-success code {StatusCode}", (int)response.StatusCode);
+                _logger.LogError("Meta AI API returned non-success code {StatusCode} for {Url} (model {Model})", (int)response.StatusCode, _options.EndpointUrl, _options.Model);
                 var retry = response.Headers.RetryAfter?.Delta is { } d ? (int?)Math.Ceiling(d.TotalSeconds) : null;
                 return FailClosed("Meta AI API returned non-success status " + (int)response.StatusCode,
                     MetaFailures.Status(response.StatusCode, retry, _options));

@@ -23,7 +23,7 @@ Every incoming message goes through four checks, in order: **Rules**, **Meta AI*
 
 ## Meta API integration
 
-Backstop calls the Meta Dev API (`https://api.meta.ai/v1`, Muse models such as `muse-spark-1.3-contributor`) from the server only, for:
+Backstop calls the Meta Dev API (`https://api.meta.ai/v1`, Muse models such as `muse-spark-1.3`) from the server only, for:
 
 - scam checks on messages, conversations and pictures,
 - Ask Me,
