@@ -1,0 +1,88 @@
+@inherits ModeComponentBase
+
+@* Bottom left: your own picture and whether you show as online. Tap it to change either. *@
+@{ var p = Api.GetProfile(Role); }
+<div class="profile" @onkeydown="OnKey">
+    @if (_open)
+    {
+        <button type="button" class="profile__scrim" tabindex="-1" aria-label="Close your profile" @onclick="Close"></button>
+    }
+    <button type="button" class="profile__btn" aria-expanded="@(_open ? "true" : "false")" aria-haspopup="dialog" aria-controls="profile-panel"
+            aria-label="Your profile, @p.Name, @(p.Presence == Presence.Online ? "online" : "hidden")" @onclick="Toggle">
+        <ProfileAvatar Profile="p" ShowStatus="true" />
+        <span class="profile__txt">
+            <span class="profile__name">@p.Name</span>
+            <span class="profile__status">@(p.Presence == Presence.Online ? "Online" : "Hidden")</span>
+        </span>
+    </button>
+
+    @if (_open)
+    {
+        <div id="profile-panel" class="profile__panel" role="dialog" aria-label="Your profile">
+            <div class="profile__head">
+                <ProfileAvatar Profile="p" Large="true" ShowStatus="true" />
+                <div>
+                    <strong>@p.Name</strong>
+                    <PresenceTag Presence="p.Presence" Own="true" />
+                </div>
+            </div>
+
+            <div role="radiogroup" aria-label="Your status" class="profile__opts">
+                <button type="button" role="radio" aria-checked="@(p.Presence == Presence.Online ? "true" : "false")" class="profile__opt @(p.Presence == Presence.Online ? "profile__opt--on" : "")" @onclick="@(() => Api.SetPresence(Role, Presence.Online))">
+                    <span class="presence-dot presence-dot--online"><Icon Name="check" /></span>
+                    <span><strong>Online</strong><span class="profile__hint">People see you are here.</span></span>
+                </button>
+                <button type="button" role="radio" aria-checked="@(p.Presence == Presence.Hidden ? "true" : "false")" class="profile__opt @(p.Presence == Presence.Hidden ? "profile__opt--on" : "")" @onclick="@(() => Api.SetPresence(Role, Presence.Hidden))">
+                    <span class="presence-dot presence-dot--hidden"><Icon Name="minus" /></span>
+                    <span><strong>Hidden</strong><span class="profile__hint">You look offline to others.</span></span>
+                </button>
+            </div>
+
+            <div class="profile__pic-actions">
+                <InputFile id="profile-photo" class="filepick" OnChange="Picked" accept="image/png,image/jpeg,image/webp,image/gif" />
+                <label for="profile-photo" class="btn btn-quiet"><Icon Name="camera" /> @(p.PhotoUrl is null ? "Add a picture" : "Change picture")</label>
+                @if (p.PhotoUrl is not null)
+                {
+                    <button type="button" class="btn btn-text" @onclick="Remove"><Icon Name="cross" /> Take picture away</button>
+                }
+            </div>
+            @if (_error is not null)
+            {
+                <p class="form-error" role="alert">@_error</p>
+            }
+            <button type="button" class="btn btn-primary profile__done" @onclick="Close"><Icon Name="check" /> Done</button>
+        </div>
+    }
+</div>
+
+@code {
+    private const long MaxBytes = 3 * 1024 * 1024;
+
+    [Parameter, EditorRequired] public ProfileRole Role { get; set; }
+
+    private bool _open;
+    private string? _error;
+
+    private void Toggle() { _open = !_open; _error = null; }
+    private void Close() { _open = false; _error = null; }
+    private void OnKey(KeyboardEventArgs e) { if (e.Key == "Escape") Close(); }
+
+    private async Task Picked(InputFileChangeEventArgs e)
+    {
+        _error = null;
+        try
+        {
+            await using var stream = e.File.OpenReadStream(MaxBytes);
+            using var memory = new MemoryStream();
+            await stream.CopyToAsync(memory);
+            if (!Api.SetProfilePhoto(Role, memory.ToArray()))
+                _error = "That file is not a picture we can use. Please choose a photo (PNG, JPEG, WebP or GIF).";
+        }
+        catch (IOException)
+        {
+            _error = "That picture is too big. Please choose a smaller one.";
+        }
+    }
+
+    private void Remove() { Api.RemoveProfilePhoto(Role); _error = null; }
+}

@@ -1,0 +1,12 @@
+@* Online or Offline, as icon, word and colour. Someone who chose Hidden shows as Offline to everyone but themselves. *@
+<span class="badge badge--@(_online ? "safe" : "off")">
+    <Icon Name="@(_online ? "check" : "eye-off")" />
+    <span>@(_online ? "Online" : Own ? "Hidden" : "Offline")</span>
+</span>
+
+@code {
+    [Parameter, EditorRequired] public Presence Presence { get; set; }
+    [Parameter] public bool Own { get; set; }
+
+    private bool _online => Presence == Presence.Online;
+}

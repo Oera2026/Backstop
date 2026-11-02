@@ -14,10 +14,21 @@ else
     <div class="convo">
         <header class="convo__head">
             <a class="btn btn-quiet convo__back" href="messages" aria-label="Back to all messages"><Icon Name="arrow-left" /></a>
-            <span class="pic pic--blue" aria-hidden="true"><Icon Name="@(_person.Role == PersonRole.Helper ? "heart" : "user")" /></span>
+            @if (_person.Id == Backstop.Services.Api.Fixtures.ChatFixtures.TrustedId)
+            {
+                <ProfileAvatar Profile="Api.GetProfile(ProfileRole.Helper)" ShowStatus="true" />
+            }
+            else
+            {
+                <span class="pic pic--blue" aria-hidden="true"><Icon Name="@(_person.Role == PersonRole.Helper ? "heart" : "user")" /></span>
+            }
             <div class="convo__who">
                 <h1>@_person.Name</h1>
                 <p>@_person.Relationship</p>
+                @if (_person.Id == Backstop.Services.Api.Fixtures.ChatFixtures.TrustedId)
+                {
+                    <PresenceTag Presence="Api.GetProfile(ProfileRole.Helper).Presence" />
+                }
             </div>
         </header>
 

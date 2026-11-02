@@ -1,0 +1,23 @@
+@* A person's own picture, or a plain person drawing. The status corner is icon and colour; the word is always written next to it. *@
+<span class="pic pic--blue profile-pic @(Profile.PhotoUrl is null ? "" : "pic--photo") @(Large ? "pic--large" : "")" aria-hidden="true">
+    @if (Profile.PhotoUrl is { } url)
+    {
+        <img src="@url" alt="" />
+    }
+    else
+    {
+        <Icon Name="user" />
+    }
+    @if (ShowStatus)
+    {
+        <span class="presence-dot presence-dot--@Kind"><Icon Name="@(Kind == "online" ? "check" : "minus")" /></span>
+    }
+</span>
+
+@code {
+    [Parameter, EditorRequired] public Profile Profile { get; set; } = default!;
+    [Parameter] public bool Large { get; set; }
+    [Parameter] public bool ShowStatus { get; set; }
+
+    private string Kind => Profile.Presence == Presence.Online ? "online" : "hidden";
+}

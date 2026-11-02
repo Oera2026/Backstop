@@ -25,11 +25,22 @@ else
                 var waiting = _held.Count(h => h.From.Id == p.Id);
                 <li>
                     <button type="button" class="row row--button @(_selected == p.Id ? "row--on" : "")" aria-current="@(_selected == p.Id ? "true" : null)" @onclick="@(() => Pick(p.Id))">
-                        <span class="pic pic--blue" aria-hidden="true"><Icon Name="@(mine ? "user" : p.Role == PersonRole.Helper ? "heart" : "people")" /></span>
+                        @if (mine)
+                        {
+                            <ProfileAvatar Profile="Api.GetProfile(ProfileRole.User)" ShowStatus="true" />
+                        }
+                        else
+                        {
+                            <span class="pic pic--blue" aria-hidden="true"><Icon Name="@(p.Role == PersonRole.Helper ? "heart" : "people")" /></span>
+                        }
                         <span class="row__main">
                             <span class="row__from">@(mine ? UserName : p.Name)</span>
                             <span class="row__subject">@(mine ? "You and " + UserName : p.Relationship)</span>
                         </span>
+                        @if (mine)
+                        {
+                            <PresenceTag Presence="Api.GetProfile(ProfileRole.User).Presence" />
+                        }
                         @if (waiting > 0)
                         {
                             <span class="msgs__tag"><Icon Name="hourglass" /> @waiting to check</span>

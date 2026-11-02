@@ -28,7 +28,14 @@ else
         {
             <li>
                 <a class="row" href="messages/@t.Person.Id">
-                    <span class="pic pic--blue" aria-hidden="true"><Icon Name="@(t.Person.Role == PersonRole.Helper ? "heart" : "user")" /></span>
+                    @if (t.Person.Id == Backstop.Services.Api.Fixtures.ChatFixtures.TrustedId)
+                    {
+                        <ProfileAvatar Profile="Api.GetProfile(ProfileRole.Helper)" ShowStatus="true" />
+                    }
+                    else
+                    {
+                        <span class="pic pic--blue" aria-hidden="true"><Icon Name="@(t.Person.Role == PersonRole.Helper ? "heart" : "user")" /></span>
+                    }
                     <span class="row__main">
                         <span class="row__from">@t.Person.Name</span>
                         <span class="row__subject">@t.Person.Relationship</span>
@@ -37,9 +44,18 @@ else
                             <span class="row__preview">@t.LastText</span>
                         }
                     </span>
-                    @if (t.LastAt is { } at)
+                    @if (t.LastAt is { } at || t.Person.Id == Backstop.Services.Api.Fixtures.ChatFixtures.TrustedId)
                     {
-                        <span class="row__side"><span class="row__time">@Clock.When(at)</span></span>
+                        <span class="row__side">
+                            @if (t.Person.Id == Backstop.Services.Api.Fixtures.ChatFixtures.TrustedId)
+                            {
+                                <PresenceTag Presence="Api.GetProfile(ProfileRole.Helper).Presence" />
+                            }
+                            @if (t.LastAt is { } when)
+                            {
+                                <span class="row__time">@Clock.When(when)</span>
+                            }
+                        </span>
                     }
                 </a>
             </li>

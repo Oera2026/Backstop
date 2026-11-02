@@ -503,3 +503,38 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 .row__call { display: flex; align-items: center; gap: .4rem; color: var(--check); font-weight: 800; font-size: calc(.9rem * var(--tx)); }
 .row__call .icon { width: 1.1rem; height: 1.1rem; }
 .row--static .row__preview { white-space: normal; }
+
+/* Profile: your own picture and status, bottom left */
+.badge--off { background: var(--band); color: var(--text-2); }
+.profile-pic { position: relative; overflow: visible; }
+.profile-pic.pic--photo { overflow: visible; }
+.profile-pic.pic--photo img { border-radius: inherit; }
+.presence-dot { display: inline-grid; place-items: center; flex: none; box-sizing: border-box; width: 1.5rem; height: 1.5rem; border-radius: 50%; border: 2px solid var(--bg); }
+/* Beats the size rules for icons inside rows and picture tiles. */
+.presence-dot .icon { width: .9rem !important; height: .9rem !important; stroke-width: 3; }
+.presence-dot--online { background: var(--safe); color: var(--bg); }
+.presence-dot--hidden { background: var(--text-2); color: var(--bg); }
+.profile-pic > .presence-dot { position: absolute; right: -.4rem; bottom: -.4rem; }
+
+.profile { position: fixed; z-index: 40; left: max(.75rem, env(safe-area-inset-left)); bottom: calc(var(--profile-lift, 4rem) + env(safe-area-inset-bottom) + .75rem); }
+.profile__btn { display: flex; align-items: center; gap: .75rem; padding: .4rem .5rem .4rem .4rem; overflow: visible; min-height: 56px; min-width: 56px; border: var(--line) solid var(--border); border-radius: var(--radius-lg); background: var(--bg); color: var(--text); font: inherit; cursor: pointer; }
+.profile__btn .pic { width: 3rem; height: 3rem; }
+.profile__btn .pic .icon { width: 1.7rem; height: 1.7rem; }
+.profile__txt { display: none; text-align: left; line-height: 1.2; padding-inline-end: .5rem; }
+.profile__name { display: block; font-weight: 800; }
+.profile__status { display: block; font-size: calc(.85rem * var(--tx)); font-weight: 700; color: var(--text-2); }
+.profile__scrim { position: fixed; inset: 0; z-index: -1; background: transparent; border: 0; cursor: default; }
+.profile__panel { position: absolute; left: 0; bottom: calc(100% + .6rem); width: min(21rem, calc(100vw - 1.5rem)); display: grid; gap: 1rem; padding: 1.1rem; background: var(--bg); border: var(--line) solid var(--border); border-radius: var(--radius-lg); }
+.profile__head { display: flex; align-items: center; gap: 1rem; }
+.profile__head > div { display: grid; gap: .3rem; justify-items: start; }
+.profile__opts { display: grid; gap: .5rem; }
+.profile__opt { display: flex; align-items: center; gap: .75rem; min-height: 56px; padding: .5rem .75rem; text-align: left; font: inherit; color: var(--text); background: var(--bg); border: var(--line) solid var(--rule); border-radius: var(--radius); cursor: pointer; }
+.profile__opt--on { background: var(--accent-soft); border-color: var(--navy); }
+.profile__hint { display: block; font-size: calc(.9rem * var(--tx)); color: var(--text-2); font-weight: 600; }
+.profile__pic-actions { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; position: relative; }
+.profile__done { width: 100%; }
+@media (min-width: 960px) {
+  .profile { --profile-lift: 0rem; left: .75rem; bottom: 1rem; }
+  .profile__btn { min-width: 0; width: 14rem; }
+  .profile__txt { display: block; min-width: 0; }
+}

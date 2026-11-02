@@ -89,6 +89,14 @@ public interface IBackstopApi
     HelperPermissions HelperAccess { get; }
     void SetHelperAccess(HelperPermissions access);
 
+    // --- Profile: your own picture and whether you show as online ---
+    Profile GetProfile(ProfileRole role);
+    /// <summary>Hidden looks like offline to the other side.</summary>
+    void SetPresence(ProfileRole role, Presence presence);
+    /// <summary>Returns false (and saves nothing) unless the bytes really are a PNG, JPEG, WebP or GIF under 3 MB.</summary>
+    bool SetProfilePhoto(ProfileRole role, byte[] bytes);
+    void RemoveProfilePhoto(ProfileRole role);
+
     // --- Helper: everything waiting, history, and who the user can message ---
     /// <summary>Everything that needs the helper, worst first, already limited to what this helper may see.</summary>
     HelperDigest GetHelperDigest();

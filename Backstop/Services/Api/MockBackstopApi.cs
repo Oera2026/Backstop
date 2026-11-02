@@ -561,6 +561,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
             _memories = MemoryFixtures.Seed();
             _activity = SeedActivity();
             _help = SeedHelp();
+            ResetProfiles();
             ResetChat();
         }
         Changed?.Invoke();

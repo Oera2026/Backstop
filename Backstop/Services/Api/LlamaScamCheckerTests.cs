@@ -712,6 +712,26 @@ public class LlamaScamCheckerTests
             Console.WriteLine("PASS: Helper digest, safeguarding floor, calls, help requests, history, people and send-as-user.");
         }
 
+        // 12d. Profiles: online / hidden and a picture, one per side, checked by the bytes.
+        {
+            var store = new MailStore();
+            var api = new MockBackstopApi(new MockGuardianService(store), new MockApiOptions());
+            Assert(api.GetProfile(ProfileRole.User).Presence == Presence.Online && api.GetProfile(ProfileRole.Helper).Presence == Presence.Online, "Everyone starts online");
+            api.SetPresence(ProfileRole.Helper, Presence.Hidden);
+            Assert(api.GetProfile(ProfileRole.Helper).Presence == Presence.Hidden && api.GetProfile(ProfileRole.User).Presence == Presence.Online, "Hidden is per person");
+            Assert(!api.SetProfilePhoto(ProfileRole.User, [1, 2, 3]) && !api.SetProfilePhoto(ProfileRole.User, System.Text.Encoding.UTF8.GetBytes("<svg xmlns='http://www.w3.org/2000/svg'><script>1</script></svg>")), "Junk and SVG are refused as pictures");
+            Assert(api.GetProfile(ProfileRole.User).PhotoUrl is null, "A refused picture saves nothing");
+            byte[] png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 0, 0, 0, 0, 0];
+            Assert(api.SetProfilePhoto(ProfileRole.User, png) && api.GetProfile(ProfileRole.User).PhotoUrl is not null && api.GetPhoto("profile-user") is not null, "A real picture is saved and served");
+            Assert(api.GetProfile(ProfileRole.Helper).PhotoUrl is null, "A picture belongs to one side only");
+            api.RemoveProfilePhoto(ProfileRole.User);
+            Assert(api.GetPhoto("profile-user") is null, "A picture can be taken away");
+            api.SetPresence(ProfileRole.User, Presence.Hidden);
+            api.ResetDemo();
+            Assert(api.GetProfile(ProfileRole.User).Presence == Presence.Online && api.GetProfile(ProfileRole.Helper).Presence == Presence.Online, "Reset puts everyone back online");
+            Console.WriteLine("PASS: Profile presence and pictures.");
+        }
+
         // 13. Explain: the AI does the explaining; local checks are a floor; failure shows a plain error, never a made-up answer.
         {
             DocumentReading Good(bool suspicious = false) => new(true, "letter", "Council letter", "A letter about your discount.", "Reply by 14 November",
