@@ -934,6 +934,20 @@ public class LlamaScamCheckerTests
             Console.WriteLine("PASS: No invented confidence, link chains or timings; seeded held mail is unscanned.");
         }
 
+        // 16. META_AI_TIMEOUT_SECONDS is read (it was documented but ignored); the nested form wins; none set keeps the default.
+        {
+            static MetaAiOptions Load(Dictionary<string, string?> v) => MetaAiOptions.Load(new ConfigurationBuilder().AddInMemoryCollection(v).Build());
+            var none = Load(new());
+            Assert(none.TimeoutSeconds == 30, "No timeout set: default 30");
+            var env = Load(new() { ["META_AI_TIMEOUT_SECONDS"] = "45" });
+            Assert(env.TimeoutSeconds == 45, "META_AI_TIMEOUT_SECONDS is read");
+            var both = Load(new() { ["META_AI_TIMEOUT_SECONDS"] = "45", ["MetaAI:TimeoutSeconds"] = "7" });
+            Assert(both.TimeoutSeconds == 7, "The nested setting wins");
+            Assert(Load(new() { ["META_AI_TIMEOUT_SECONDS"] = "99999" }).TimeoutSeconds == 300 && Load(new() { ["META_AI_TIMEOUT_SECONDS"] = "abc" }).TimeoutSeconds == 30 && Load(new() { ["META_AI_TIMEOUT_SECONDS"] = "" }).TimeoutSeconds == 30,
+                "A huge value is capped; junk or empty keeps the default");
+            Console.WriteLine("PASS: META_AI_TIMEOUT_SECONDS is read and bounded.");
+        }
+
         Console.WriteLine("\nALL TESTS PASSED SUCCESSFULLY.");
     }
 

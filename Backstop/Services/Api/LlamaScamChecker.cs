@@ -60,6 +60,10 @@ public sealed class MetaAiOptions
         var endpoint = config["META_AI_ENDPOINT_URL"];
         if (!string.IsNullOrWhiteSpace(endpoint)) options.EndpointUrl = endpoint;
 
+        // The documented setting. The nested MetaAI:TimeoutSeconds form still works and wins if both are set.
+        if (string.IsNullOrWhiteSpace(config[$"{SectionName}:TimeoutSeconds"]) && int.TryParse(config["META_AI_TIMEOUT_SECONDS"]?.Trim(), out var secs) && secs > 0)
+            options.TimeoutSeconds = Math.Clamp(secs, 2, 300);
+
         var model = config["META_AI_MODEL"];
         if (!string.IsNullOrWhiteSpace(model)) options.Model = model.Trim();
         return options;

@@ -66,13 +66,25 @@ static void Resilience(Microsoft.Extensions.Http.Resilience.HttpStandardResilien
     o.CircuitBreaker.FailureRatio = 0.6;
     o.CircuitBreaker.BreakDuration = TimeSpan.FromSeconds(20);
 }
+// Stories are one long reply (about 40 seconds with painted scenes), so they get longer limits than the other Meta calls.
+// One retry is the least the handler allows; it cannot finish inside the total, so a slow story is not asked for twice.
+static void StoryResilience(Microsoft.Extensions.Http.Resilience.HttpStandardResilienceOptions o)
+{
+    o.Retry.MaxRetryAttempts = 1;
+    o.AttemptTimeout.Timeout = TimeSpan.FromSeconds(110);
+    o.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(120);
+    o.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(230);
+    o.CircuitBreaker.MinimumThroughput = 5;
+    o.CircuitBreaker.FailureRatio = 0.6;
+    o.CircuitBreaker.BreakDuration = TimeSpan.FromSeconds(20);
+}
 // One shared cap on calls to Meta (single instance, so in memory is enough).
 builder.Services.AddSingleton<MetaCallGuard>();
 builder.Services.AddHttpClient<MetaAiScamChecker>().ConfigurePrimaryHttpMessageHandler(NoRedirectHandler).AddStandardResilienceHandler(Resilience);
 // Ask Me: the same Meta endpoint, the same rules.
 builder.Services.AddHttpClient<MetaAssistant>().ConfigurePrimaryHttpMessageHandler(NoRedirectHandler).AddStandardResilienceHandler(Resilience);
 // Social stories: the same Meta endpoint, the same rules.
-builder.Services.AddHttpClient<MetaStoryWriter>().ConfigurePrimaryHttpMessageHandler(NoRedirectHandler).AddStandardResilienceHandler(Resilience);
+builder.Services.AddHttpClient<MetaStoryWriter>().ConfigurePrimaryHttpMessageHandler(NoRedirectHandler).AddStandardResilienceHandler(StoryResilience);
 // Explain and questions about a document: the same Meta endpoint, the same rules.
 builder.Services.AddHttpClient<MetaDocumentExplainer>().ConfigurePrimaryHttpMessageHandler(NoRedirectHandler).AddStandardResilienceHandler(Resilience);
 

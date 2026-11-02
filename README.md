@@ -59,7 +59,7 @@ Set these as environment variables (locally in the untracked `.env`, in producti
 |---|---|
 | `PORT` | Port to listen on. Defaults to 5106. |
 | `META_AI_KEY` | Meta Dev API key. |
-| `META_AI_ENDPOINT_URL`, `META_AI_MODEL`, `META_AI_TIMEOUT_SECONDS` | Meta endpoint (must be on `https://api.meta.ai`), model and timeout. |
+| `META_AI_ENDPOINT_URL`, `META_AI_MODEL`, `META_AI_TIMEOUT_SECONDS` | Meta endpoint (must be on `https://api.meta.ai`), model and timeout in seconds. The timeout applies to checks and chat; social stories always wait at least 100 seconds, because a story with painted scenes takes about 40. |
 | `MetaAI__MaxCallsPerMinute` | Cap on calls to Meta per minute. Default 40. |
 | `META_AI_MAX_CALLS_PER_DAY` | Cap on calls to Meta per UTC day for the whole app. Default 1500. A restart resets the count. |
 | `META_AI_MAX_CALLS_PER_IP_PER_MINUTE` | Cap on calls to Meta per visitor per minute. Default 15. |

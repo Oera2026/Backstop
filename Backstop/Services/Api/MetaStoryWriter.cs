@@ -19,6 +19,9 @@ public sealed class MetaStoryWriter : IStoryWriter
     private const int MaxThings = 3;
     private const int MaxResponseBytes = 64 * 1024;
 
+    /// <summary>A story with scenes is one long reply (about 40 seconds in testing). It waits at least this long, so a short general timeout cannot cut it off.</summary>
+    private const int MinStorySeconds = 100;
+
     private readonly HttpClient _http;
     private readonly ILogger<MetaStoryWriter> _logger;
     private readonly MetaAiOptions _options;
@@ -78,7 +81,7 @@ public sealed class MetaStoryWriter : IStoryWriter
         }
 
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        cts.CancelAfter(TimeSpan.FromSeconds(Math.Max(2, _options.TimeoutSeconds)));
+        cts.CancelAfter(TimeSpan.FromSeconds(Math.Max(MinStorySeconds, _options.TimeoutSeconds)));
 
         try
         {
@@ -125,7 +128,12 @@ public sealed class MetaStoryWriter : IStoryWriter
                 if (ms.Length + n > MaxResponseBytes) return Fail(MetaFailures.BadReply("Response too large", _options));
                 ms.Write(buffer, 0, n);
             }
-            return Parse(Encoding.UTF8.GetString(ms.ToArray()));
+            var draft = Parse(Encoding.UTF8.GetString(ms.ToArray()));
+            // A page with no valid scene shows a plain picture with its words. Say so in the log (counts only, no story text).
+            var plain = draft.Pages.Count(p => p.Scene is not { IsDrawable: true });
+            if (draft.Success && plain > 0)
+                _logger.LogWarning("Story written, but {Plain} of {Pages} pages had no usable scene and will show a plain picture.", plain, draft.Pages.Count);
+            return draft;
         }
         catch (Polly.CircuitBreaker.BrokenCircuitException) { return Fail(MetaFailures.CircuitOpen(_options)); }
         catch (Polly.Timeout.TimeoutRejectedException) { return Fail(MetaFailures.Timeout(_options)); }
