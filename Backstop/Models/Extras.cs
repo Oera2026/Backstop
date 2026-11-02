@@ -19,6 +19,8 @@ public sealed class SentMessage
     public required string Subject { get; init; }
     public required string Body { get; init; }
     public DateTimeOffset SentAt { get; init; } = DateTimeOffset.Now;
+    /// <summary>Set when a helper with administrator access wrote it. Shown to the user in Sent.</summary>
+    public string? SentBy { get; init; }
 }
 
 public sealed class CalendarEvent

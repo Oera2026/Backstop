@@ -15,7 +15,7 @@ else
     <PageTitle>@s.Subject – Backstop</PageTitle>
     <article class="reading" aria-labelledby="subject">
         <h1 id="subject">@s.Subject</h1>
-        <p class="reading__from">To <strong>@(string.IsNullOrEmpty(s.ToName) ? s.ToAddress : s.ToName)</strong> (@s.ToAddress)<br />@Clock.Long(s.SentAt)</p>
+        <p class="reading__from">To <strong>@(string.IsNullOrEmpty(s.ToName) ? s.ToAddress : s.ToName)</strong> (@s.ToAddress)<br />@(s.SentBy is null ? "" : $"Sent by {s.SentBy}. ")@Clock.Long(s.SentAt)</p>
         <div class="reading__body">
             @foreach (var line in s.Body.Split('\n'))
             {

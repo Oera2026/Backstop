@@ -189,6 +189,7 @@
     {
         (MessageState.Blocked, null) => "The checker blocked this automatically. The user never saw it.",
         (MessageState.Blocked, _) => "Done. You blocked this message. The user will never see it.",
+        (MessageState.Cleared, null) => "The checker cleared this message. The user can read it.",
         _ => "Done. You approved this message. It is now in the user's inbox.",
     };
 

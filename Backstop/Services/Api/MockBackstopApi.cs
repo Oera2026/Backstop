@@ -28,6 +28,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
     private readonly Dictionary<string, string> _savedFrom = []; // guide or explanation id -> memory id
     private List<MemoryCard> _memories = MemoryFixtures.Seed();
     private List<ActivityEntry> _activity = SeedActivity();
+    private List<HelpRequest> _help = SeedHelp();
 
     private const int MaxCheckLength = 20000;
     private const int MaxExplainImageBytes = 8 * 1024 * 1024;
@@ -273,6 +274,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         {
             var title = _guides.TryGetValue(guideId, out var g) ? g.Guide.Title : "a task";
             Log("hand", $"{User} is stuck on step {stepNumber} of \"{title}\" and would like your help.");
+            _help.Add(new HelpRequest(NewId("h"), DateTimeOffset.Now, title, stepNumber, false));
         }
         Changed?.Invoke();
     }
@@ -450,9 +452,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         List<ReviewItem> stories;
         lock (_gate)
         {
-            checks = guardian.Allows(HelperCapability.SeeCheckRequests)
-                ? _checks.Values.Where(c => c.Result.Status == ReviewStatus.Held).Select(FromCheck).ToList()
-                : [];
+            checks = _checks.Values.Where(c => c.Result.Status == ReviewStatus.Held && CanSee(c)).Select(FromCheck).ToList();
             stories = _stories.Values.Where(x => x.Story.Status == StoryStatus.Held).Select(FromStory).ToList();
         }
         return inbox.Concat(checks).Concat(stories).OrderByDescending(i => i.At).ToList();
@@ -463,7 +463,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         await Wait(400, ct);
         lock (_gate)
         {
-            if (_checks.TryGetValue(id, out var c)) return c.Result.Status == ReviewStatus.Held && guardian.Allows(HelperCapability.SeeCheckRequests) ? FromCheck(c) : null;
+            if (_checks.TryGetValue(id, out var c)) return c.Result.Status == ReviewStatus.Held && CanSee(c) ? FromCheck(c) : null;
             if (_stories.TryGetValue(id, out var st)) return st.Story.Status == StoryStatus.Held ? FromStory(st) : null;
         }
         var m = guardian.Get(id);
@@ -479,7 +479,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         {
             if (_checks.TryGetValue(id, out var c))
             {
-                if (!guardian.Allows(HelperCapability.SeeCheckRequests)) throw new BackstopApiException($"{User} has not allowed you to see their checks.");
+                if (!CanSee(c)) throw new BackstopApiException($"{User} has not allowed you to see their checks.");
                 // Only a held item can be decided, and Blocked is final.
                 if (c.Result.Status != ReviewStatus.Held) throw new BackstopApiException("This has already been decided.");
                 var r = decision switch
@@ -560,6 +560,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
             _checks.Clear(); _stories.Clear(); _guides.Clear(); _explanations.Clear(); _photos.Clear(); _savedFrom.Clear();
             _memories = MemoryFixtures.Seed();
             _activity = SeedActivity();
+            _help = SeedHelp();
             ResetChat();
         }
         Changed?.Invoke();
@@ -669,6 +670,9 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         m.Confidence == Confidence.High ? Verdict.DontReply : Verdict.BeCareful,
         m.Flags.Select(f => new RiskFlag(f.Title, f.Icon, f.Title, f.Explanation)).ToList(),
         m.Summary, m.CallRequested, m.ReceivedAt);
+
+    // The same "stuck" request the seeded activity mentions, so it can be answered.
+    private static List<HelpRequest> SeedHelp() => [new HelpRequest("h-seed", DateTimeOffset.Now.AddHours(-5), "Setting the washing machine", 4, false)];
 
     private static List<ActivityEntry> SeedActivity()
     {

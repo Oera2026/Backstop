@@ -15,12 +15,15 @@ public sealed partial class MockBackstopApi
         public string Text { get; } = text;
         public DateTimeOffset At { get; set; } = at;
         public ChatState State { get; set; } = state;
+        /// <summary>A helper decided this message (so it shows in their history).</summary>
+        public bool Reviewed { get; set; }
         public Verdict Verdict { get; set; } = Verdict.LooksSafe;
         public IReadOnlyList<RiskFlag> Flags { get; set; } = [];
         public string Reason { get; set; } = "";
     }
 
     private List<StoredChat> _chat = SeedChat();
+    private List<ChatPerson> _people = [.. ChatFixtures.People];
     private readonly Dictionary<string, int> _chatSent = []; // how many messages the user has sent each person
 
     private static List<StoredChat> SeedChat()
@@ -41,11 +44,17 @@ public sealed partial class MockBackstopApi
     private void ResetChat()
     {
         _chat = SeedChat();
+        _people = [.. ChatFixtures.People];
         _chatSent.Clear();
         guardian.SetAccess(HelperPermissions.Default);
     }
 
-    public IReadOnlyList<ChatPerson> ChatPeople => ChatFixtures.People;
+    public IReadOnlyList<ChatPerson> ChatPeople { get { lock (_gate) return _people.ToList(); } }
+
+    private ChatPerson? FindPerson(string id)
+    {
+        lock (_gate) return _people.FirstOrDefault(p => p.Id == id);
+    }
 
     public HelperPermissions HelperAccess => guardian.Access;
 
@@ -61,7 +70,7 @@ public sealed partial class MockBackstopApi
     {
         await Wait(300, ct);
         lock (_gate)
-            return ChatFixtures.People
+            return _people
                 .Select(p =>
                 {
                     var last = _chat.Where(m => m.PersonId == p.Id && m.State == ChatState.Delivered).MaxBy(m => m.At);
@@ -74,7 +83,7 @@ public sealed partial class MockBackstopApi
     public async Task<IReadOnlyList<ChatMessage>> GetChatMessagesAsync(string personId, CancellationToken ct = default)
     {
         await Wait(300, ct);
-        if (ChatFixtures.Find(personId) is null) throw new BackstopApiException("You can only message people on your list.");
+        if (FindPerson(personId) is null) throw new BackstopApiException("You can only message people on your list.");
         lock (_gate) return Delivered(personId);
     }
 
@@ -87,7 +96,7 @@ public sealed partial class MockBackstopApi
     public async Task<ChatMessage> SendChatAsync(string personId, string text, CancellationToken ct = default)
     {
         await Wait(300, ct);
-        var person = ChatFixtures.Find(personId) ?? throw new BackstopApiException("You can only message people on your list.");
+        var person = FindPerson(personId) ?? throw new BackstopApiException("You can only message people on your list.");
         var clean = Clean(text);
 
         StoredChat stored;
@@ -110,7 +119,9 @@ public sealed partial class MockBackstopApi
         try
         {
             await Task.Delay(2500);
-            await ReceiveChatAsync(person, ChatFixtures.Reply(person.Id, count), CancellationToken.None);
+            var reply = ChatFixtures.Reply(person.Id, count);
+            if (reply.Length == 0) return; // a person the helper added has no made-up replies
+            await ReceiveChatAsync(person, reply, CancellationToken.None);
         }
         catch (Exception)
         {
@@ -195,9 +206,9 @@ public sealed partial class MockBackstopApi
         await Wait(300, ct);
         lock (_gate)
             return _chat
-                .Where(m => !m.FromMe && m.State == ChatState.Held && ChatFixtures.Find(m.PersonId) is not null)
+                .Where(m => !m.FromMe && m.State == ChatState.Held && FindPerson(m.PersonId) is not null)
                 .OrderByDescending(m => m.At)
-                .Select(m => new HeldChat(m.Id, ChatFixtures.Find(m.PersonId)!, Defang.ForUser(m.Text), m.Verdict, m.Flags, m.Reason, m.At))
+                .Select(m => new HeldChat(m.Id, FindPerson(m.PersonId)!, Defang.ForUser(m.Text), m.Verdict, m.Flags, m.Reason, m.At))
                 .ToList();
     }
 
@@ -208,7 +219,8 @@ public sealed partial class MockBackstopApi
         {
             var m = _chat.FirstOrDefault(x => x.Id == id && x.State == ChatState.Held)
                 ?? throw new BackstopApiException("That message has already been decided.");
-            var who = ChatFixtures.Find(m.PersonId)?.Name ?? "someone";
+            var who = FindPerson(m.PersonId)?.Name ?? "someone";
+            m.Reviewed = decision is ReviewDecision.Release or ReviewDecision.Block;
             switch (decision)
             {
                 case ReviewDecision.Release:
@@ -243,7 +255,7 @@ public sealed partial class MockBackstopApi
     public async Task<IReadOnlyList<ChatMessage>> GetChatLogAsync(string personId, CancellationToken ct = default)
     {
         await Wait(300, ct);
-        if (ChatFixtures.Find(personId) is null) throw new BackstopApiException("That person is not on the list.");
+        if (FindPerson(personId) is null) throw new BackstopApiException("That person is not on the list.");
         lock (_gate)
         {
             // The helper's own chat with the user is always theirs to read. Everyone else's needs the permission.

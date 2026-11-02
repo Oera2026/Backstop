@@ -39,7 +39,7 @@ public sealed partial class MockBackstopApi
 
         // Someone may be in danger, or the assistant wants a human: the helper is always told.
         var told = localRisk || reply.NeedsHuman || reply.AtRisk;
-        if (told) Escalate(text, atRisk: localRisk || reply.AtRisk);
+        if (told) Escalate(text, atRisk: localRisk || reply.AtRisk, history);
 
         string answer;
         if (reply.Success)
@@ -198,15 +198,17 @@ public sealed partial class MockBackstopApi
         e is null || e.Date < today || e.Date > today.AddYears(2) ? null : new AskEvent(e.Title, e.Date, e.Time, e.Place);
 
     /// <summary>Puts the conversation in the helper's queue, held, so a person looks at it.</summary>
-    private void Escalate(string text, bool atRisk)
+    private void Escalate(string text, bool atRisk, IReadOnlyList<AskTurn> history)
     {
+        // The helper reads the last few turns, not only the final message, so they can see how it got here.
+        var original = string.Join("\n", history.TakeLast(6).Select(t => $"{(t.FromUser ? User : "Ask Me")}: {t.Text}").Append($"{User}: {text}"));
         var flag = atRisk
             ? MockRiskRules.AllFlags.First(f => f.Id == "at-risk")
             : new RiskFlag("review-needed", "hourglass", "Needs helper check", "Your helper will take a look at this.");
         var result = new CheckResult(NewId("chk"), CheckKind.Message, Verdict.BeCareful,
             atRisk ? "Someone may need help." : "Ask Me was not sure how to help.",
             [flag], Defang.ForUser(text), [], null, ReviewStatus.Held, false, DateTimeOffset.Now);
-        lock (_gate) _checks[result.Id] = new(result, text, DateTimeOffset.Now);
+        lock (_gate) _checks[result.Id] = new(result, original, DateTimeOffset.Now);
         Changed?.Invoke();
     }
 }

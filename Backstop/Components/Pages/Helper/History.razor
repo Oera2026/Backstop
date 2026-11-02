@@ -1,0 +1,141 @@
+@page "/helper/history"
+@layout HelperLayout
+@inherits ModeComponentBase
+
+<PageTitle>History – Backstop Helper</PageTitle>
+
+<h1>History</h1>
+
+@{ var decisions = Api.GetDecisionHistory(); }
+
+<h2>What you decided</h2>
+@if (decisions.Count == 0)
+{
+    <p class="empty">Nothing decided yet.</p>
+}
+else
+{
+    <ul class="rows rows--compact" aria-label="Decisions">
+        @foreach (var d in decisions)
+        {
+            <li>
+                <div class="row row--static">
+                    <span class="pic @(d.Tone == "block" ? "pic--block" : d.Tone == "safe" ? "pic--safe" : "pic--check")" aria-hidden="true"><Icon Name="@d.Icon" /></span>
+                    <span class="row__main">
+                        <span class="row__from">@d.Title</span>
+                        <span class="row__subject">@d.Outcome</span>
+                    </span>
+                    <span class="row__side"><span class="row__time">@Clock.When(d.At)</span></span>
+                </div>
+            </li>
+        }
+    </ul>
+}
+
+@if (Guardian.Allows(HelperCapability.SeeClearedMail))
+{
+    var cleared = Guardian.GetCleared();
+    <h2>Mail @UserName can read</h2>
+    <ul class="rows rows--compact" aria-label="Mail that was cleared">
+        @foreach (var m in _showAll ? cleared : cleared.Take(8).ToList())
+        {
+            <li>
+                <a class="row" href="helper/@m.Id">
+                    <span class="pic pic--safe" aria-hidden="true"><Icon Name="mail" /></span>
+                    <span class="row__main">
+                        <span class="row__from">@m.FromName</span>
+                        <span class="row__subject">@m.Subject</span>
+                    </span>
+                    <span class="row__side"><span class="row__time">@Clock.When(m.ReceivedAt)</span></span>
+                </a>
+            </li>
+        }
+    </ul>
+    @if (cleared.Count > 8)
+    {
+        <p class="actions"><button type="button" class="btn btn-quiet" @onclick="@(() => _showAll = !_showAll)"><Icon Name="@(_showAll ? "minus" : "plus")" /> @(_showAll ? "Show fewer" : $"Show all {cleared.Count}")</button></p>
+    }
+}
+
+@if (Guardian.Allows(HelperCapability.SeeFullActivity))
+{
+    var sent = Guardian.GetUserSent();
+    var contacts = Guardian.GetUserContacts();
+    var events = Guardian.GetUserEvents();
+
+    <h2>Everything @UserName did</h2>
+    <ActivityLog Entries="_activity" Heading="" />
+
+    <h2>Sent by @UserName</h2>
+    @if (sent.Count == 0) { <p class="empty">Nothing sent yet.</p> }
+    else
+    {
+        <ul class="rows rows--compact" aria-label="Sent mail">
+            @foreach (var s in sent)
+            {
+                <li>
+                    <div class="row row--static">
+                        <span class="pic pic--blue" aria-hidden="true"><Icon Name="send" /></span>
+                        <span class="row__main">
+                            <span class="row__from">To @(string.IsNullOrEmpty(s.ToName) ? s.ToAddress : s.ToName)</span>
+                            <span class="row__subject">@s.Subject</span>
+                            @if (s.SentBy is not null) { <span class="row__preview">Sent by @s.SentBy</span> }
+                        </span>
+                        <span class="row__side"><span class="row__time">@Clock.When(s.SentAt)</span></span>
+                    </div>
+                </li>
+            }
+        </ul>
+    }
+
+    <h2>@(UserName)'s contacts</h2>
+    <ul class="rows rows--compact" aria-label="Contacts">
+        @foreach (var c in contacts)
+        {
+            <li>
+                <div class="row row--static">
+                    <span class="pic pic--blue" aria-hidden="true"><Icon Name="user" /></span>
+                    <span class="row__main">
+                        <span class="row__from">@c.Name</span>
+                        <span class="row__subject">@c.Relationship</span>
+                    </span>
+                </div>
+            </li>
+        }
+    </ul>
+
+    <h2>@(UserName)'s calendar</h2>
+    @if (events.Count == 0) { <p class="empty">Nothing in the calendar.</p> }
+    else
+    {
+        <ul class="rows rows--compact" aria-label="Calendar">
+            @foreach (var e in events)
+            {
+                <li>
+                    <div class="row row--static">
+                        <span class="pic pic--blue" aria-hidden="true"><Icon Name="calendar" /></span>
+                        <span class="row__main">
+                            <span class="row__from">@e.Title</span>
+                            <span class="row__subject">@e.Date.ToString("ddd d MMM")@(e.Time is { } t ? $", {t:h:mm tt}" : "")@(e.Place.Length > 0 ? $", {e.Place}" : "")</span>
+                        </span>
+                    </div>
+                </li>
+            }
+        </ul>
+    }
+}
+
+@code {
+    private IReadOnlyList<ActivityEntry> _activity = [];
+    private bool _showAll;
+
+    protected override Task OnInitializedAsync() => Load();
+    protected override Task OnApiChangedAsync() => Load();
+    protected override Task OnStoreChangedAsync() => Load();
+
+    private async Task Load()
+    {
+        try { _activity = await Api.GetActivityAsync(); }
+        catch (BackstopApiException) { /* keep what is on screen */ }
+    }
+}

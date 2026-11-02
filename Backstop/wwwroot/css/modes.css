@@ -394,6 +394,9 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 /* Helper: people on the left, the open chat on the right */
 .msgs { display: grid; gap: 1.5rem; margin-top: 1rem; }
 @media (min-width: 900px) { .msgs { grid-template-columns: 22rem 1fr; align-items: start; } }
+/* Next to a side bar the page is narrower, so the list sits above the chat until there is real room. */
+@media (min-width: 900px) and (max-width: 1399px) { .shell .msgs { grid-template-columns: 1fr; } }
+.people .field { margin-block: .75rem; }
 .msgs__list { list-style: none; margin: 0; padding: 0; display: grid; gap: .5rem; }
 .msgs__list .row { min-height: 72px; }
 .row--button { width: 100%; text-align: left; font: inherit; cursor: pointer; }
@@ -491,3 +494,12 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 .evidence__who code { overflow-wrap: anywhere; }
 .evidence__read { margin: 0 0 1rem; }
 .evidence__read .btn { padding-inline: 0; min-height: 48px; }
+
+/* Waiting page: each row says what kind of thing it is */
+.group-h { display: flex; align-items: center; gap: .6rem; margin: 2rem 0 .75rem; }
+.group-h .icon { width: 1.5rem; height: 1.5rem; color: var(--navy); }
+.group-count { min-width: 1.8em; padding: 0 .5em; border-radius: 999px; background: var(--band); color: var(--navy); font-size: .9rem; font-weight: 800; text-align: center; line-height: 1.7; }
+.row__kind { font-size: calc(.85rem * var(--tx)); font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--text-2); }
+.row__call { display: flex; align-items: center; gap: .4rem; color: var(--check); font-weight: 800; font-size: calc(.9rem * var(--tx)); }
+.row__call .icon { width: 1.1rem; height: 1.1rem; }
+.row--static .row__preview { white-space: normal; }

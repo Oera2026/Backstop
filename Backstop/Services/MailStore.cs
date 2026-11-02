@@ -150,6 +150,12 @@ public sealed class MailStore
         lock (_gate) return _notices.Where(n => !n.Seen).OrderByDescending(n => n.At).ToList();
     }
 
+    /// <summary>Notices the helper already dismissed, newest first.</summary>
+    public IReadOnlyList<HelperNotice> SeenNotices()
+    {
+        lock (_gate) return _notices.Where(n => n.Seen).OrderByDescending(n => n.At).ToList();
+    }
+
     /// <summary>True when the address is a contact or has been written to before.</summary>
     public bool IsKnownRecipient(string address)
     {

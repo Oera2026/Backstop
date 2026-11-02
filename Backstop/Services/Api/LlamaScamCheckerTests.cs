@@ -654,6 +654,64 @@ public class LlamaScamCheckerTests
             Console.WriteLine("PASS: Unchecked mail stays held and is rescanned; helper access is enforced in the service.");
         }
 
+        // 12c. Helper work: the Waiting digest, safeguarding floor, calls, help requests, history, people, send-as-user.
+        {
+            var store = new MailStore();
+            var mail = new MockMailService(store, new SwitchMeta { Answer = new MetaScamAnalysis(Verdict.LooksSafe, "Fine.", [], true) });
+            var guardian = new MockGuardianService(store);
+            var api = new MockBackstopApi(guardian, new MockApiOptions(), null, new StubAssistant(_ => new AssistantReply("", false)), null, mail);
+
+            var scam = (await mail.ReceiveAsync("payment-redirect", false))!;
+            Assert(scam.State == MessageState.Held, "Scenario mail is held for the helper");
+            var d = api.GetHelperDigest();
+            Assert(d.In(HelperGroup.Decide).Any(i => i.Kind == HelperItemKind.Mail && i.Id == scam.Id) && d.WaitingCount >= 1, "Held mail shows in To decide and in the count");
+
+            // A call promise moves it to Calls, and "I called" moves it back.
+            guardian.CallFirst(scam.Id);
+            Assert(api.GetHelperDigest().In(HelperGroup.Calls).Any(i => i.Id == scam.Id && i.CallRequested), "Call them first puts it under Calls");
+            api.MarkCalled(scam.Id);
+            Assert(api.GetHelperDigest().In(HelperGroup.Decide).Any(i => i.Id == scam.Id), "After the call it is back in To decide, still held");
+
+            // Safeguarding is the floor: the lowest tier still gets it, with the conversation.
+            guardian.SetAccess(new HelperPermissions(HelperTier.Minimal));
+            await api.AskAsync([new AskTurn(true, "Hello"), new AskTurn(false, "Hi Margaret")], "I am scared of him and he hurt me");
+            var urgent = api.GetHelperDigest().In(HelperGroup.Urgent);
+            Assert(urgent.Count == 1 && urgent[0].Kind == HelperItemKind.Safeguarding && urgent[0].Preview.Contains("Hi Margaret"), "Minimal still gets safeguarding alerts, with the chat");
+            Assert((await api.GetReviewQueueAsync()).Any(i => i.Source == ReviewSource.Check), "The escalation is open to the helper at every tier");
+
+            // Stuck requests wait until the helper says they helped.
+            await api.AskForHelpAsync("no-such-guide", 4);
+            var helps = api.GetHelperDigest().In(HelperGroup.Decide).Where(i => i.Kind == HelperItemKind.Help).ToList();
+            Assert(helps.Count == 2, "The seeded demo request and the new one both wait");
+            foreach (var h in helps) api.ResolveHelpRequest(h.Id);
+            Assert(api.GetHelperDigest().Items.All(i => i.Kind != HelperItemKind.Help) && api.GetDecisionHistory().Any(h => h.Outcome == "You helped"), "A help request is cleared and kept in history");
+
+            // Decisions are kept without a cap.
+            guardian.SetAccess(HelperPermissions.Default);
+            guardian.Block(scam.Id);
+            Assert(api.GetDecisionHistory().Any(h => h.Outcome == "You blocked it"), "Mail decisions show in history");
+
+            // The list of people the user can message.
+            var before = api.ChatPeople.Count;
+            var added = api.AddChatPerson("Ruth", "Friend from church");
+            Assert(api.ChatPeople.Count == before + 1, "A person can be added");
+            Assert(Throws(() => api.AddChatPerson("ruth", "x")), "A duplicate name is refused");
+            Assert(Throws(() => api.AddChatPerson("  ", "x")) && Throws(() => api.RemoveChatPerson("p-priya")), "An empty name and removing the helper are refused");
+            api.RemoveChatPerson(added.Id);
+            Assert(api.ChatPeople.Count == before, "A person can be taken off");
+
+            // Send as user: Administrator only, marked as sent by the helper, bad addresses refused.
+            var ok = guardian.SendAsUser("friend@example.org", "Hello", "Hi there");
+            Assert(ok.Message is { SentBy: not null } && store.Sent().Any(x => x.SentBy is not null), "Sent as the user and marked as sent by the helper");
+            Assert(guardian.SendAsUser("noreply@example.org", "x", "y").Refused is not null && guardian.SendAsUser("not an address", "x", "y").Refused is not null, "No-reply and bad addresses are refused");
+            guardian.SetAccess(new HelperPermissions(HelperTier.Standard));
+            Assert(guardian.SendAsUser("friend@example.org", "Hello", "Hi").Refused is not null, "Standard cannot send as the user");
+            Assert(guardian.GetCleared().Count == 0 && guardian.GetUserSent().Count == 0 && guardian.GetUserContacts().Count == 0, "Standard sees no cleared mail, sent mail or contacts");
+            guardian.SetAccess(HelperPermissions.Default);
+            Assert(guardian.GetCleared().Count > 0 && guardian.GetUserSent().Count > 0, "Administrator sees them");
+            Console.WriteLine("PASS: Helper digest, safeguarding floor, calls, help requests, history, people and send-as-user.");
+        }
+
         // 13. Explain: the AI does the explaining; local checks are a floor; failure shows a plain error, never a made-up answer.
         {
             DocumentReading Good(bool suspicious = false) => new(true, "letter", "Council letter", "A letter about your discount.", "Reply by 14 November",
@@ -806,5 +864,11 @@ public class LlamaScamCheckerTests
         public MetaScamAnalysis Answer { get; set; } = null!;
         public Task<MetaScamAnalysis> CheckScamAsync(string? text, byte[]? imageBytes = null, string? mimeType = null, CancellationToken ct = default) =>
             Task.FromResult(Answer);
+    }
+
+    private static bool Throws(Action a)
+    {
+        try { a(); return false; }
+        catch (BackstopApiException) { return true; }
     }
 }

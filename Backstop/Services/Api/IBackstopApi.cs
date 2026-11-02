@@ -89,6 +89,19 @@ public interface IBackstopApi
     HelperPermissions HelperAccess { get; }
     void SetHelperAccess(HelperPermissions access);
 
+    // --- Helper: everything waiting, history, and who the user can message ---
+    /// <summary>Everything that needs the helper, worst first, already limited to what this helper may see.</summary>
+    HelperDigest GetHelperDigest();
+    /// <summary>Finished decisions on mail, Check, stories and chats, newest first.</summary>
+    IReadOnlyList<HistoryEntry> GetDecisionHistory();
+    /// <summary>The helper helped with a "stuck" request.</summary>
+    void ResolveHelpRequest(string id);
+    /// <summary>The helper made the call they promised. The item stays held until they decide.</summary>
+    void MarkCalled(string id);
+    /// <summary>Puts a person on the list the user may message. Throws a plain-language error when the details are not valid.</summary>
+    ChatPerson AddChatPerson(string name, string relationship);
+    void RemoveChatPerson(string id);
+
     // --- Trusted person ---
     /// <summary>Held items from the inbox and from Check, newest first.</summary>
     Task<IReadOnlyList<ReviewItem>> GetReviewQueueAsync(CancellationToken ct = default);

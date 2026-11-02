@@ -70,6 +70,38 @@ else
             }
         </section>
     </div>
+
+    <section class="card people" aria-labelledby="people-h">
+        <h2 id="people-h">People @UserName can message</h2>
+        <ul class="rows rows--compact" aria-label="People on the list">
+            @foreach (var p in Api.ChatPeople.Where(p => p.Id != ChatFixtures.TrustedId))
+            {
+                <li>
+                    <div class="row row--static">
+                        <span class="pic pic--blue" aria-hidden="true"><Icon Name="@(p.Role == PersonRole.Helper ? "heart" : "people")" /></span>
+                        <span class="row__main">
+                            <span class="row__from">@p.Name</span>
+                            <span class="row__subject">@p.Relationship</span>
+                        </span>
+                        <button type="button" class="btn btn-quiet" @onclick="@(() => RemovePerson(p.Id))"><Icon Name="minus" /> Take off</button>
+                    </div>
+                </li>
+            }
+        </ul>
+        <div class="field">
+            <label for="np-name">Name</label>
+            <input id="np-name" type="text" @bind="_newName" autocomplete="off" />
+        </div>
+        <div class="field">
+            <label for="np-rel">Who they are</label>
+            <input id="np-rel" type="text" @bind="_newRel" autocomplete="off" placeholder="Friend from church" />
+        </div>
+        @if (_peopleProblem is not null)
+        {
+            <p class="form-error" role="alert">@_peopleProblem</p>
+        }
+        <p class="actions"><button type="button" class="btn btn-quiet" @onclick="AddPerson"><Icon Name="plus" /> Add to the list</button></p>
+    </section>
 }
 
 @code {
@@ -79,6 +111,30 @@ else
     private string? _problem;
     private string? _logProblem;
     private bool _busy;
+    private string _newName = "", _newRel = "";
+    private string? _peopleProblem;
+
+    private void AddPerson()
+    {
+        try
+        {
+            Api.AddChatPerson(_newName, _newRel);
+            _newName = _newRel = "";
+            _peopleProblem = null;
+        }
+        catch (BackstopApiException ex) { _peopleProblem = ex.Message; }
+    }
+
+    private void RemovePerson(string id)
+    {
+        try
+        {
+            Api.RemoveChatPerson(id);
+            if (_selected == id) _selected = ChatFixtures.TrustedId;
+            _peopleProblem = null;
+        }
+        catch (BackstopApiException ex) { _peopleProblem = ex.Message; }
+    }
 
     private bool IsMine => _selected == ChatFixtures.TrustedId;
 

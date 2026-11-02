@@ -37,6 +37,16 @@ else
     <article class="evidence" aria-labelledby="ev-title">
         <p class="evidence__status"><StatusBadge State="MessageState.Held" ForHelper="true" /></p>
         <h1 id="ev-title">@_item.Title</h1>
+        @if (_item.Flags.Any(f => f.Id == "at-risk"))
+        {
+            <div class="banner banner--block" role="alert">
+                <Icon Name="alert" />
+                <div>
+                    <p class="verdict__head">@UserName may need help now.</p>
+                    <p class="verdict__sub">Please get in touch with them as soon as you can.</p>
+                </div>
+            </div>
+        }
         <VerdictCard Verdict="_item.Verdict" Reason="@_item.Reasoning" Level="2" />
 
         @if (_item.Flags.Count > 0)

@@ -20,8 +20,49 @@ public sealed class MockGuardianService(MailStore store) : IGuardianService
     public IReadOnlyList<MailMessage> GetQueue() =>
         store.Query(m => m.State == MessageState.Held);
 
-    public IReadOnlyList<MailMessage> GetDecided() =>
-        store.Query(m => m.State == MessageState.Blocked || m.HelperDecision is not null).Take(6).ToList();
+    public IReadOnlyList<MailMessage> GetDecided(int take = 6) =>
+        store.Query(m => m.State == MessageState.Blocked || m.HelperDecision is not null).Take(take).ToList();
+
+    public IReadOnlyList<MailMessage> GetCleared() =>
+        Allows(HelperCapability.SeeClearedMail) ? store.Query(m => m.State == MessageState.Cleared) : [];
+
+    public void CalledBack(string id)
+    {
+        string? subject = null;
+        if (store.TryChange(id, m => m.State == MessageState.Held && m.CallRequested, m => { m.CallRequested = false; subject = m.Subject; }))
+            store.AddActivity("phone", $"You called {Names.User} about \"{subject}\".");
+    }
+
+    public IReadOnlyList<SentMessage> GetUserSent() => Allows(HelperCapability.SeeFullActivity) ? store.Sent() : [];
+    public IReadOnlyList<Contact> GetUserContacts() => Allows(HelperCapability.SeeFullActivity) ? store.Contacts() : [];
+    public IReadOnlyList<CalendarEvent> GetUserEvents() => Allows(HelperCapability.SeeFullActivity) ? store.Events() : [];
+    public IReadOnlyList<HelperNotice> GetSeenNotices() => Allows(HelperCapability.SeeFullActivity) ? store.SeenNotices() : [];
+
+    public SendResult SendAsUser(string to, string subject, string body)
+    {
+        if (!Allows(HelperCapability.SendAsUser)) return new(null, false, $"{Names.User} has not allowed you to send mail as them.");
+        to = (to ?? "").Trim();
+        if (!InputGuard.IsPlainAddress(to)) return new(null, false, "Please check the address.");
+        if (!InputGuard.IsSingleLine(subject ?? "", 200)) return new(null, false, "The subject is not right. Please shorten it.");
+        if (string.IsNullOrWhiteSpace(body) || body.Length > 20000) return new(null, false, "Please write the message, and keep it under 20,000 letters.");
+        if (NoReply.IsNoReply(to)) return new(null, false, "Nobody reads replies to that address.");
+
+        var isNew = !store.IsKnownRecipient(to);
+        var contact = store.FindContact(to);
+        var sent = new SentMessage
+        {
+            Id = Guid.NewGuid().ToString("N")[..8],
+            ToName = contact?.Name ?? "",
+            ToAddress = to,
+            Subject = string.IsNullOrWhiteSpace(subject) ? "(no subject)" : subject.Trim(),
+            Body = body,
+            SentBy = HouseholdFixture.Household.TrustedPersonName,
+        };
+        // MOCK: the message is only stored in memory. Nothing is sent anywhere.
+        store.AddSent(sent, null);
+        store.AddActivity("send", $"You sent an email to {to} as {Names.User}: \"{sent.Subject}\".");
+        return new(sent, isNew, null);
+    }
 
     public MailMessage? Get(string id)
     {

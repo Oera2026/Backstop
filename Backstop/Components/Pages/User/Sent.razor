@@ -28,7 +28,7 @@ else
                     <span class="row__main">
                         <span class="row__from">To @(string.IsNullOrEmpty(s.ToName) ? s.ToAddress : s.ToName)</span>
                         <span class="row__subject">@s.Subject</span>
-                        <span class="row__preview">@Clock.When(s.SentAt)</span>
+                        <span class="row__preview">@(s.SentBy is null ? "" : $"Sent by {s.SentBy}. ")@Clock.When(s.SentAt)</span>
                     </span>
                 </a>
             </li>

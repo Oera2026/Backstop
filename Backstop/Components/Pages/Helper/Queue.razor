@@ -2,128 +2,24 @@
 @layout HelperLayout
 @inherits ModeComponentBase
 
-<PageTitle>Messages to check – Backstop Helper</PageTitle>
+<PageTitle>Waiting – Backstop Helper</PageTitle>
 
-<h1>Messages waiting for you</h1>
+<h1>Waiting for you</h1>
 
-@{
-    var queue = Guardian.GetQueue().OrderByDescending(m => m.Confidence).ThenByDescending(m => m.ReceivedAt).ToList();
-    var decided = Guardian.GetDecided();
-    var notices = Guardian.GetNotices();
-    var outgoing = Guardian.GetHeldOutgoing();
-}
+@{ var digest = Api.GetHelperDigest(); }
 
-@* The user's own message looked private, so it waits here. Nothing is sent until the helper decides. *@
-@if (outgoing.Count > 0)
-{
-    <h2>Waiting to be sent</h2>
-    <ul class="rows" aria-label="Messages waiting to be sent">
-        @foreach (var o in outgoing)
-        {
-            <li>
-                <div class="row row--static row--notice">
-                    <span class="pic pic--check" aria-hidden="true"><Icon Name="hourglass" /></span>
-                    <span class="row__main">
-                        <span class="row__from">To <code>@Defang.ForHelper(o.ToAddress)</code></span>
-                        <span class="row__subject">@o.Subject</span>
-                        <span class="row__preview">@Defang.ForHelper(o.Body)</span>
-                        <span class="row__preview">@string.Join(" ", o.Reasons)</span>
-                        <span class="row__time">@Clock.When(o.At)</span>
-                    </span>
-                    <button type="button" class="btn btn-primary" @onclick="@(() => Guardian.ApproveOutgoing(o.Id))"><Icon Name="check" /> Send it</button>
-                    <button type="button" class="btn btn-quiet" @onclick="@(() => Guardian.BlockOutgoing(o.Id))"><Icon Name="cross" /> Do not send</button>
-                </div>
-            </li>
-        }
-    </ul>
-}
-
-@* FYI only: the user wrote to someone for the first time. Nothing to approve, just "Got it". *@
-@if (notices.Count > 0)
-{
-    <h2>New people</h2>
-    <ul class="rows" aria-label="Someone new was written to">
-        @foreach (var n in notices)
-        {
-            <li>
-                <div class="row row--static row--notice">
-                    <span class="pic pic--blue" aria-hidden="true"><Icon Name="user" /></span>
-                    <span class="row__main">
-                        <span class="row__from">Wrote to someone new</span>
-                        <span class="row__subject"><code>@n.Address</code></span>
-                        <span class="row__preview">First time. Subject: @n.Subject</span>
-                        <span class="row__time">@Clock.When(n.At)</span>
-                    </span>
-                    <button type="button" class="btn btn-quiet" @onclick="@(() => Guardian.DismissNotice(n.Id))"><Icon Name="check" /> Got it</button>
-                </div>
-            </li>
-        }
-    </ul>
-}
-
-<h2>From the inbox</h2>
-@if (queue.Count == 0)
+@if (digest.WaitingCount == 0)
 {
     <div class="banner banner--safe" role="status">
         <Icon Name="check" />
-        <p>Nothing to check right now. All clear.</p>
+        <p>Nothing to do right now. All clear.</p>
     </div>
 }
-else
-{
-    <ul class="rows" aria-label="Held messages">
-        @foreach (var m in queue)
-        {
-            <li>
-                <a class="row" href="helper/@m.Id">
-                    <span class="pic @(Risk(m).Pic)" aria-hidden="true"><Icon Name="@Risk(m).Icon" /></span>
-                    <span class="row__main">
-                        <span class="row__from">@m.FromName</span>
-                        <span class="row__subject">@m.Subject</span>
-                        <span class="row__preview">@Why(m)</span>
-                    </span>
-                    <span class="row__side">
-                        <span class="badge badge--@(Risk(m).Kind)"><Icon Name="@Risk(m).Icon" /><span>@Risk(m).Word</span></span>
-                        <span class="row__time">@Clock.When(m.ReceivedAt)</span>
-                    </span>
-                </a>
-            </li>
-        }
-    </ul>
-}
 
-@if (_problem is not null)
-{
-    <ErrorState Message="@_problem" OnRetry="Load" />
-}
-
-@* Things the user asked about from Check (see Components/Helper/CheckQueue). *@
-<CheckQueue Items="_checks" />
-
-<StoryQueue Items="_stories" />
-
-@if (decided.Count > 0)
-{
-    <h2>Decided already</h2>
-    <ul class="rows rows--compact" aria-label="Messages already decided">
-        @foreach (var m in decided)
-        {
-            <li>
-                <a class="row" href="helper/@m.Id">
-                    <span class="pic @(m.State == MessageState.Blocked ? "pic--block" : "pic--safe")" aria-hidden="true"><Icon Name="@(m.State == MessageState.Blocked ? "cross" : "check")" /></span>
-                    <span class="row__main">
-                        <span class="row__from">@m.FromName</span>
-                        <span class="row__subject">@m.Subject</span>
-                    </span>
-                    <span class="row__side">
-                        <StatusBadge State="m.State" ForHelper="true" />
-                        <span class="row__time">@(m.HelperDecision is null ? "Blocked by checker" : $"{m.HelperDecision} by you")</span>
-                    </span>
-                </a>
-            </li>
-        }
-    </ul>
-}
+@Section("Needs you now", "alert", digest.In(HelperGroup.Urgent))
+@Section("To decide", "hourglass", digest.In(HelperGroup.Decide))
+@Section("Calls to make", "phone", digest.In(HelperGroup.Calls))
+@Section("To know", "eye", digest.In(HelperGroup.Info))
 
 @if (Guardian.Allows(HelperCapability.SeeSharedMemories))
 {
@@ -135,57 +31,111 @@ else
 }
 
 @code {
-    private IReadOnlyList<ReviewItem> _checks = [];
-    private IReadOnlyList<ReviewItem> _stories = [];
     private IReadOnlyList<MemoryCard> _memories = [];
     private IReadOnlyList<ActivityEntry> _activity = [];
-    private string? _problem;
-    private bool _loading, _again;
+    private bool _scanning;
 
     protected override Task OnInitializedAsync() => Load();
     protected override Task OnApiChangedAsync() => Load();
     protected override Task OnStoreChangedAsync() => Load();
 
-    // One load for the whole page, not one per section. A change while loading asks for one more round.
     private async Task Load()
     {
-        if (_loading) { _again = true; return; }
-        _loading = true;
         try
         {
-            do
-            {
-                _again = false;
-                _problem = null;
-                try
-                {
-                    var review = Api.GetReviewQueueAsync();
-                    var memories = Api.GetSharedMemoriesAsync();
-                    var activity = Api.GetActivityAsync();
-                    await Task.WhenAll(review, memories, activity);
-                    var items = review.Result;
-                    _checks = items.Where(i => i.Source == ReviewSource.Check).ToList();
-                    _stories = items.Where(i => i.Source == ReviewSource.Story).ToList();
-                    _memories = memories.Result;
-                    _activity = activity.Result;
-                }
-                catch (BackstopApiException ex) { _problem = ex.Message; }
-            } while (_again);
+            var memories = Api.GetSharedMemoriesAsync();
+            var activity = Api.GetActivityAsync();
+            await Task.WhenAll(memories, activity);
+            _memories = memories.Result;
+            _activity = activity.Result;
         }
-        finally { _loading = false; }
+        catch (BackstopApiException) { /* keep what is on screen */ }
     }
 
-    // Why it is here. A message the AI has not checked says so.
-    private static string Why(MailMessage m) =>
-        m.AwaitingScan ? "The checker could not finish. It will try again." : m.Summary;
+    private async Task Rescan()
+    {
+        _scanning = true;
+        try { await Mail.RescanAsync(); }
+        finally { _scanning = false; }
+    }
 
-    // Risk is always a word, an icon and a colour together.
-    private static (string Kind, string Pic, string Icon, string Word) Risk(MailMessage m) =>
-        m.AwaitingScan ? ("check", "pic--check", "refresh", "Not checked yet") :
-        m.Confidence switch
-        {
-            Confidence.High => ("block", "pic--block", "alert", "Looks like a scam"),
-            Confidence.Medium => ("check", "pic--check", "alert", "Might be a scam"),
-            _ => ("check", "pic--check", "hourglass", "Not sure"),
-        };
+    private static string Pic(string tone) => tone switch { "block" => "pic--block", "safe" => "pic--safe", "info" => "pic--blue", _ => "pic--check" };
+
+    private RenderFragment Section(string heading, string icon, IReadOnlyList<HelperItem> items) => items.Count == 0 ? @<text></text> :
+    @<section aria-labelledby="@SectionId(heading)">
+        <h2 id="@SectionId(heading)" class="group-h"><Icon Name="@icon" /> @heading <span class="group-count">@items.Count</span></h2>
+        <ul class="rows" aria-label="@heading">
+            @foreach (var i in items)
+            {
+                <li>
+                    @if (i.Href is not null && !i.CallRequested)
+                    {
+                        <a class="row" href="@i.Href">@Body(i)</a>
+                    }
+                    else if (i.Href is not null)
+                    {
+                        <div class="row row--static">
+                            <a class="row__link" href="@i.Href">@Body(i)</a>
+                            <button type="button" class="btn btn-quiet" @onclick="@(() => Called(i.Id))"><Icon Name="phone" /> I called</button>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="row row--static @(i.Kind == HelperItemKind.NewPerson ? "row--notice" : "")">
+                            @Body(i)
+                            @Actions(i)
+                        </div>
+                    }
+                </li>
+            }
+        </ul>
+    </section>;
+
+    private static string SectionId(string heading) => "g-" + heading.Replace(' ', '-').ToLowerInvariant();
+
+    private RenderFragment Body(HelperItem i) =>
+    @<text>
+        <span class="pic @Pic(i.Tone)" aria-hidden="true"><Icon Name="@i.Icon" /></span>
+        <span class="row__main">
+            <span class="row__kind">@i.Label</span>
+            <span class="row__from">@i.Title</span>
+            <span class="row__subject">@i.Detail</span>
+            @if (i.Preview.Length > 0)
+            {
+                <span class="row__preview">@i.Preview</span>
+            }
+            @if (i.CallRequested)
+            {
+                <span class="row__call"><Icon Name="phone" /> You said you would call</span>
+            }
+        </span>
+        <span class="row__side">
+            @if (i.Word.Length > 0)
+            {
+                <span class="badge badge--@i.Tone"><Icon Name="@i.Icon" /><span>@i.Word</span></span>
+            }
+            @if (i.At != default && i.Kind != HelperItemKind.Checker)
+            {
+                <span class="row__time">@Clock.When(i.At)</span>
+            }
+        </span>
+    </text>;
+
+    private RenderFragment Actions(HelperItem i) => i.Kind switch
+    {
+        HelperItemKind.Outgoing =>
+            @<text>
+                <button type="button" class="btn btn-primary" @onclick="@(() => Guardian.ApproveOutgoing(i.Id))"><Icon Name="check" /> Send it</button>
+                <button type="button" class="btn btn-quiet" @onclick="@(() => Guardian.BlockOutgoing(i.Id))"><Icon Name="cross" /> Do not send</button>
+            </text>,
+        HelperItemKind.NewPerson =>
+            @<button type="button" class="btn btn-quiet" @onclick="@(() => Guardian.DismissNotice(i.Id))"><Icon Name="check" /> Got it</button>,
+        HelperItemKind.Help =>
+            @<button type="button" class="btn btn-quiet" @onclick="@(() => Api.ResolveHelpRequest(i.Id))"><Icon Name="check" /> I helped</button>,
+        HelperItemKind.Checker =>
+            @<button type="button" class="btn btn-quiet" disabled="@_scanning" @onclick="Rescan"><Icon Name="refresh" /> @(_scanning ? "Checking…" : "Check again")</button>,
+        _ => @<text></text>,
+    };
+
+    private void Called(string id) => Api.MarkCalled(id);
 }

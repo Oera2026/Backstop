@@ -80,7 +80,25 @@ public interface IGuardianService
     IReadOnlyList<MailMessage> GetQueue();
 
     /// <summary>Messages already decided (approved, blocked by a helper, or auto-blocked).</summary>
-    IReadOnlyList<MailMessage> GetDecided();
+    IReadOnlyList<MailMessage> GetDecided(int take = 6);
+
+    /// <summary>Mail the user can read. Empty unless the helper may see cleared mail.</summary>
+    IReadOnlyList<MailMessage> GetCleared();
+
+    /// <summary>The helper said they would call. Done calling: the message stays held until they decide.</summary>
+    void CalledBack(string id);
+
+    /// <summary>Everything below is empty (or refused) unless the helper was given that access.</summary>
+    IReadOnlyList<SentMessage> GetUserSent();
+    IReadOnlyList<Contact> GetUserContacts();
+    IReadOnlyList<CalendarEvent> GetUserEvents();
+    IReadOnlyList<HelperNotice> GetSeenNotices();
+
+    /// <summary>
+    /// Administrator only. MOCK: pretends to send. The message is marked as sent by the helper in the user's Sent list
+    /// and in the activity log. Refuses no-reply and invalid addresses.
+    /// </summary>
+    SendResult SendAsUser(string to, string subject, string body);
 
     MailMessage? Get(string id);
 

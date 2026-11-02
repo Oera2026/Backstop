@@ -1,41 +1,39 @@
-@inherits LiveComponentBase
+@inherits ModeComponentBase
 @implements IAsyncDisposable
 @inject IJSRuntime Js
 
 @* Same frame as the user's: a tab bar on phones, a side bar on wide screens (see modes.css .appnav). *@
 @{
-    var waiting = Waiting();
+    var waiting = Api.GetHelperDigest().WaitingCount;
     var place = Place();
 }
 <nav class="appnav" aria-label="Helper">
     <ul class="appnav__list">
-        <li>
-            <a class="appnav__item @(place == "waiting" ? "appnav__item--on" : "")" href="/helper" aria-current="@(place == "waiting" ? "page" : null)">
-                <Icon Name="hourglass" />
-                <span>Waiting</span>
-                @if (waiting > 0)
-                {
-                    <span class="nav-count" aria-label="@waiting waiting">@waiting</span>
-                }
-            </a>
-        </li>
-        <li>
-            <a class="appnav__item @(place == "messages" ? "appnav__item--on" : "")" href="/helper/messages" aria-current="@(place == "messages" ? "page" : null)">
-                <Icon Name="people" />
-                <span>Messages</span>
-            </a>
-        </li>
-        <li>
-            <a class="appnav__item @(place == "settings" ? "appnav__item--on" : "")" href="/helper/settings" aria-current="@(place == "settings" ? "page" : null)">
-                <Icon Name="lines" />
-                <span>Settings</span>
-            </a>
-        </li>
+        @Item("/helper", "waiting", "hourglass", "Waiting", place, waiting)
+        @Item("/helper/messages", "messages", "people", "Messages", place, 0)
+        @Item("/helper/history", "history", "clock", "History", place, 0)
+        @if (Guardian.Allows(HelperCapability.SendAsUser))
+        {
+            @Item("/helper/write", "write", "pen", "Write", place, 0)
+        }
+        @Item("/helper/settings", "settings", "lines", "Settings", place, 0)
     </ul>
 </nav>
 
 @code {
     private int _shown = -1;
+
+    private RenderFragment Item(string href, string key, string icon, string label, string place, int count) =>
+    @<li>
+        <a class="appnav__item @(place == key ? "appnav__item--on" : "")" href="@href" aria-current="@(place == key ? "page" : null)">
+            <Icon Name="@icon" />
+            <span>@label</span>
+            @if (count > 0)
+            {
+                <span class="nav-count" aria-label="@count waiting">@count</span>
+            }
+        </a>
+    </li>;
 
     protected override void OnInitialized()
     {
@@ -45,20 +43,17 @@
 
     private void OnMoved(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e) => _ = InvokeAsync(StateHasChanged);
 
-    // Everything the helper has to look at or decide that lives in the mail store.
-    private int Waiting() => Guardian.GetQueue().Count + Guardian.GetHeldOutgoing().Count + Guardian.GetNotices().Count;
-
-    // Every helper page that is not Messages or Settings (a message, a check, a story) belongs to Waiting.
+    // Every helper page that is not one of the others (a message, a check, a story) belongs to Waiting.
     private string Place()
     {
         var parts = Nav.ToBaseRelativePath(Nav.Uri).Split('?', '#')[0].Split('/');
         var second = parts.Length > 1 ? parts[1] : "";
-        return second switch { "messages" => "messages", "settings" => "settings", _ => "waiting" };
+        return second switch { "messages" => "messages", "history" => "history", "write" => "write", "settings" => "settings", _ => "waiting" };
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        var n = Waiting();
+        var n = Api.GetHelperDigest().WaitingCount;
         if (n == _shown) return;
         _shown = n;
         try { await Js.InvokeVoidAsync("backstop.setTitleCount", n); }
