@@ -693,3 +693,29 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
   .role-tag__who { display: inline; }
   .site-header--helper { gap: 0 .5rem; }
 }
+
+/* ---------- Phones: fewer things on screen, nothing covering the words ----------
+   The tab bar already has Ask Me, so the floating button is left for wide screens.
+   The inbox shows the Write button, one row of shortcuts, then the messages. */
+@media (max-width: 699px) {
+  .dock-tab { display: none; }
+
+  .page .home__side .actions { margin: 0 0 .75rem; }
+  .page .home .tiles { grid-template-columns: repeat(4, 1fr); gap: .5rem; margin: 0 0 1rem; }
+  .page .home .tile {
+    grid-auto-flow: row; justify-items: center; align-content: center; gap: .25rem;
+    min-height: 80px; padding: .5rem .1rem; text-align: center; font-size: calc(.8rem * var(--tx));
+  }
+  .page .home .tile .pic { width: 2.25rem; height: 2.25rem; }
+  .page .home .tile .pic .icon { width: 1.4rem; height: 1.4rem; }
+
+  /* Every inbox row had the same mail picture. Without it the sender, subject and start of the message get the full width. */
+  .home__list .row { min-height: 0; padding: .9rem 1rem; gap: .25rem; }
+  .home__list .row .pic { display: none; }
+  .page:has(.home) h1 { margin-bottom: .75rem; }
+}
+/* Big text or a very narrow screen: two across, so no label breaks into pieces */
+@media (max-width: 359px) { .page .home .tiles { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 699px) {
+  :root[data-size="large"] .page .home .tiles, :root[data-size="xlarge"] .page .home .tiles { grid-template-columns: repeat(2, 1fr); }
+}
