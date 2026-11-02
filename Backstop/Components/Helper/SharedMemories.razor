@@ -1,15 +1,8 @@
-@inherits ModeComponentBase
-
-@if (_problem is not null)
-{
-    <h2>Shared with you</h2>
-    <ErrorState Message="@_problem" OnRetry="Load" />
-}
-else if (_cards is { Count: > 0 })
+@if (Cards.Count > 0)
 {
     <h2>Shared with you</h2>
     <ul class="memories">
-        @foreach (var c in _cards)
+        @foreach (var c in Cards)
         {
             <li>
                 <details class="memory memory--shared">
@@ -34,16 +27,5 @@ else if (_cards is { Count: > 0 })
 }
 
 @code {
-    private IReadOnlyList<MemoryCard>? _cards;
-    private string? _problem;
-
-    protected override Task OnInitializedAsync() => Load();
-    protected override Task OnApiChangedAsync() => Load();
-
-    private async Task Load()
-    {
-        _problem = null;
-        try { _cards = await Api.GetSharedMemoriesAsync(); }
-        catch (BackstopApiException ex) { _problem = ex.Message; }
-    }
+    [Parameter, EditorRequired] public IReadOnlyList<MemoryCard> Cards { get; set; } = [];
 }

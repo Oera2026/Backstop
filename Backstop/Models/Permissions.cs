@@ -32,7 +32,8 @@ public enum HelperTier { Minimal, Standard, Custom, Administrator }
 /// <summary>The user's choice, kept per household. Created in the setup flow and editable in Settings.</summary>
 public sealed record HelperPermissions(HelperTier Tier, HelperCapability Custom = HelperCapability.None)
 {
-    public static readonly HelperPermissions Default = new(HelperTier.Minimal);
+    /// <summary>The standard setup: the helper has administrator access.</summary>
+    public static readonly HelperPermissions Default = new(HelperTier.Administrator);
 
     /// <summary>What each named tier allows. The floor is part of every one.</summary>
     public static HelperCapability For(HelperTier tier, HelperCapability custom = HelperCapability.None) => HelperCapability.Floor | tier switch

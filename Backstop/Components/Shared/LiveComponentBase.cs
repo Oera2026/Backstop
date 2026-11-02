@@ -20,9 +20,20 @@ public abstract class LiveComponentBase : ComponentBase, IDisposable
 
     private void OnStoreChanged()
     {
-        try { _ = InvokeAsync(StateHasChanged); }
+        try
+        {
+            _ = InvokeAsync(async () =>
+            {
+                try { await OnStoreChangedAsync(); }
+                catch (Services.Api.BackstopApiException) { /* keep what is on screen */ }
+                StateHasChanged();
+            });
+        }
         catch (ObjectDisposedException) { /* circuit already closed */ }
     }
+
+    /// <summary>Reload anything the screen fetched when mail or helper state changes. The default does nothing.</summary>
+    protected virtual Task OnStoreChangedAsync() => Task.CompletedTask;
 
     public virtual void Dispose() => Mail.Changed -= OnStoreChanged;
 }

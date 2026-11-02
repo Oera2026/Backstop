@@ -247,8 +247,8 @@ public sealed partial class MockMailService(MailStore store, IMetaScamChecker? m
             catch (Exception)
             {
                 // Last resort: even if recording the failure goes wrong, the message must not stay in Received or Scanning.
-                try { store.Update(() => { msg.State = MessageState.Held; msg.ReceivedAt = DateTimeOffset.Now; }); }
-                catch (Exception) { msg.State = MessageState.Held; }
+                try { store.Update(() => { msg.State = MessageState.Held; msg.AwaitingScan = true; msg.ReceivedAt = DateTimeOffset.Now; }); }
+                catch (Exception) { msg.State = MessageState.Held; msg.AwaitingScan = true; }
             }
         }
         return msg;
@@ -296,6 +296,7 @@ public sealed partial class MockMailService(MailStore store, IMetaScamChecker? m
         store.Update(() =>
         {
             msg.State = MessageState.Failed;
+            msg.AwaitingScan = true; // the AI did not answer, so it is scanned again until it does
             msg.Tiers = done;
             msg.Flags = [new Flag("alert", "The checker had a problem", "We could not finish checking this message, so it is held until a person looks at it."), .. local?.Flags ?? []];
             msg.Links = analysis is null ? [] : [.. analysis.Links];
@@ -305,6 +306,53 @@ public sealed partial class MockMailService(MailStore store, IMetaScamChecker? m
             msg.Confidence = Confidence.Low;
             msg.ReceivedAt = DateTimeOffset.Now;
             msg.State = MessageState.Held; // explicit Failed -> Held transition, never Blocked or Cleared
+        });
+    }
+
+    private readonly object _scanGate = new();
+    private readonly HashSet<string> _scanning = [];
+
+    /// <summary>
+    /// Mail held because the AI never answered is checked again here. It is only released, held for a helper or
+    /// blocked when the AI answers, using the same policy as a new message. No answer leaves it exactly as it was.
+    /// </summary>
+    public async Task<int> RescanAsync(string? id = null)
+    {
+        if (metaChecker is null) return 0;
+        var waiting = store.Query(m => m.State == MessageState.Held && m.AwaitingScan && (id is null || m.Id == id));
+        var answered = 0;
+        foreach (var msg in waiting)
+        {
+            lock (_scanGate) { if (!_scanning.Add(msg.Id)) continue; } // already being scanned
+            try { if (await RescanOne(msg)) answered++; }
+            catch (Exception) { /* no answer: stays held and is tried again later */ }
+            finally { lock (_scanGate) _scanning.Remove(msg.Id); }
+        }
+        return answered;
+    }
+
+    private async Task<bool> RescanOne(MailMessage msg)
+    {
+        var mail = msg.AsInbound();
+        var analysis = MailAnalyzer.Analyze(mail);
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        var ai = await metaChecker!.CheckScamAsync($"{mail.Subject}\n\n{mail.Body}", null, null);
+        if (!ai.Success) return false;
+
+        var aiTier = new TierResult("Meta AI", (int)clock.ElapsedMilliseconds,
+            ai.Verdict == Verdict.LooksSafe && !ai.NeedsHuman && !ai.AtRisk ? TierStatus.Passed : TierStatus.Flagged, ai.Reason);
+        var decision = MailAnalyzer.Decide(analysis, ai);
+        // Only still-held, still-waiting mail changes. A helper who blocked it in the meantime wins.
+        return store.TryChange(msg.Id, m => m.State == MessageState.Held && m.AwaitingScan, m =>
+        {
+            m.Flags = [.. decision.Flags];
+            m.Links = [.. analysis.Links];
+            m.Summary = decision.Summary;
+            m.Confidence = decision.Confidence;
+            m.Tiers = [analysis.RulesTier, aiTier, analysis.LinkTier, decision.PolicyTier];
+            m.State = decision.State;
+            m.AwaitingScan = false;
+            m.ReceivedAt = DateTimeOffset.Now;
         });
     }
 

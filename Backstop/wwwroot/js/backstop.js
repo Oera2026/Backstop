@@ -22,5 +22,21 @@ window.backstop = {
   },
   stop() {
     if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+  },
+  // Puts "(3) " in front of the tab title while things wait for the helper. 0 takes it off again.
+  setTitleCount(n) {
+    const b = window.backstop;
+    b._n = n;
+    const t = document.querySelector('title');
+    if (t && !b._obs) {
+      b._obs = new MutationObserver(() => b._paintTitle());
+      b._obs.observe(t, { childList: true, characterData: true, subtree: true });
+    }
+    b._paintTitle();
+  },
+  _paintTitle() {
+    const base = document.title.replace(/^\(\d+\)\s*/, '');
+    const want = this._n > 0 ? '(' + this._n + ') ' + base : base;
+    if (document.title !== want) document.title = want;
   }
 };

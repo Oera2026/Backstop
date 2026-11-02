@@ -1,13 +1,13 @@
 @page "/helper"
 @layout HelperLayout
-@inherits LiveComponentBase
+@inherits ModeComponentBase
 
 <PageTitle>Messages to check – Backstop Helper</PageTitle>
 
 <h1>Messages waiting for you</h1>
 
 @{
-    var queue = Guardian.GetQueue();
+    var queue = Guardian.GetQueue().OrderByDescending(m => m.Confidence).ThenByDescending(m => m.ReceivedAt).ToList();
     var decided = Guardian.GetDecided();
     var notices = Guardian.GetNotices();
     var outgoing = Guardian.GetHeldOutgoing();
@@ -76,14 +76,14 @@ else
         {
             <li>
                 <a class="row" href="helper/@m.Id">
-                    <span class="pic pic--check" aria-hidden="true"><Icon Name="hourglass" /></span>
+                    <span class="pic @(Risk(m).Pic)" aria-hidden="true"><Icon Name="@Risk(m).Icon" /></span>
                     <span class="row__main">
                         <span class="row__from">@m.FromName</span>
                         <span class="row__subject">@m.Subject</span>
-                        <span class="row__preview">@m.Summary</span>
+                        <span class="row__preview">@Why(m)</span>
                     </span>
                     <span class="row__side">
-                        <StatusBadge State="m.State" ForHelper="true" />
+                        <span class="badge badge--@(Risk(m).Kind)"><Icon Name="@Risk(m).Icon" /><span>@Risk(m).Word</span></span>
                         <span class="row__time">@Clock.When(m.ReceivedAt)</span>
                     </span>
                 </a>
@@ -92,10 +92,15 @@ else
     </ul>
 }
 
-@* Things the user asked about from Check (see Components/Helper/CheckQueue). *@
-<CheckQueue />
+@if (_problem is not null)
+{
+    <ErrorState Message="@_problem" OnRetry="Load" />
+}
 
-<StoryQueue />
+@* Things the user asked about from Check (see Components/Helper/CheckQueue). *@
+<CheckQueue Items="_checks" />
+
+<StoryQueue Items="_stories" />
 
 @if (decided.Count > 0)
 {
@@ -120,5 +125,67 @@ else
     </ul>
 }
 
-<SharedMemories />
-<ActivityLog />
+@if (Guardian.Allows(HelperCapability.SeeSharedMemories))
+{
+    <SharedMemories Cards="_memories" />
+}
+@if (Guardian.Allows(HelperCapability.SeeActivitySummary))
+{
+    <ActivityLog Entries="_activity" />
+}
+
+@code {
+    private IReadOnlyList<ReviewItem> _checks = [];
+    private IReadOnlyList<ReviewItem> _stories = [];
+    private IReadOnlyList<MemoryCard> _memories = [];
+    private IReadOnlyList<ActivityEntry> _activity = [];
+    private string? _problem;
+    private bool _loading, _again;
+
+    protected override Task OnInitializedAsync() => Load();
+    protected override Task OnApiChangedAsync() => Load();
+    protected override Task OnStoreChangedAsync() => Load();
+
+    // One load for the whole page, not one per section. A change while loading asks for one more round.
+    private async Task Load()
+    {
+        if (_loading) { _again = true; return; }
+        _loading = true;
+        try
+        {
+            do
+            {
+                _again = false;
+                _problem = null;
+                try
+                {
+                    var review = Api.GetReviewQueueAsync();
+                    var memories = Api.GetSharedMemoriesAsync();
+                    var activity = Api.GetActivityAsync();
+                    await Task.WhenAll(review, memories, activity);
+                    var items = review.Result;
+                    _checks = items.Where(i => i.Source == ReviewSource.Check).ToList();
+                    _stories = items.Where(i => i.Source == ReviewSource.Story).ToList();
+                    _memories = memories.Result;
+                    _activity = activity.Result;
+                }
+                catch (BackstopApiException ex) { _problem = ex.Message; }
+            } while (_again);
+        }
+        finally { _loading = false; }
+    }
+
+    // Why it is here. A message the AI has not checked says so.
+    private static string Why(MailMessage m) =>
+        m.AwaitingScan ? "The checker could not finish. It will try again." : m.Summary;
+
+    // Risk is always a word, an icon and a colour together.
+    private static (string Kind, string Pic, string Icon, string Word) Risk(MailMessage m) =>
+        m.AwaitingScan ? ("check", "pic--check", "refresh", "Not checked yet") :
+        m.Confidence switch
+        {
+            Confidence.High => ("block", "pic--block", "alert", "Looks like a scam"),
+            Confidence.Medium => ("check", "pic--check", "alert", "Might be a scam"),
+            _ => ("check", "pic--check", "hourglass", "Not sure"),
+        };
+}

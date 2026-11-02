@@ -16,7 +16,8 @@ else
     <EvidenceCard Message="m"
                   OnApprove="@(() => Decide(() => Guardian.Approve(m.Id)))"
                   OnBlock="@(() => Decide(() => Guardian.Block(m.Id)))"
-                  OnCallFirst="@(() => Guardian.CallFirst(m.Id))" />
+                  OnCallFirst="@(() => Guardian.CallFirst(m.Id))"
+                  OnRescan="@(() => Mail.RescanAsync(m.Id))" />
 }
 
 @code {

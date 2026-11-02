@@ -1,17 +1,10 @@
-@inherits ModeComponentBase
-
 @* Held items the user sent from Check. Inbox items are listed by the queue page itself.
    Nothing to show means no heading, so the page does not reserve room that then collapses. *@
-@if (_problem is not null)
-{
-    <h2>From Check</h2>
-    <ErrorState Message="@_problem" OnRetry="Load" />
-}
-else if (_items is { Count: > 0 })
+@if (Items.Count > 0)
 {
     <h2>From Check</h2>
     <ul class="rows" aria-label="Held items from Check">
-        @foreach (var i in _items)
+        @foreach (var i in Items)
         {
             <li>
                 <a class="row" href="helper/check/@i.Id">
@@ -32,16 +25,6 @@ else if (_items is { Count: > 0 })
 }
 
 @code {
-    private IReadOnlyList<ReviewItem>? _items;
-    private string? _problem;
-
-    protected override Task OnInitializedAsync() => Load();
-    protected override Task OnApiChangedAsync() => Load();
-
-    private async Task Load()
-    {
-        _problem = null;
-        try { _items = (await Api.GetReviewQueueAsync()).Where(i => i.Source == ReviewSource.Check).ToList(); }
-        catch (BackstopApiException ex) { _problem = ex.Message; }
-    }
+    [Parameter, EditorRequired] public IReadOnlyList<ReviewItem> Items { get; set; } = [];
+    [CascadingParameter] private UserClock Clock { get; set; } = UserClock.Server;
 }

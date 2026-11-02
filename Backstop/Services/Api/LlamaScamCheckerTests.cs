@@ -621,6 +621,39 @@ public class LlamaScamCheckerTests
             Console.WriteLine("PASS: Mail scanning false holds, evidence on failure, sender and stuck states.");
         }
 
+        // 12b. Held-for-scan mail: withheld until the AI answers, rescanned, helper access gates.
+        {
+            var ai = new SwitchMeta { Answer = new MetaScamAnalysis(Verdict.LooksSafe, "", [], false, "down") };
+            var store = new MailStore();
+            var mail = new MockMailService(store, ai);
+            var guardian = new MockGuardianService(store);
+            var m = (await mail.ReceiveAsync(new InboundMail("Sam Lee", "sam.lee@example.org", "Tea", "See you at three."), false))!;
+            Assert(m.State == MessageState.Held && m.AwaitingScan && mail.GetInbox().All(x => x.Id != m.Id), "AI down: withheld and waiting for a scan");
+            Assert(await mail.RescanAsync() == 0 && m.State == MessageState.Held, "AI still down: rescan leaves it held");
+            guardian.Approve(m.Id);
+            Assert(m.State == MessageState.Held, "A helper cannot approve mail the AI has not checked");
+            ai.Answer = new MetaScamAnalysis(Verdict.LooksSafe, "Fine.", [], true);
+            Assert(await mail.RescanAsync() == 1 && m.State == MessageState.Cleared && !m.AwaitingScan, "AI answers safe: released by the rescan");
+            var scam = (await mail.ReceiveAsync(new InboundMail("Sam Lee", "sam.lee@example.org", "Gift", "Buy a gift card and send me the codes."), true))!;
+            await mail.RescanAsync();
+            Assert(scam.State == MessageState.Held && !scam.AwaitingScan, "AI answers, local rules worried: held for the helper, not cleared");
+            guardian.Block(scam.Id);
+            Assert(scam.State == MessageState.Blocked && guardian.GetMailActivity().Count == 1, "Block works and is written to the activity log");
+
+            // Access: the standard setup is administrator. A lower tier cannot read cleared mail it did not decide.
+            Assert(guardian.Access.Tier == HelperTier.Administrator && guardian.Get(m.Id) is not null, "Default access can read cleared mail");
+            guardian.SetAccess(new HelperPermissions(HelperTier.Standard));
+            var other = (await mail.ReceiveAsync(new InboundMail("Sam Lee", "sam.lee@example.org", "Cake", "Cake on Friday?"), false))!;
+            Assert(other.State == MessageState.Cleared && guardian.Get(other.Id) is null, "Standard cannot open cleared mail it never decided");
+            Assert(!guardian.Allows(HelperCapability.SendAsUser) && guardian.Allows(HelperCapability.ReviewHeldMail), "Standard: floor stays, send-as-user is off");
+            var api = new MockBackstopApi(guardian, new MockApiOptions(), null, null, null, mail);
+            guardian.SetAccess(new HelperPermissions(HelperTier.Minimal));
+            Assert((await api.GetActivityAsync()).Count == 0 && (await api.GetSharedMemoriesAsync()).Count == 0, "Minimal sees no activity or shared memories");
+            store.Reset();
+            Assert(store.HelperAccess.Tier == HelperTier.Administrator, "Reset puts the standard access back");
+            Console.WriteLine("PASS: Unchecked mail stays held and is rescanned; helper access is enforced in the service.");
+        }
+
         // 13. Explain: the AI does the explaining; local checks are a floor; failure shows a plain error, never a made-up answer.
         {
             DocumentReading Good(bool suspicious = false) => new(true, "letter", "Council letter", "A letter about your discount.", "Reply by 14 November",
@@ -766,5 +799,12 @@ public class LlamaScamCheckerTests
 
         public Task<MetaScamAnalysis> CheckScamAsync(string? text, byte[]? imageBytes = null, string? mimeType = null, CancellationToken ct = default) =>
             Task.FromResult(analysis);
+    }
+
+    private sealed class SwitchMeta : IMetaScamChecker
+    {
+        public MetaScamAnalysis Answer { get; set; } = null!;
+        public Task<MetaScamAnalysis> CheckScamAsync(string? text, byte[]? imageBytes = null, string? mimeType = null, CancellationToken ct = default) =>
+            Task.FromResult(Answer);
     }
 }

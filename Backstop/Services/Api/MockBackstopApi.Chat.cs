@@ -22,7 +22,6 @@ public sealed partial class MockBackstopApi
 
     private List<StoredChat> _chat = SeedChat();
     private readonly Dictionary<string, int> _chatSent = []; // how many messages the user has sent each person
-    private HelperPermissions _helperAccess = HelperPermissions.Default;
 
     private static List<StoredChat> SeedChat()
     {
@@ -43,16 +42,16 @@ public sealed partial class MockBackstopApi
     {
         _chat = SeedChat();
         _chatSent.Clear();
-        _helperAccess = HelperPermissions.Default;
+        guardian.SetAccess(HelperPermissions.Default);
     }
 
     public IReadOnlyList<ChatPerson> ChatPeople => ChatFixtures.People;
 
-    public HelperPermissions HelperAccess { get { lock (_gate) return _helperAccess; } }
+    public HelperPermissions HelperAccess => guardian.Access;
 
     public void SetHelperAccess(HelperPermissions access)
     {
-        lock (_gate) _helperAccess = access;
+        guardian.SetAccess(access);
         Changed?.Invoke();
     }
 
@@ -248,7 +247,7 @@ public sealed partial class MockBackstopApi
         lock (_gate)
         {
             // The helper's own chat with the user is always theirs to read. Everyone else's needs the permission.
-            if (personId != ChatFixtures.TrustedId && !_helperAccess.Allows(HelperCapability.SeeChats))
+            if (personId != ChatFixtures.TrustedId && !guardian.Allows(HelperCapability.SeeChats))
                 throw new BackstopApiException($"{User} has not allowed you to read their chats.");
             return Delivered(personId);
         }

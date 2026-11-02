@@ -1,22 +1,13 @@
-@inherits ModeComponentBase
-
+@* The parent loads the entries once for the whole page. Nothing here fetches. *@
 <h2>Recent activity</h2>
-@if (_entries is null && _problem is null)
-{
-    <LoadingState Text="Getting recent activity…" />
-}
-else if (_problem is not null)
-{
-    <ErrorState Message="@_problem" OnRetry="Load" />
-}
-else if (_entries!.Count == 0)
+@if (Entries.Count == 0)
 {
     <p class="empty">Nothing has happened yet.</p>
 }
 else
 {
     <ul class="activity">
-        @foreach (var a in _entries)
+        @foreach (var a in Entries)
         {
             <li>
                 <Icon Name="@a.Icon" />
@@ -27,16 +18,6 @@ else
 }
 
 @code {
-    private IReadOnlyList<ActivityEntry>? _entries;
-    private string? _problem;
-
-    protected override Task OnInitializedAsync() => Load();
-    protected override Task OnApiChangedAsync() => Load();
-
-    private async Task Load()
-    {
-        _problem = null;
-        try { _entries = await Api.GetActivityAsync(); }
-        catch (BackstopApiException ex) { _problem = ex.Message; }
-    }
+    [Parameter, EditorRequired] public IReadOnlyList<ActivityEntry> Entries { get; set; } = [];
+    [CascadingParameter] private UserClock Clock { get; set; } = UserClock.Server;
 }

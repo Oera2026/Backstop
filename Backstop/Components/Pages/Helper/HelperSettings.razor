@@ -1,6 +1,45 @@
 @page "/helper/settings"
 @layout HelperLayout
+@inherits LiveComponentBase
 
 <PageTitle>Settings – Backstop Helper</PageTitle>
 
+
 <SettingsPanel DoneHref="/helper" />
+
+<section class="card" style="margin-block-start:1.5rem" aria-labelledby="ha-title">
+    <h2 id="ha-title">Your access: @TierName</h2>
+    <ul class="flags">
+        @foreach (var (cap, label) in Labels)
+        {
+            var on = Guardian.Allows(cap);
+            <li class="flag">
+                <span class="flag__icon"><Icon Name="@(on ? "check" : "cross")" /></span>
+                <span><strong>@label</strong> <span class="flag__text">@(on ? "Yes" : "No")</span></span>
+            </li>
+        }
+    </ul>
+</section>
+
+@code {
+    private string TierName => Guardian.Access.Tier switch
+    {
+        HelperTier.Administrator => "Administrator",
+        HelperTier.Standard => "Standard",
+        HelperTier.Custom => "Custom",
+        _ => "Minimal",
+    };
+
+    private static readonly (HelperCapability Cap, string Label)[] Labels =
+    [
+        (HelperCapability.RiskAlerts, "Hear about risky mail"),
+        (HelperCapability.ReviewHeldMail, "Decide held mail"),
+        (HelperCapability.SeeCheckRequests, "See what they ask Check"),
+        (HelperCapability.SeeSharedMemories, "See memories they share"),
+        (HelperCapability.SeeActivitySummary, "See recent activity"),
+        (HelperCapability.SeeClearedMail, "Read mail that was cleared"),
+        (HelperCapability.SeeFullActivity, "See all activity"),
+        (HelperCapability.SendAsUser, "Send mail as them"),
+        (HelperCapability.SeeChats, "Read their chats"),
+    ];
+}

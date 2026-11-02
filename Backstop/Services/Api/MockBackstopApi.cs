@@ -450,7 +450,9 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         List<ReviewItem> stories;
         lock (_gate)
         {
-            checks = _checks.Values.Where(c => c.Result.Status == ReviewStatus.Held).Select(FromCheck).ToList();
+            checks = guardian.Allows(HelperCapability.SeeCheckRequests)
+                ? _checks.Values.Where(c => c.Result.Status == ReviewStatus.Held).Select(FromCheck).ToList()
+                : [];
             stories = _stories.Values.Where(x => x.Story.Status == StoryStatus.Held).Select(FromStory).ToList();
         }
         return inbox.Concat(checks).Concat(stories).OrderByDescending(i => i.At).ToList();
@@ -461,7 +463,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         await Wait(400, ct);
         lock (_gate)
         {
-            if (_checks.TryGetValue(id, out var c)) return c.Result.Status == ReviewStatus.Held ? FromCheck(c) : null;
+            if (_checks.TryGetValue(id, out var c)) return c.Result.Status == ReviewStatus.Held && guardian.Allows(HelperCapability.SeeCheckRequests) ? FromCheck(c) : null;
             if (_stories.TryGetValue(id, out var st)) return st.Story.Status == StoryStatus.Held ? FromStory(st) : null;
         }
         var m = guardian.Get(id);
@@ -472,10 +474,12 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
     {
         await Wait(500, ct);
         string title;
+        var logged = false; // mail decisions are written to the activity log by the guardian service
         lock (_gate)
         {
             if (_checks.TryGetValue(id, out var c))
             {
+                if (!guardian.Allows(HelperCapability.SeeCheckRequests)) throw new BackstopApiException($"{User} has not allowed you to see their checks.");
                 // Only a held item can be decided, and Blocked is final.
                 if (c.Result.Status != ReviewStatus.Held) throw new BackstopApiException("This has already been decided.");
                 var r = decision switch
@@ -506,7 +510,9 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
             {
                 var m = guardian.Get(id);
                 if (m is not { State: MessageState.Held }) throw new BackstopApiException("This has already been decided.");
+                if (decision == ReviewDecision.Release && m.AwaitingScan) throw new BackstopApiException("The checker has not finished with this message yet.");
                 title = $"\"{m.Subject}\"";
+                logged = true;
                 switch (decision)
                 {
                     case ReviewDecision.Release: guardian.Approve(id); break;
@@ -514,7 +520,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
                     default: guardian.CallFirst(id); break;
                 }
             }
-            Log(decision switch { ReviewDecision.Release => "check", ReviewDecision.Block => "cross", _ => "phone" },
+            if (!logged) Log(decision switch { ReviewDecision.Release => "check", ReviewDecision.Block => "cross", _ => "phone" },
                 decision switch
                 {
                     ReviewDecision.Release => $"You said {LowerFirst(title)} is safe.",
@@ -528,12 +534,15 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
     public async Task<IReadOnlyList<ActivityEntry>> GetActivityAsync(CancellationToken ct = default)
     {
         await Wait(400, ct);
-        lock (_gate) return _activity.OrderByDescending(a => a.At).Take(10).ToList();
+        if (!guardian.Allows(HelperCapability.SeeActivitySummary)) return [];
+        var limit = guardian.Allows(HelperCapability.SeeFullActivity) ? 50 : 10;
+        lock (_gate) return _activity.Concat(guardian.GetMailActivity()).OrderByDescending(a => a.At).Take(limit).ToList();
     }
 
     public async Task<IReadOnlyList<MemoryCard>> GetSharedMemoriesAsync(CancellationToken ct = default)
     {
         await Wait(400, ct);
+        if (!guardian.Allows(HelperCapability.SeeSharedMemories)) return [];
         lock (_gate) return _memories.Where(c => c.Shared).OrderByDescending(c => c.Date).ToList();
     }
 

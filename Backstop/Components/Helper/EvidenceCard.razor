@@ -4,7 +4,8 @@
     <p class="evidence__status">
         <StatusBadge State="Message.State" ForHelper="true" />
     </p>
-    <h1 id="ev-title">Check this message</h1>
+    <h1 id="ev-title">@Message.Subject</h1>
+    <p class="evidence__who">From <strong>@Message.FromName</strong> <code>@Defang.ForHelper(Message.FromAddress)</code></p>
 
     @if (Message.State == MessageState.Held)
     {
@@ -17,8 +18,16 @@
         </div>
     }
 
+    @if (Message.AwaitingScan && Message.State == MessageState.Held)
+    {
+        <div class="banner banner--check" role="status">
+            <Icon Name="hourglass" />
+            <p>The checker could not finish. This message stays held and is checked again soon.</p>
+        </div>
+    }
+
     <p class="lead">@Message.Summary</p>
-    <ReadAloudButton Text="@($"{VerdictHead} {Message.Summary} {string.Join(' ', Message.Flags.Select(f => f.Title + ". " + f.Explanation))}")" />
+    <div class="evidence__read"><ReadAloudButton Text="@($"{VerdictHead} {Message.Summary} {string.Join(' ', Message.Flags.Select(f => f.Title + ". " + f.Explanation))}")" /></div>
 
     @if (Message.Flags.Count > 0)
     {
@@ -67,9 +76,8 @@
         </details>
     }
 
-    <details class="card fold">
-        <summary>Read the message (text only, links made safe)</summary>
-        <p class="preview-meta">From @Message.FromName, <code>@Defang.ForHelper(Message.FromAddress)</code><br />Subject: @Message.Subject</p>
+    <details class="card fold" open>
+        <summary>The message (text only, links made safe)</summary>
         <pre class="preview">@Defang.ForHelper(Message.Body)</pre>
     </details>
 
@@ -105,9 +113,18 @@
                     <button type="button" class="btn @(Message.Confidence == Confidence.High ? "btn-block" : "btn-quiet btn-danger")" @onclick="@(() => Start("Blocked"))">
                         <Icon Name="cross" /> Block
                     </button>
-                    <button type="button" class="btn btn-quiet" @onclick="AskConfirm">
-                        <Icon Name="check" /> Approve
-                    </button>
+                    @if (Message.AwaitingScan)
+                    {
+                        <button type="button" class="btn btn-quiet" disabled="@_scanning" @onclick="Rescan">
+                            <Icon Name="refresh" /> @(_scanning ? "Checking…" : "Check again")
+                        </button>
+                    }
+                    else
+                    {
+                        <button type="button" class="btn btn-quiet" @onclick="AskConfirm">
+                            <Icon Name="check" /> Approve
+                        </button>
+                    }
                     <button type="button" class="btn btn-text" @onclick="OnCallFirst">
                         <Icon Name="phone" /> Call them first
                     </button>
@@ -138,6 +155,16 @@
     [Parameter] public EventCallback OnApprove { get; set; }
     [Parameter] public EventCallback OnBlock { get; set; }
     [Parameter] public EventCallback OnCallFirst { get; set; }
+    [Parameter] public EventCallback OnRescan { get; set; }
+
+    private bool _scanning;
+
+    private async Task Rescan()
+    {
+        _scanning = true;
+        try { await OnRescan.InvokeAsync(); }
+        finally { _scanning = false; }
+    }
 
     private bool _confirming;
     private string? _pending;

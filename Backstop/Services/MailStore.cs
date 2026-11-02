@@ -16,6 +16,8 @@ public sealed class MailStore
     private List<CalendarEvent> _events = MockData.SeedEvents();
     private List<HelperNotice> _notices = [];
     private List<HeldOutgoing> _heldOutgoing = [];
+    private HelperPermissions _helperAccess = HelperPermissions.Default;
+    private readonly List<ActivityEntry> _activity = [];
 
     public event Action? Changed;
 
@@ -35,6 +37,7 @@ public sealed class MailStore
             foreach (var m in open)
             {
                 m.State = MessageState.Held;
+                m.AwaitingScan = true; // never scanned to the end, so it is scanned again
                 if (string.IsNullOrEmpty(m.Summary)) m.Summary = "The automatic check did not finish. Please look at this message with care.";
             }
             n = open.Count;
@@ -236,6 +239,35 @@ public sealed class MailStore
         Changed?.Invoke();
     }
 
+    // --- Helper access and mail activity (shared by the guardian service and the API) ---
+
+    public HelperPermissions HelperAccess
+    {
+        get { lock (_gate) return _helperAccess; }
+    }
+
+    public void SetHelperAccess(HelperPermissions access)
+    {
+        lock (_gate) _helperAccess = access;
+        Changed?.Invoke();
+    }
+
+    /// <summary>What the helper did with mail. Newest last. Kept short so memory stays small.</summary>
+    public void AddActivity(string icon, string text)
+    {
+        lock (_gate)
+        {
+            _activity.Add(new ActivityEntry(DateTimeOffset.Now, icon, text));
+            if (_activity.Count > 200) _activity.RemoveRange(0, _activity.Count - 200);
+        }
+        Changed?.Invoke();
+    }
+
+    public IReadOnlyList<ActivityEntry> Activity()
+    {
+        lock (_gate) return _activity.ToList();
+    }
+
     public void Reset()
     {
         lock (_gate)
@@ -247,6 +279,8 @@ public sealed class MailStore
             _events = MockData.SeedEvents();
             _notices = [];
             _heldOutgoing = [];
+            _helperAccess = HelperPermissions.Default;
+            _activity.Clear();
         }
         HoldUnfinished();
         Changed?.Invoke();

@@ -37,6 +37,12 @@ public sealed class MailMessage
     public Confidence Confidence { get; set; } = Confidence.Low;
     public List<TierResult> Tiers { get; set; } = [];
 
+    /// <summary>
+    /// Held because the AI check did not finish. It stays withheld and is scanned again until the AI answers.
+    /// A helper cannot approve it while this is set (Block is still allowed).
+    /// </summary>
+    public bool AwaitingScan { get; set; }
+
     /// <summary>The helper chose "Call them first". The message stays held.</summary>
     public bool CallRequested { get; set; }
 

@@ -249,7 +249,7 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 .answer { border: var(--line) solid var(--border); border-radius: var(--radius-lg); padding: 1.25rem; margin: 1rem 0; background: var(--bg); }
 .answer > p:first-child { font-size: calc(1.15rem * var(--tx)); font-weight: 700; }
 .memories { list-style: none; margin: 1rem 0; padding: 0; display: grid; gap: .9rem; }
-@media (min-width: 720px) { .memories { grid-template-columns: 1fr 1fr; } }
+@media (min-width: 720px) { .memories { grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); } }
 .memory { display: flex; gap: 1rem; padding: 1rem; min-height: 120px; border: var(--line) solid var(--border); border-radius: var(--radius-lg); background: var(--bg); color: var(--text); text-decoration: none; }
 @media (hover: hover) { .memory:hover { background: var(--band); color: var(--text); } }
 .memory__thumb { flex: none; width: 6rem; height: 6rem; border-radius: var(--radius); overflow: hidden; border: 2px solid var(--rule); background: var(--surface); }
@@ -269,7 +269,8 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 
 /* ---------- Trusted person ---------- */
 .banner__h { margin: 0; font-size: calc(1.3rem * var(--tx)); text-decoration: none; }
-.review-banner { margin: 0; display: flex; align-items: center; justify-content: center; gap: .6rem; padding: .5rem 1rem; background: var(--marker); color: var(--on-marker); font-weight: 800; border-bottom: var(--line) solid var(--border); }
+.review-banner { margin: 0; display: flex; align-items: center; gap: .6rem; padding: .5rem max(1rem, env(safe-area-inset-left)); background: var(--accent-soft); color: var(--text); font-weight: 700; font-size: calc(.95rem * var(--tx)); border-bottom: 1px solid var(--rule); }
+.review-banner .icon { color: var(--navy); width: 1.3rem; height: 1.3rem; flex: none; }
 .activity { list-style: none; margin: .5rem 0 1.5rem; padding: 0; display: grid; gap: .5rem; }
 .activity li { display: flex; gap: .75rem; align-items: flex-start; padding: .6rem .9rem; border: 2px solid var(--rule); border-radius: var(--radius); }
 .activity .icon { margin-top: .2rem; color: var(--navy); }
@@ -476,3 +477,17 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 .failure__tech > summary { cursor: pointer; padding: .5rem .75rem; min-height: 44px; display: flex; align-items: center; font-size: .9rem; }
 .failure__tech > summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 .failure__tech pre { margin: 0; padding: .6rem .75rem; border-top: var(--line) solid var(--border); font-size: .85rem; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
+
+/* Helper side bar: the waiting count sits on the item */
+.appnav__item { position: relative; }
+.nav-count { min-width: 1.6em; padding: 0 .45em; border-radius: 999px; background: var(--marker); color: var(--on-marker); font-weight: 800; text-align: center; font-size: .85rem; line-height: 1.5; }
+@media (max-width: 959px) { .appnav__item .nav-count { position: absolute; top: .2rem; left: calc(50% + .5rem); } }
+@media (min-width: 960px) { .appnav__item .nav-count { margin-inline-start: auto; } }
+
+/* Helper queue rows: risk is a word, an icon and a colour */
+.row__side .badge { white-space: nowrap; }
+.evidence__who { margin: 0 0 1rem; }
+.evidence__who strong { font-size: calc(1.2rem * var(--tx)); }
+.evidence__who code { overflow-wrap: anywhere; }
+.evidence__read { margin: 0 0 1rem; }
+.evidence__read .btn { padding-inline: 0; min-height: 48px; }

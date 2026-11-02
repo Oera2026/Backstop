@@ -91,6 +91,7 @@ builder.Services.AddScoped<AskSession>();
 builder.Services.AddSingleton<MailStore>();
 builder.Services.AddSingleton<IMailService, MockMailService>();
 builder.Services.AddSingleton<IGuardianService, MockGuardianService>();
+builder.Services.AddHostedService<MailRescanService>();
 
 // The Check, Show me, Explain, Remember and trusted-person modes.
 builder.Services.AddSingleton<MockApiOptions>();

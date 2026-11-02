@@ -1,11 +1,9 @@
-@inherits ModeComponentBase
-
 @* Stories the user asked for about a sensitive topic. They wait here until the helper decides. *@
-@if (_items is { Count: > 0 })
+@if (Items.Count > 0)
 {
     <h2>Stories to read first</h2>
     <ul class="rows" aria-label="Held stories">
-        @foreach (var i in _items)
+        @foreach (var i in Items)
         {
             <li>
                 <a class="row" href="helper/story/@i.Id">
@@ -23,22 +21,8 @@
         }
     </ul>
 }
-else if (_problem is not null)
-{
-    <ErrorState Message="@_problem" OnRetry="Load" />
-}
 
 @code {
-    private IReadOnlyList<ReviewItem>? _items;
-    private string? _problem;
-
-    protected override Task OnInitializedAsync() => Load();
-    protected override Task OnApiChangedAsync() => Load();
-
-    private async Task Load()
-    {
-        _problem = null;
-        try { _items = (await Api.GetReviewQueueAsync()).Where(i => i.Source == ReviewSource.Story).ToList(); }
-        catch (BackstopApiException ex) { _problem = ex.Message; }
-    }
+    [Parameter, EditorRequired] public IReadOnlyList<ReviewItem> Items { get; set; } = [];
+    [CascadingParameter] private UserClock Clock { get; set; } = UserClock.Server;
 }
