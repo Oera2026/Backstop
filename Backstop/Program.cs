@@ -50,6 +50,7 @@ builder.Services.AddTransient<ILlamaScamChecker>(sp => sp.GetRequiredService<Met
 builder.Services.AddTransient<IMetaScamChecker>(sp => sp.GetRequiredService<MetaAiScamChecker>());
 
 // MOCK: swap these registrations for real implementations later. No other code needs to change.
+builder.Services.AddScoped<AskSession>();
 builder.Services.AddSingleton<MailStore>();
 builder.Services.AddSingleton<IMailService, MockMailService>();
 builder.Services.AddSingleton<IGuardianService, MockGuardianService>();

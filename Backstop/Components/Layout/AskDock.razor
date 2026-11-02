@@ -1,0 +1,52 @@
+@implements IDisposable
+@inject AskSession Session
+@inject NavigationManager Nav
+
+@* The Ask Me page is the same chat at full size, so the dock stays out of its way there. *@
+@if (!OnAskPage)
+{
+    @if (Session.DockOpen)
+    {
+        <aside id="ask-dock" class="dock" aria-label="Ask Me">
+            <div class="dock__head">
+                <h2>Ask Me</h2>
+                <a class="btn btn-text dock__full" href="ask-me">Open full page</a>
+                <button type="button" class="btn btn-text dock__close" aria-label="Close Ask Me" @onclick="() => Session.SetDock(false)">
+                    <Icon Name="cross" />
+                </button>
+            </div>
+            <AskChat Compact="true" />
+        </aside>
+    }
+    else
+    {
+        <button type="button" class="dock-tab" aria-expanded="false" aria-controls="ask-dock" @onclick="() => Session.SetDock(true)">
+            <Icon Name="chat" /> <span>Ask Me</span>
+        </button>
+    }
+}
+
+@code {
+    private bool OnAskPage =>
+        Nav.ToBaseRelativePath(Nav.Uri).Split('?', '#')[0].Equals("ask-me", StringComparison.OrdinalIgnoreCase);
+
+    protected override void OnInitialized()
+    {
+        Session.Changed += OnChanged;
+        Nav.LocationChanged += OnMoved;
+    }
+
+    private void OnChanged() => _ = InvokeAsync(() =>
+    {
+        try { StateHasChanged(); }
+        catch (ObjectDisposedException) { /* circuit already closed */ }
+    });
+
+    private void OnMoved(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e) => OnChanged();
+
+    public void Dispose()
+    {
+        Session.Changed -= OnChanged;
+        Nav.LocationChanged -= OnMoved;
+    }
+}

@@ -1,5 +1,6 @@
 @page "/message/{Id}"
 @inherits LiveComponentBase
+@inject AskSession AskSession
 
 @* Fail closed: GetClearedMessage returns null for anything that is not Cleared. *@
 @{ var m = Mail.GetClearedMessage(Id); }
@@ -44,4 +45,13 @@ else
 
 @code {
     [Parameter] public string Id { get; set; } = "";
+
+    // Ask Me can answer about the email that is open. It only ever gets a Cleared one.
+    protected override void OnParametersSet() => AskSession.SetPage(this, () => new AskSession.PageContext(Id));
+
+    public override void Dispose()
+    {
+        AskSession.ClearPage(this);
+        base.Dispose();
+    }
 }

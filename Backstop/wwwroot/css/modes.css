@@ -423,3 +423,50 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
   .site-header:not(.site-header--helper) .site-nav a { padding-inline: .4rem; }
 }
 @media (max-width: 959px) { .settings-foot { position: static; border-top: 0; padding-inline: 0; } }
+
+/* ---------- Ask Me dock: the same chat in a panel on the right ---------- */
+.dock-tab {
+  position: fixed; right: 0; bottom: calc(5rem + env(safe-area-inset-bottom)); z-index: 35;
+  display: inline-flex; align-items: center; gap: .6rem; min-height: 56px; padding: 0 1.1rem;
+  font: inherit; font-weight: 800; color: var(--on-navy); background: var(--navy);
+  border: 0; border-radius: var(--radius) 0 0 var(--radius); cursor: pointer;
+}
+@media (hover: hover) { .dock-tab:hover { background: var(--navy-hover); } }
+@media (min-width: 960px) { .dock-tab { bottom: auto; top: 50%; transform: translateY(-50%); } }
+
+.dock {
+  position: fixed; inset: 0 0 calc(4rem + env(safe-area-inset-bottom)) 0; z-index: 40;
+  display: flex; flex-direction: column; background: var(--bg); padding: 0 .75rem;
+}
+.dock__head { display: flex; align-items: center; gap: .25rem; min-height: 56px; border-bottom: 1px solid var(--rule); }
+.dock__head h2 { margin: 0 auto 0 0; font-size: calc(1.3rem * var(--tx)); }
+.dock__close { min-width: 56px; padding-inline: 0; }
+.dock .chat { border: 0; padding: 0; margin: 0; flex: 1; min-height: 0; }
+.dock .chat__log { overflow-y: auto; flex: 1 1 0; min-height: 0; padding-top: 1rem; }
+.dock .bubble { max-width: 92%; font-size: calc(1rem * var(--tx)); padding: .7rem 1rem; }
+.dock .composer { position: static; padding-bottom: .75rem; }
+
+@media (min-width: 960px) {
+  .dock {
+    position: sticky; inset: auto; top: 4.5rem; z-index: auto; align-self: flex-start;
+    flex: 0 0 24rem; height: calc(100vh - 4.5rem); border-left: var(--line) solid var(--border);
+  }
+}
+@media (min-width: 960px) and (max-width: 1279px) { .dock { flex-basis: 20rem; } }
+
+/* ---------- Ask Me cards: a draft, a calendar entry, things it found ---------- */
+.askcard { margin-top: .8rem; padding: .9rem 1rem; background: var(--bg); border: var(--line) solid var(--border); border-radius: var(--radius); display: grid; gap: .5rem; }
+.askcard__title { display: flex; align-items: center; gap: .5rem; margin: 0; font-weight: 800; }
+.askcard__line { margin: 0; overflow-wrap: anywhere; }
+.askcard .btn { justify-self: start; }
+.askfound { margin: .8rem 0 0; padding-left: 1.2rem; display: grid; gap: .3rem; }
+.askfound a { font-weight: 700; }
+
+/* The dock sits beside the page on wide screens. On mid-width screens it floats over the page instead,
+   so the side bar, the page and the dock never squeeze each other. */
+@media (min-width: 960px) and (max-width: 1279px) {
+  .dock {
+    position: fixed; top: 4.5rem; right: 0; bottom: 0; height: auto; z-index: 40;
+    flex: none; width: 24rem; max-width: 90vw; box-shadow: -8px 0 24px rgb(0 0 0 / .18);
+  }
+}

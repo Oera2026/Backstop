@@ -1,5 +1,6 @@
 @page "/compose"
 @inherits LiveComponentBase
+@inject AskSession AskSession
 
 @switch (_stage)
 {
@@ -138,27 +139,56 @@
     [SupplyParameterFromQuery(Name = "to")] public string? ToAddress { get; set; }
     [SupplyParameterFromQuery(Name = "subject")] public string? SubjectText { get; set; }
     [SupplyParameterFromQuery(Name = "reply")] public string? ReplyId { get; set; }
+    [SupplyParameterFromQuery(Name = "body")] public string? BodyText { get; set; }
 
-    // Contacts open this page with the person filled in. A reply takes the person and subject
-    // from the message itself, and only from a Cleared one.
+    private string? _appliedQuery;
+
     protected override void OnInitialized()
     {
         base.OnInitialized();
+        // Ask Me can see the message being written, and the one being answered.
+        AskSession.SetPage(this, () => new AskSession.PageContext(_reply?.Id, _to, _subject, _body));
+    }
+
+    // Contacts open this page with the person filled in. A reply takes the person and subject
+    // from the message itself, and only from a Cleared one. Ask Me can open this page again with a
+    // draft, so the link is read whenever it changes, not only the first time. A draft is only text
+    // in the box: nothing is sent until the person presses Send.
+    protected override void OnParametersSet()
+    {
+        var query = $"{ReplyId}|{ToAddress}|{SubjectText}|{BodyText}";
+        if (query == _appliedQuery) return;
+        var first = _appliedQuery is null;
+        _appliedQuery = query;
+        if (!first && _stage != Stage.Form) return;
+        ApplyQuery();
+    }
+
+    private void ApplyQuery()
+    {
         _reply = string.IsNullOrWhiteSpace(ReplyId) ? null : Mail.GetClearedMessage(ReplyId);
+        _locked = false;
         if (_reply is not null && !NoReply.IsNoReply(_reply.FromAddress))
         {
             _to = _reply.FromAddress;
             _subject = _reply.Subject.StartsWith("Re:", StringComparison.OrdinalIgnoreCase) ? _reply.Subject : "Re: " + _reply.Subject;
             _locked = true;
-            return;
         }
-        _reply = null;
-        if (!string.IsNullOrWhiteSpace(ToAddress))
+        else
         {
-            _to = ToAddress.Trim();
-            _locked = true;
+            _reply = null;
+            if (!string.IsNullOrWhiteSpace(ToAddress))
+            {
+                _to = ToAddress.Trim();
+                _locked = true;
+            }
+            if (!string.IsNullOrWhiteSpace(SubjectText)) _subject = SubjectText;
         }
-        if (!string.IsNullOrWhiteSpace(SubjectText)) _subject = SubjectText;
+        if (!string.IsNullOrWhiteSpace(BodyText))
+        {
+            _body = BodyText.Length > 2000 ? BodyText[..2000] : BodyText;
+            _quick = "";
+        }
     }
 
     private string PauseSpeech =>
@@ -270,6 +300,7 @@
 
     public override void Dispose()
     {
+        AskSession.ClearPage(this);
         if (_stage == Stage.Sending)
         {
             _cts?.Cancel();

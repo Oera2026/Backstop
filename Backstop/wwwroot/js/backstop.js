@@ -6,7 +6,7 @@ window.backstop = {
     // Wait two frames so the bubble that was just added has been laid out, then measure.
     requestAnimationFrame(() => requestAnimationFrame(() => {
       // The composer sticks to the bottom of the screen, so stop short of it instead of scrolling behind it.
-      const composer = document.querySelector(".composer");
+      const composer = el.closest(".chat")?.querySelector(".composer") ?? document.querySelector(".composer");
       el.style.scrollMarginBottom = composer ? Math.max(0, window.innerHeight - composer.getBoundingClientRect().top) + 8 + "px" : "0px";
       el.scrollIntoView({ block: "end", behavior: calm ? "auto" : "smooth" });
     }));

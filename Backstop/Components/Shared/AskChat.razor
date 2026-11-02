@@ -1,0 +1,250 @@
+@inherits ModeComponentBase
+@inject IJSRuntime JS
+@inject AskSession Session
+
+<div class="chat @(Compact ? "chat--dock" : "")">
+    @if (!Compact)
+    {
+        <h1>Ask Me</h1>
+    }
+
+    <ol class="chat__log" aria-live="polite" aria-label="Your conversation">
+        <li class="bubble bubble--bot">What do you need help with?</li>
+        @foreach (var t in Session.Turns)
+        {
+            @if (t.FromUser)
+            {
+                <li class="bubble bubble--user">
+                    @t.Text
+                    @if (t.HadPicture)
+                    {
+                        <span class="bubble__pic"><Icon Name="camera" /> Picture</span>
+                    }
+                </li>
+            }
+            else
+            {
+                <li class="bubble bubble--bot">
+                    @if (t.Verdict is { } v)
+                    {
+                        <span class="bubble__verdict bubble__verdict--@v.ToString().ToLowerInvariant()">
+                            <Icon Name="@(v == Verdict.LooksSafe ? "check" : v == Verdict.BeCareful ? "hand" : "cross")" />
+                            @(v == Verdict.LooksSafe ? "Looks safe" : v == Verdict.BeCareful ? "Be careful" : "Do not reply")
+                        </span>
+                    }
+                    <span class="bubble__text">@t.Text</span>
+                    @if (t.Lines.Count > 0)
+                    {
+                        <ul class="bubble__list">
+                            @foreach (var line in t.Lines)
+                            {
+                                <li>@line</li>
+                            }
+                        </ul>
+                    }
+                    @if (t.Draft is { } d)
+                    {
+                        <div class="askcard">
+                            <p class="askcard__title"><Icon Name="pen" /> Draft message</p>
+                            <p class="askcard__line"><strong>Subject:</strong> @d.Subject</p>
+                            @foreach (var para in d.Body.Split("\n\n"))
+                            {
+                                <p class="askcard__line">@para</p>
+                            }
+                            <a class="btn btn-primary" href="@DraftHref(d)"><Icon Name="pen" /> Open draft</a>
+                        </div>
+                    }
+                    @if (t.Event is { } e)
+                    {
+                        <div class="askcard">
+                            <p class="askcard__title"><Icon Name="calendar" /> @e.Title</p>
+                            <p class="askcard__line">@e.Date.ToString("dddd d MMMM")@(e.Time is { } tm ? $", {tm:HH:mm}" : "")@(e.Place.Length > 0 ? $", {e.Place}" : "")</p>
+                            <a class="btn btn-primary" href="@EventHref(e)"><Icon Name="calendar" /> Add to calendar</a>
+                        </div>
+                    }
+                    @if (t.Found is { Count: > 0 } found)
+                    {
+                        <ul class="askfound">
+                            @foreach (var f in found)
+                            {
+                                <li><a href="@f.Href">@f.Text</a></li>
+                            }
+                        </ul>
+                    }
+                    @if (t.Href is not null)
+                    {
+                        <a class="btn btn-quiet bubble__link" href="@t.Href">@t.LinkText <Icon Name="arrow-right" /></a>
+                    }
+                </li>
+            }
+        }
+        @if (_busy)
+        {
+            <li class="bubble bubble--bot bubble--working" role="status">
+                <span class="working working--sm" aria-hidden="true"><span class="working__ring"></span><Icon Name="inspect" /></span>
+                <span>Working on it<span class="dots" aria-hidden="true"><i></i><i></i><i></i></span></span>
+            </li>
+        }
+        <li class="chat__end" @ref="_end" aria-hidden="true"></li>
+    </ol>
+
+    <form class="composer" @onsubmit="Send" novalidate>
+        @if (_picture is not null)
+        {
+            <p class="composer__file">
+                <Icon Name="camera" /> <span>@_picture.Name</span>
+                <button type="button" class="btn btn-text" @onclick="() => _picture = null">Remove</button>
+            </p>
+        }
+        <label class="sr-note" for="@TextId">Type here</label>
+        <textarea id="@TextId" rows="2" @bind="_text" @bind:event="oninput" placeholder="Type here, or paste a message"></textarea>
+        <div class="composer__row">
+            <label class="btn btn-quiet composer__attach">
+                <Icon Name="camera" /> <span class="composer__label">Add a picture</span>
+                <InputFile OnChange="PickPicture" accept="image/*" class="sr-note" />
+            </label>
+            <button type="submit" class="btn btn-primary" disabled="@_busy" aria-busy="@(_busy ? "true" : null)">
+                @if (_busy) { <span class="spinner" aria-hidden="true"></span> } else { <Icon Name="send" /> }
+                Send
+            </button>
+        </div>
+        <p class="form-error" role="alert">@_error</p>
+    </form>
+</div>
+
+@code {
+    /// <summary>True in the dock on the right: no page heading, and the layout fits a narrow panel.</summary>
+    [Parameter] public bool Compact { get; set; }
+
+    private const long MaxPicture = 10 * 1024 * 1024;
+
+    private static string Esc(string s) => Uri.EscapeDataString(s);
+
+    // Opening a draft only fills in the Compose form. The person reads it and presses Send themselves.
+    private static string DraftHref(AskDraft d)
+    {
+        var q = d.ReplyToId is not null ? $"reply={Esc(d.ReplyToId)}" : (d.To is not null ? $"to={Esc(d.To)}&subject={Esc(d.Subject)}" : $"subject={Esc(d.Subject)}");
+        return $"compose?{q}&body={Esc(d.Body)}";
+    }
+
+    private static string EventHref(AskEvent e) =>
+        $"calendar/new?date={e.Date:yyyy-MM-dd}&title={Esc(e.Title)}" + (e.Time is { } t ? $"&time={t:HH:mm}" : "") + (e.Place.Length > 0 ? $"&place={Esc(e.Place)}" : "");
+
+    private string TextId => Compact ? "ask-text-dock" : "ask-text";
+
+    private string _text = "";
+    private string? _error;
+    private bool _busy;
+    private PicturePicker.PickedFile? _picture;
+    private ElementReference _end;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        Session.Changed += OnSessionChanged;
+    }
+
+    private void OnSessionChanged() => _ = InvokeAsync(() =>
+    {
+        try { StateHasChanged(); }
+        catch (ObjectDisposedException) { /* circuit already closed */ }
+    });
+
+    public override void Dispose()
+    {
+        Session.Changed -= OnSessionChanged;
+        base.Dispose();
+    }
+
+    private async Task PickPicture(InputFileChangeEventArgs e)
+    {
+        _error = null;
+        try
+        {
+            await using var stream = e.File.OpenReadStream(MaxPicture);
+            using var memory = new MemoryStream();
+            await stream.CopyToAsync(memory);
+            _picture = new PicturePicker.PickedFile(memory.ToArray(), e.File.Name);
+        }
+        catch (IOException)
+        {
+            _picture = null;
+            _error = "That picture is too big. Please choose a smaller one.";
+        }
+    }
+
+    private async Task Send()
+    {
+        _error = null;
+        var text = _text.Trim();
+        if (_busy) return;
+        if (text.Length == 0 && _picture is null)
+        {
+            _error = "Please type something, or add a picture.";
+            return;
+        }
+
+        var picture = _picture;
+        Session.Turns.Add(new AskLine(true, text, picture is not null));
+        _text = "";
+        _picture = null;
+        _busy = true;
+        Session.Touch();
+        await ScrollDown();
+
+        try
+        {
+            Session.Turns.Add(await Answer(text, picture));
+        }
+        catch (BackstopApiException ex)
+        {
+            Session.Turns.Add(new AskLine(false, ex.Message));
+        }
+        catch (Exception)
+        {
+            // Anything unexpected: say so plainly. Nothing is marked safe on an error.
+            Session.Turns.Add(new AskLine(false, "Sorry, I could not do that. Please try again."));
+        }
+        finally
+        {
+            _busy = false;
+        }
+        Session.Touch();
+        await ScrollDown();
+    }
+
+    /// <summary>A picture, or a plain question about a scam, goes through Check (the full verdict). Everything else is a conversation with the AI.</summary>
+    private static bool WantsCheck(string text, bool hasPicture)
+    {
+        if (hasPicture) return true;
+        var t = text.ToLowerInvariant();
+        return new[] { "is this safe", "is this real", "is this a scam", "is this genuine", "is it a scam", "scam", "suspicious", "is this message", "is this email" }.Any(t.Contains);
+    }
+
+    private async Task<AskLine> Answer(string text, PicturePicker.PickedFile? picture)
+    {
+        var page = Session.Page;
+        var context = new AskContext(Clock.Today, page?.MessageId, page?.DraftTo, page?.DraftSubject, page?.DraftBody);
+
+        if (WantsCheck(text, picture is not null))
+        {
+            // "Is this a scam?" with an email open, and nothing pasted, means that email. Only a Cleared one is read.
+            var open = picture is null && text.Length < 200 && !string.IsNullOrWhiteSpace(page?.MessageId) ? Mail.GetClearedMessage(page.MessageId) : null;
+            var result = picture is not null
+                ? await Api.CheckContentAsync(new CheckRequest(CheckKind.Picture, null, picture.Bytes, picture.Name))
+                : await Api.CheckContentAsync(new CheckRequest(CheckKind.Message, open is not null ? $"{open.Subject}\n{open.Body}" : text));
+            return new AskLine(false, result.Reason, Verdict: result.Verdict, Href: $"check/{result.Id}", LinkText: "See the whole check");
+        }
+
+        // The turns so far, without the message just added: the API adds that one itself.
+        var history = Session.Turns.SkipLast(1).Select(t => new AskTurn(t.FromUser, t.Text)).ToList();
+        var reply = await Api.AskAsync(history, text, context);
+        return new AskLine(false, reply.Text, Href: reply.Href, LinkText: reply.LinkText, Draft: reply.Draft, Event: reply.Event, Found: reply.Found);
+    }
+
+    private async Task ScrollDown()
+    {
+        StateHasChanged();
+        try { await JS.InvokeVoidAsync("backstop.scrollToEnd", _end); } catch (Exception) { /* scrolling is a nicety */ }
+    }
+}

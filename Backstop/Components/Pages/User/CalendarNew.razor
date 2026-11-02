@@ -31,6 +31,9 @@
 
 @code {
     [SupplyParameterFromQuery(Name = "date")] public string? DateText { get; set; }
+    [SupplyParameterFromQuery(Name = "title")] public string? TitleText { get; set; }
+    [SupplyParameterFromQuery(Name = "time")] public string? TimeText { get; set; }
+    [SupplyParameterFromQuery(Name = "place")] public string? PlaceText { get; set; }
 
     private string _title = "", _place = "", _error = "";
     private DateOnly _date;
@@ -40,6 +43,10 @@
     {
         base.OnInitialized();
         _date = DateOnly.TryParse(DateText, out var d) ? d : Clock.Today;
+        // Ask Me can fill this in. It is only a form: nothing is saved until the person presses Save.
+        if (!string.IsNullOrWhiteSpace(TitleText)) _title = TitleText.Length > 80 ? TitleText[..80] : TitleText;
+        if (TimeOnly.TryParseExact(TimeText, "HH:mm", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var t)) _time = t;
+        if (!string.IsNullOrWhiteSpace(PlaceText)) _place = PlaceText.Length > 80 ? PlaceText[..80] : PlaceText;
     }
 
     private void Save()

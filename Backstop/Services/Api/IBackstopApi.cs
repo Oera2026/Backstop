@@ -38,7 +38,7 @@ public interface IBackstopApi
 
     // --- Ask Me ---
     /// <summary>A real conversation with the AI. The helper is told whenever someone may need help.</summary>
-    Task<AskReply> AskAsync(IReadOnlyList<AskTurn> history, string message, CancellationToken ct = default);
+    Task<AskReply> AskAsync(IReadOnlyList<AskTurn> history, string message, AskContext? context = null, CancellationToken ct = default);
 
     // --- Remember ---
     Task<IReadOnlyList<MemoryCard>> GetMemoryCardsAsync(string? search = null, CancellationToken ct = default);
