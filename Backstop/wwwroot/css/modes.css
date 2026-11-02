@@ -568,14 +568,17 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 .tour-spot { position: fixed; z-index: 40; pointer-events: none; border-radius: var(--radius-lg); outline: 4px solid var(--marker); box-shadow: 0 0 0 100vmax var(--scrim); }
 .framed .tour-spot, .framed .tourcard { display: none; }
 .tourcard {
-  position: fixed; z-index: 50; inset-inline: .75rem; bottom: calc(5rem + env(safe-area-inset-bottom)); max-width: 26rem; margin-inline: auto;
-  background: var(--bg); border: var(--line) solid var(--navy); border-radius: var(--radius-lg); padding: 1rem 1.25rem; box-shadow: 0 8px 24px var(--scrim);
+  position: fixed; z-index: 50; left: 0; top: 0; visibility: hidden;
+  width: min(22rem, calc(100vw - 1.5rem)); height: 13.5rem; overflow: auto;
+  display: flex; flex-direction: column; justify-content: space-between; gap: .5rem;
+  background: var(--bg); border: var(--line) solid var(--navy); border-radius: var(--radius-lg); padding: .75rem 1rem 1rem; box-shadow: 0 8px 24px var(--scrim);
 }
-.tourcard[data-pos="top"] { bottom: auto; top: 4.5rem; }
-.tourcard p { margin: 0 0 .5rem; }
-.tourcard__title { font-weight: 800; font-size: calc(1.15rem * var(--tx, 1)); }
-.tourcard__actions { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
-@media (min-width: 960px) {
-  .tourcard { inset-inline: auto 1.5rem; bottom: 1.5rem; margin-inline: 0; }
-  .tourcard[data-pos="top"] { top: 5rem; bottom: auto; }
-}
+.tourcard--placed { visibility: visible; }
+.tourcard__head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.tourcard__title { margin: 0; font-weight: 800; font-size: calc(1.2rem * var(--tx, 1)); }
+.tourcard__count { color: var(--text-2); font-weight: 600; font-size: .9rem; white-space: nowrap; }
+.tourcard__text { margin: 0; }
+.tourcard__actions { display: flex; gap: .5rem; }
+.tourcard__actions .btn-primary { flex: 1; }
+.tourcard__close { min-height: 48px; min-width: 48px; padding: 0; }
+.tourcard__head .tourcard__title { flex: 1; }

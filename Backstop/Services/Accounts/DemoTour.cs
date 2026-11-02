@@ -10,16 +10,16 @@ public sealed class DemoTour
 {
     public static readonly IReadOnlyList<TourStep> Steps =
     [
-        new(TourSide.User, "/", "The inbox", "This is what the user sees. Mail still being checked is not shown. Tap Ask Me.", ".appnav__item[href='ask-me']", true),
-        new(TourSide.User, "ask-me", "Ask Me", "The user can ask for help in plain words. Try typing a question here.", ".composer textarea"),
-        new(TourSide.User, "ask-me", "Messages", "Chats with the people they know live here. Tap Messages.", ".appnav__item[href='messages']", true),
-        new(TourSide.User, "messages", "Remember", "Notes for things they want to do again. Tap Remember.", ".appnav__item[href='remember']", true),
-        new(TourSide.User, "remember", "Remember", "Saved notes appear here, with pictures and steps.", "main h1"),
-        new(TourSide.Helper, "/helper", "Waiting for the helper", "Now you are the helper. Anything unclear waits here for a decision.", "main h1"),
-        new(TourSide.Helper, "/helper", "History", "Every decision is kept. Tap History.", ".appnav__item[href='/helper/history']", true),
-        new(TourSide.Helper, "/helper/history", "Messages", "The helper can talk to the user from here. Tap Messages.", ".appnav__item[href='/helper/messages']", true),
-        new(TourSide.Helper, "/helper/messages", "Messages", "A private chat between helper and user.", "main h1"),
-        new(TourSide.User, "/demo", "Demo panel", "Pick a made-up email, then press Simulate. Watch it get checked.", "#scenario"),
+        new(TourSide.User, "/", "Inbox", "Mail waits here until it is checked. Tap Ask Me.", ".appnav__item[href='ask-me']", true),
+        new(TourSide.User, "ask-me", "Ask Me", "Type a question and send it.", ".composer textarea"),
+        new(TourSide.User, "ask-me", "Messages", "Chats with family live here. Tap Messages.", ".appnav__item[href='messages']", true),
+        new(TourSide.User, "messages", "Notes", "Notes to do things again. Tap Remember.", ".appnav__item[href='remember']", true),
+        new(TourSide.User, "remember", "Your notes", "Saved notes show here, with steps.", "main h1"),
+        new(TourSide.Helper, "/helper", "Helper side", "Unclear mail waits here for a decision.", "main h1"),
+        new(TourSide.Helper, "/helper", "History", "Past decisions are kept. Tap History.", ".appnav__item[href='/helper/history']", true),
+        new(TourSide.Helper, "/helper/history", "Messages", "Talk to the user. Tap Messages.", ".appnav__item[href='/helper/messages']", true),
+        new(TourSide.Helper, "/helper/messages", "Chat", "A private chat with the user.", "main h1"),
+        new(TourSide.User, "/demo", "Demo panel", "Pick an email, then press Simulate.", "#scenario"),
     ];
 
     public bool Active { get; private set; } = true;
@@ -33,7 +33,14 @@ public sealed class DemoTour
     public void Next() { if (!IsLast) { Index++; _last[Current.Side] = Index; Changed?.Invoke(); } }
     public void Back() { if (!IsFirst) { Index--; _last[Current.Side] = Index; Changed?.Invoke(); } }
     public void Close() { Active = false; Changed?.Invoke(); }
-    public void Restart() { Index = 0; Active = true; Changed?.Invoke(); }
+    /// <summary>Starts again from the first step on the side the visitor is looking at.</summary>
+    public void Restart(TourSide side)
+    {
+        Index = Steps.ToList().FindIndex(s => s.Side == side);
+        _last[side] = Index;
+        Active = true;
+        Changed?.Invoke();
+    }
 
     private readonly Dictionary<TourSide, int> _last = new() { [TourSide.User] = 0, [TourSide.Helper] = Steps.ToList().FindIndex(s => s.Side == TourSide.Helper) };
 

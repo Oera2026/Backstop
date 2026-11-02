@@ -13,17 +13,20 @@
             </div>
             @if (!Tour.Active)
             {
-                <button type="button" class="btn btn-quiet" @onclick="Tour.Restart">Start the guide</button>
+                <button type="button" class="btn btn-quiet" @onclick="Restart">Start the guide</button>
             }
         </div>
     </div>
     @if (Tour.Active)
     {
         var s = Tour.Current;
-        <section class="tourcard" data-pos="@_pos" role="region" aria-label="Guide" aria-live="polite">
-            <p class="demobar__count">Step @(Tour.Index + 1) of @DemoTour.Steps.Count</p>
-            <p class="tourcard__title">@s.Title</p>
-            <p>@s.Text</p>
+        <section class="tourcard" role="region" aria-label="Guide" aria-live="polite">
+            <div class="tourcard__head">
+                <p class="tourcard__title">@s.Title</p>
+                <span class="tourcard__count">@(Tour.Index + 1) of @DemoTour.Steps.Count</span>
+                <button type="button" class="btn btn-text tourcard__close" @onclick="Tour.Close" aria-label="Close guide"><Icon Name="cross" /></button>
+            </div>
+            <p class="tourcard__text">@s.Text</p>
             <div class="tourcard__actions">
                 @if (!Tour.IsFirst)
                 {
@@ -37,7 +40,6 @@
                 {
                     <button type="button" class="btn btn-primary" @onclick="Next">@(s.Tap ? "Show me" : "Next") <Icon Name="arrow-right" /></button>
                 }
-                <button type="button" class="btn btn-text" @onclick="Tour.Close">Close guide</button>
             </div>
         </section>
     }
@@ -46,7 +48,6 @@
 @code {
     [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
 
-    private string _pos = "bottom";
     private string _key = "";
     private bool _isDemo;
 
@@ -79,13 +80,13 @@
         try
         {
             if (!Tour.Active) { await JS.InvokeVoidAsync("backstopTour.hide"); return; }
-            var pos = await JS.InvokeAsync<string>("backstopTour.show", Tour.Current.Selector);
-            if (pos != _pos) { _pos = pos; StateHasChanged(); }
+            await JS.InvokeVoidAsync("backstopTour.show", Tour.Current.Selector);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or InvalidOperationException or TaskCanceledException) { /* closed, or still drawing on the server */ }
     }
 
     private void Go() => Nav.NavigateTo(Tour.Current.Path);
+    private void Restart() { Tour.Restart(Side); Go(); }
     private void Next() { Tour.Next(); Go(); }
     private void Back() { Tour.Back(); Go(); }
 
