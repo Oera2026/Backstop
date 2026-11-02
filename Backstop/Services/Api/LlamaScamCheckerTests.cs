@@ -450,6 +450,34 @@ public class LlamaScamCheckerTests
             Assert(scam.Href == "check", "A scam-looking message points to Check");
             Console.WriteLine("PASS: Ask Me answers differ and failures are honest.");
 
+            // Social stories: the model sends a scene as data. Unknown shapes are dropped, numbers clamped, markup never passes.
+            var okJson = "{\"title\":\"Going to the dentist\",\"sensitive\":false,\"pages\":[{\"heading\":\"What happens\",\"text\":\"I go to the dentist. I sit down.\",\"picture\":\"door\",\"scene\":[" +
+                "{\"shape\":\"person\",\"x\":9999,\"y\":-5,\"scale\":900,\"tone\":\"paper\",\"motion\":\"fade-in\",\"delay\":9}," +
+                "{\"shape\":\"script\",\"x\":10,\"y\":10},{\"shape\":\"door\",\"tone\":\"red\",\"motion\":\"spin\"}]}]}";
+            var okStory = MetaStoryWriter.ParseContent(okJson);
+            Assert(okStory.Success && okStory.Pages.Count == 1, "A good story is read");
+            var items = okStory.Pages[0].Scene!.Items;
+            Assert(items.Count == 2, "Unknown shapes are dropped");
+            Assert(items[0].X == 300 && items[0].Y == 20 && items[0].Scale == 200 && items[0].Delay == 3, "Numbers are clamped");
+            Assert(items[1].Tone == "paper" && items[1].Motion == "none", "Unknown tone and motion fall back");
+            Assert(!MetaStoryWriter.ParseContent("{\"title\":\"x\",\"pages\":[{\"heading\":\"Go to http://example.com\",\"text\":\"Hi\",\"picture\":\"door\"}]}").Success, "A page with a link is refused");
+            Assert(!MetaStoryWriter.ParseContent("not json").Success, "Rubbish is refused");
+            Assert(MetaStoryWriter.ParseContent("{\"title\":\"A\",\"pages\":[{\"heading\":\"B\",\"text\":\"C.\",\"picture\":\"nope\",\"scene\":[{\"shape\":\"bad\"}]}]}").Pages[0].Scene is null, "A page with no valid items has no scene");
+
+            // Through the app: a failed writer gives no story; a sensitive word still holds it; the AI can add a hold.
+            var failApi = new MockBackstopApi(new MockGuardianService(new MailStore()), new MockApiOptions(), null, null, null, null, new StubWriter(new StoryDraft(false, "", [], false)));
+            var threw = false;
+            try { await failApi.MakeStoryAsync(new StoryRequest("I am going to the dentist", null)); } catch (BackstopApiException) { threw = true; }
+            Assert(threw, "A failed writer makes no story");
+            var good = new StoryDraft(true, "T", [new StoryPage("H", "Words.", "home")], false);
+            var goodApi = new MockBackstopApi(new MockGuardianService(new MailStore()), new MockApiOptions(), null, null, null, null, new StubWriter(good));
+            Assert((await goodApi.MakeStoryAsync(new StoryRequest("I am going to the dentist", null))).Status == StoryStatus.Ready, "A normal story is ready");
+            Assert((await goodApi.MakeStoryAsync(new StoryRequest("I owe the bank money", null))).Status == StoryStatus.Held, "A sensitive word still holds");
+            var aiHold = new MockBackstopApi(new MockGuardianService(new MailStore()), new MockApiOptions(), null, null, null, null, new StubWriter(good with { Sensitive = true }));
+            var held = await aiHold.MakeStoryAsync(new StoryRequest("I am going to the dentist", null));
+            Assert(held.Status == StoryStatus.Held && held.Pages.Count == 0, "The AI can hold a story, and the user sees no words");
+            Console.WriteLine("PASS: Social stories are checked, clamped and fail closed.");
+
             // Anyone who may need help reaches the helper, even with no AI at all.
             foreach (var api2 in new[]
             {
@@ -862,6 +890,11 @@ public class LlamaScamCheckerTests
             Task.FromResult(read(text));
         public Task<DocumentAnswer> AnswerAsync(string documentText, string question, CancellationToken ct = default) =>
             Task.FromResult(answer(question));
+    }
+
+    private sealed class StubWriter(StoryDraft draft) : IStoryWriter
+    {
+        public Task<StoryDraft> WriteAsync(string situation, string? when, CancellationToken ct = default) => Task.FromResult(draft);
     }
 
     private sealed class StubAssistant(Func<string, AssistantReply> answer) : IAssistant

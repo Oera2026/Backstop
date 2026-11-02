@@ -1,0 +1,87 @@
+@* An animated picture drawn from a Scene. The scene is only shape names and numbers (already checked), so nothing
+   from the model is ever written out as markup. Colours come from theme classes. *@
+<svg class="guidepic" viewBox="0 0 320 240" role="img" aria-label="@Label">
+    @foreach (var it in Scene.Items)
+    {
+        var tone = "gp-" + (it.Tone is "band" or "paper" or "mark" or "ink" ? it.Tone : "paper");
+        var motion = it.Motion switch { "float" => "an-float", "pulse" => "an-pulse", "slide-in" => "an-slide-in", "fade-in" => "an-fade-in", _ => "" };
+        var delay = it.Delay switch { 1 => "0.6s", 2 => "1.2s", 3 => "1.8s", _ => "0s" };
+        <g transform="translate(@it.X @it.Y) scale(@(it.Scale / 100.0))">
+            <g class="an @motion" style="animation-delay:@delay">
+                @switch (it.Shape)
+                {
+                    case "person":
+                        <circle class="@tone" cx="0" cy="-26" r="14" />
+                        <path class="@tone" d="M-22 34c0-26 10-44 22-44s22 18 22 44z" />
+                        break;
+                    case "door":
+                        <rect class="@tone" x="-24" y="-40" width="48" height="80" rx="4" />
+                        <circle class="gp-ink" cx="14" cy="2" r="2" />
+                        break;
+                    case "bus":
+                        <rect class="@tone" x="-44" y="-22" width="88" height="40" rx="10" />
+                        <rect class="gp-paper" x="-34" y="-14" width="16" height="14" rx="2" />
+                        <rect class="gp-paper" x="-12" y="-14" width="16" height="14" rx="2" />
+                        <rect class="gp-paper" x="10" y="-14" width="16" height="14" rx="2" />
+                        <circle class="gp-paper" cx="-24" cy="20" r="8" />
+                        <circle class="gp-paper" cx="24" cy="20" r="8" />
+                        break;
+                    case "chair":
+                        <path class="@tone" d="M-18 -34h26v40h-26z" />
+                        <rect class="@tone" x="-24" y="6" width="42" height="10" rx="3" />
+                        <line class="gp-ink" x1="-20" y1="16" x2="-22" y2="36" />
+                        <line class="gp-ink" x1="14" y1="16" x2="16" y2="36" />
+                        break;
+                    case "clock":
+                        <circle class="@tone" cx="0" cy="0" r="30" />
+                        <line class="gp-ink" x1="0" y1="0" x2="0" y2="-18" />
+                        <line class="gp-ink" x1="0" y1="0" x2="12" y2="6" />
+                        break;
+                    case "building":
+                        <rect class="@tone" x="-30" y="-40" width="60" height="80" rx="4" />
+                        <rect class="gp-paper" x="-20" y="-28" width="14" height="14" rx="2" />
+                        <rect class="gp-paper" x="6" y="-28" width="14" height="14" rx="2" />
+                        <rect class="gp-paper" x="-7" y="10" width="14" height="30" rx="2" />
+                        break;
+                    case "shop":
+                        <rect class="@tone" x="-36" y="-12" width="72" height="50" rx="4" />
+                        <path class="gp-mark" d="M-42 -12 -32 -38h64l10 26z" />
+                        <rect class="gp-paper" x="-9" y="8" width="18" height="30" rx="2" />
+                        break;
+                    case "speech":
+                        <path class="@tone" d="M-34 -24h68a8 8 0 0 1 8 8v28a8 8 0 0 1-8 8H-6l-16 14V20h-12a8 8 0 0 1-8-8v-28a8 8 0 0 1 8-8z" />
+                        <line class="gp-ink" x1="-26" y1="-6" x2="26" y2="-6" />
+                        <line class="gp-ink" x1="-26" y1="6" x2="8" y2="6" />
+                        break;
+                    case "heart":
+                        <path class="@tone" d="M0 30C-40 4-34 -26-14 -26c10 0 14 6 14 12 0-6 4-12 14-12 20 0 26 30-14 56z" />
+                        break;
+                    case "sun":
+                        <circle class="@tone" cx="0" cy="0" r="16" />
+                        <path class="gp-ink" d="M0 -30v-8M0 30v8M-30 0h-8M30 0h8M-21 -21l-6 -6M21 21l6 6M21 -21l6 -6M-21 21l-6 6" />
+                        break;
+                    case "tree":
+                        <rect class="gp-band" x="-6" y="8" width="12" height="32" rx="2" />
+                        <circle class="@tone" cx="0" cy="-8" r="28" />
+                        break;
+                    case "table":
+                        <rect class="@tone" x="-40" y="-6" width="80" height="12" rx="3" />
+                        <line class="gp-ink" x1="-32" y1="6" x2="-34" y2="34" />
+                        <line class="gp-ink" x1="32" y1="6" x2="34" y2="34" />
+                        break;
+                    case "paper":
+                        <rect class="@tone" x="-22" y="-30" width="44" height="60" rx="3" />
+                        <line class="gp-ink" x1="-12" y1="-14" x2="12" y2="-14" />
+                        <line class="gp-ink" x1="-12" y1="-2" x2="12" y2="-2" />
+                        <line class="gp-ink" x1="-12" y1="10" x2="4" y2="10" />
+                        break;
+                }
+            </g>
+        </g>
+    }
+</svg>
+
+@code {
+    [Parameter, EditorRequired] public Scene Scene { get; set; } = new([]);
+    [Parameter] public string Label { get; set; } = "Picture for this part of the story";
+}

@@ -79,6 +79,10 @@
                             }
                         </ul>
                     }
+                    @if (t.Story is { Pages.Count: > 0 } story)
+                    {
+                        <StoryPlayer Story="story" />
+                    }
                     @if (t.Href is not null)
                     {
                         <a class="btn btn-quiet bubble__link" href="@t.Href">@t.LinkText <Icon Name="arrow-right" /></a>
@@ -105,12 +109,15 @@
             </p>
         }
         <label class="sr-note" for="@TextId">Type here</label>
-        <textarea id="@TextId" rows="2" @bind="_text" @bind:event="oninput" placeholder="Type here, or paste a message"></textarea>
+        <textarea id="@TextId" rows="2" @bind="_text" @bind:event="oninput" placeholder="@(_storyMode ? "Tell me what is going to happen" : "Type here, or paste a message")"></textarea>
         <div class="composer__row">
             <label class="btn btn-quiet composer__attach">
                 <Icon Name="camera" /> <span class="composer__label">Add a picture</span>
                 <InputFile OnChange="PickPicture" accept="image/*" class="sr-note" />
             </label>
+            <button type="button" class="btn btn-quiet" aria-pressed="@(_storyMode ? "true" : "false")" disabled="@_busy" @onclick="() => _storyMode = !_storyMode">
+                <Icon Name="story" /> <span class="composer__label">Social story</span>
+            </button>
             <button type="submit" class="btn btn-primary" disabled="@_busy" aria-busy="@(_busy ? "true" : null)">
                 @if (_busy) { <span class="spinner" aria-hidden="true"></span> } else { <Icon Name="send" /> }
                 Send
@@ -142,7 +149,7 @@
 
     private string _text = "";
     private string? _error;
-    private bool _busy;
+    private bool _busy, _storyMode;
     private PicturePicker.PickedFile? _picture;
     private ElementReference _end;
 
@@ -192,6 +199,8 @@
             return;
         }
 
+        var story = _storyMode && text.Length > 0;
+        _storyMode = false;
         var picture = _picture;
         Session.Turns.Add(new AskLine(true, text, picture is not null));
         _text = "";
@@ -202,7 +211,7 @@
 
         try
         {
-            Session.Turns.Add(await Answer(text, picture));
+            Session.Turns.Add(story ? await MakeStory(text) : await Answer(text, picture));
         }
         catch (BackstopApiException ex)
         {
@@ -227,6 +236,14 @@
         if (hasPicture) return true;
         var t = text.ToLowerInvariant();
         return new[] { "is this safe", "is this real", "is this a scam", "is this genuine", "is it a scam", "scam", "suspicious", "is this message", "is this email" }.Any(t.Contains);
+    }
+
+    private async Task<AskLine> MakeStory(string text)
+    {
+        var made = await Api.MakeStoryAsync(new StoryRequest(text, null));
+        return made.Status == StoryStatus.Held
+            ? new AskLine(false, $"{Helper} is checking your story.")
+            : new AskLine(false, made.Title, Href: $"stories/{made.Id}", LinkText: "Open in My stories", Story: made);
     }
 
     private async Task<AskLine> Answer(string text, PicturePicker.PickedFile? picture)

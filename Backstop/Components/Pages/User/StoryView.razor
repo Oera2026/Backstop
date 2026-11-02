@@ -56,7 +56,9 @@ else
             <span style="width:@((_at + 1) * 100 / _story.Pages.Count)%"></span>
         </div>
         <figure class="storyfig">
-            <div class="figure__frame"><StoryPicture Name="@pg.Picture" /></div>
+            <div class="figure__frame">
+                @if (pg.Scene is { Items.Count: > 0 }) { <SceneArt @key="_at" Scene="pg.Scene" Label="@("Picture: " + pg.Heading)" /> } else { <StoryPicture Name="@pg.Picture" /> }
+            </div>
         </figure>
         <h2 class="storypage__h">@pg.Heading</h2>
         <p class="stepview__text" aria-live="polite">@pg.Text</p>

@@ -13,17 +13,34 @@ public sealed partial class MockBackstopApi
 
     public async Task<Story> MakeStoryAsync(StoryRequest request, CancellationToken ct = default)
     {
-        await Wait(1600, ct);
+        if (storyWriter is null) await Wait(1600, ct);
         if (string.IsNullOrWhiteSpace(request.Situation)) throw new BackstopApiException("Please say what is coming up.");
 
         var text = request.Situation.Trim();
-        var template = StoryFixtures.Match(text);
-        var pages = template.Pages.Select(p => p with { Text = Fill(p.Text) }).ToList();
         var when = string.IsNullOrWhiteSpace(request.When) ? null : request.When.Trim();
 
+        string title;
+        List<StoryPage> pages;
         // Fail closed: a sensitive topic is held for the trusted person before the user sees a word.
+        // The local words are an immovable floor. The AI can only add to them (held), never remove them.
         var held = StoryFixtures.IsSensitive(text);
-        var story = new Story(NewId("s"), template.Title, when, pages, held ? StoryStatus.Held : StoryStatus.Ready, DateTimeOffset.Now);
+        if (storyWriter is not null)
+        {
+            // If the AI cannot write it, there is no story. Nothing canned is passed off as its work.
+            var draft = await storyWriter.WriteAsync(text, when, ct);
+            if (!draft.Success) throw new BackstopApiException("I could not make your story. Please try again.");
+            title = draft.Title;
+            pages = draft.Pages.Select(p => p with { Text = Fill(p.Text) }).ToList();
+            held |= draft.Sensitive;
+        }
+        else
+        {
+            var template = StoryFixtures.Match(text);
+            title = template.Title;
+            pages = template.Pages.Select(p => p with { Text = Fill(p.Text) }).ToList();
+        }
+
+        var story = new Story(NewId("s"), title, when, pages, held ? StoryStatus.Held : StoryStatus.Ready, DateTimeOffset.Now);
         lock (_gate)
         {
             _stories[story.Id] = new(story, text);

@@ -161,3 +161,16 @@ body:has(#main) .boot { display: none; }
 
 /* On a phone the guide card sits at the bottom, so the page needs room to scroll the lit-up thing above it */
 @media (max-width: 699px) { .tour-on .shell > .page { padding-bottom: 22rem; } }
+
+/* ---------- Story scenes: gentle movement on drawn shapes ---------- */
+.an { transform-box: fill-box; transform-origin: center; }
+.an-float { animation: an-float 3.2s ease-in-out infinite; }
+.an-pulse { animation: an-pulse 2.4s ease-in-out infinite; }
+.an-slide-in { animation: an-slide-in .8s ease-out both; }
+.an-fade-in { animation: an-fade-in .9s ease-out both; }
+@keyframes an-float { 50% { transform: translateY(-6px); } }
+@keyframes an-pulse { 50% { transform: scale(1.08); } }
+@keyframes an-slide-in { from { transform: translateX(-40px); opacity: 0; } }
+@keyframes an-fade-in { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .an { animation: none; } }
+:root[data-motion="calm"] .an { animation: none; }

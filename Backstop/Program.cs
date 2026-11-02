@@ -71,6 +71,8 @@ builder.Services.AddSingleton<MetaCallGuard>();
 builder.Services.AddHttpClient<MetaAiScamChecker>().ConfigurePrimaryHttpMessageHandler(NoRedirectHandler).AddStandardResilienceHandler(Resilience);
 // Ask Me: the same Meta endpoint, the same rules.
 builder.Services.AddHttpClient<MetaAssistant>().ConfigurePrimaryHttpMessageHandler(NoRedirectHandler).AddStandardResilienceHandler(Resilience);
+// Social stories: the same Meta endpoint, the same rules.
+builder.Services.AddHttpClient<MetaStoryWriter>().ConfigurePrimaryHttpMessageHandler(NoRedirectHandler).AddStandardResilienceHandler(Resilience);
 // Explain and questions about a document: the same Meta endpoint, the same rules.
 builder.Services.AddHttpClient<MetaDocumentExplainer>().ConfigurePrimaryHttpMessageHandler(NoRedirectHandler).AddStandardResilienceHandler(Resilience);
 
@@ -85,6 +87,7 @@ builder.Services.Configure<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>
     o.ForwardLimit = 1;
 });
 builder.Services.AddTransient<IAssistant>(sp => sp.GetRequiredService<MetaAssistant>());
+builder.Services.AddTransient<IStoryWriter>(sp => sp.GetRequiredService<MetaStoryWriter>());
 builder.Services.AddTransient<IDocumentExplainer>(sp => sp.GetRequiredService<MetaDocumentExplainer>());
 builder.Services.AddTransient<ILlamaScamChecker>(sp => sp.GetRequiredService<MetaAiScamChecker>());
 builder.Services.AddTransient<IMetaScamChecker>(sp => sp.GetRequiredService<MetaAiScamChecker>());

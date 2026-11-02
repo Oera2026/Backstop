@@ -1,0 +1,40 @@
+@* One page of a story at a time: picture, heading, words, Back and Next. Used in the chat and on the story page. *@
+@if (Story.Pages.Count > 0)
+{
+    var pg = Story.Pages[_at];
+    <div class="stepview storyplayer">
+        <p class="stepview__count">Page @(_at + 1) of @Story.Pages.Count</p>
+        <figure class="storyfig">
+            <div class="figure__frame">
+                @* Re-keyed per page so the animation starts again on each page. *@
+                @if (pg.Scene is { Items.Count: > 0 })
+                {
+                    <SceneArt @key="_at" Scene="pg.Scene" Label="@("Picture: " + pg.Heading)" />
+                }
+                else
+                {
+                    <StoryPicture @key="_at" Name="@pg.Picture" />
+                }
+            </div>
+        </figure>
+        <h2 class="storypage__h">@pg.Heading</h2>
+        <p class="stepview__text" aria-live="polite">@pg.Text</p>
+    </div>
+    <div class="actions">
+        @if (_at > 0)
+        {
+            <button type="button" class="btn btn-quiet" @onclick="() => _at--"><Icon Name="arrow-left" /> Back</button>
+        }
+        @if (_at < Story.Pages.Count - 1)
+        {
+            <button type="button" class="btn btn-primary" @onclick="() => _at++"><Icon Name="arrow-right" /> Next page</button>
+        }
+        <ReadAloudButton Text="@($"{pg.Heading}. {pg.Text}")" />
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public Story Story { get; set; } = null!;
+
+    private int _at;
+}

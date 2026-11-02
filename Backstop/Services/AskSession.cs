@@ -5,7 +5,7 @@ namespace Backstop.Services;
 /// <summary>One line of the Ask Me conversation, as shown on screen.</summary>
 public sealed record AskLine(bool FromUser, string Text, bool HadPicture = false, Verdict? Verdict = null,
                              IReadOnlyList<string>? LinesOrNull = null, string? Href = null, string? LinkText = null,
-                             AskDraft? Draft = null, AskEvent? Event = null, IReadOnlyList<AskLink>? Found = null, FailureInfo? Failure = null)
+                             AskDraft? Draft = null, AskEvent? Event = null, IReadOnlyList<AskLink>? Found = null, FailureInfo? Failure = null, Story? Story = null)
 {
     public IReadOnlyList<string> Lines => LinesOrNull ?? [];
 }
