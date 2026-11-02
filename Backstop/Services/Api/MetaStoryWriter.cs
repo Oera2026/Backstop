@@ -101,7 +101,7 @@ public sealed class MetaStoryWriter : IStoryWriter
                 model = _options.Model,
                 messages = new object[] { new { role = "system", content = system }, new { role = "user", content = user } },
                 temperature = 0.6,
-                max_tokens = 4000, // Muse spends tokens on reasoning first; scenes need room
+                max_tokens = 15000, // Muse spends tokens on reasoning first; stories with scenes need a lot of room
             };
 
             using var req = new HttpRequestMessage(HttpMethod.Post, _options.ChatUrl);
