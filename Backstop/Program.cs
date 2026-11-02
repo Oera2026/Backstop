@@ -206,6 +206,11 @@ app.MapGet("/account/demo", async (HttpContext http, string? next, string? side)
     return Results.Redirect(next == "demo" ? "/demo" : side == "helper" ? "/helper?tour=1" : "/?tour=1");
 });
 
+// TEMPORARY: shows the URL, status and body of one "Hello" call to Meta. Needs a signed-in cookie. Remove once the Meta 404 is solved.
+app.MapGet("/diag/meta", async (MetaAiScamChecker meta, CancellationToken ct) =>
+    Results.Text(await meta.DiagnoseAsync(ct), "text/plain"))
+    .RequireAuthorization();
+
 app.MapGet("/account/logout", async (HttpContext http) =>
 {
     await http.SignOutAsync();

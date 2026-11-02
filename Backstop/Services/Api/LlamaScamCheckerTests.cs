@@ -255,6 +255,15 @@ public class LlamaScamCheckerTests
             }
             Console.WriteLine("PASS: Any endpoint other than https://api.meta.ai is refused before sending.");
 
+            // Whatever form the base is given in, the request goes to {base}/chat/completions.
+            foreach (var given in new[] { "https://api.meta.ai/v1", "https://api.meta.ai/v1/", "https://api.meta.ai/v1/chat/completions", "https://api.meta.ai/v1/chat/completions/", "https://api.meta.ai/v1/responses", "https://api.meta.ai/v1/messages/" })
+            {
+                var (c, reqs) = CreateChecker(_ => Task.FromResult(Reply("LooksSafe")), new() { ["META_AI_ENDPOINT_URL"] = given });
+                await c.CheckScamAsync("Hello");
+                Assert(reqs.Count == 1 && reqs[0].RequestUri?.ToString() == "https://api.meta.ai/v1/chat/completions", $"Request must go to /v1/chat/completions when given: {given}");
+            }
+            Console.WriteLine("PASS: Every Meta call goes to {base}/chat/completions.");
+
             // Pictures: only real image types, and not huge.
             {
                 var (c, reqs) = CreateChecker(_ => Task.FromResult(Reply("LooksSafe")));

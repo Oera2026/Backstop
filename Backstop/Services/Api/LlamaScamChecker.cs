@@ -11,11 +11,34 @@ public sealed class MetaAiOptions
 {
     public const string SectionName = "MetaAI";
 
-    /// <summary>API key for Meta AI Dev API (META_AI_KEY or MODEL_API_KEY).</summary>
+    /// <summary>API key for Meta AI Dev API (META_AI_KEY).</summary>
     public string? ApiKey { get; set; }
 
-    /// <summary>Endpoint URL for Meta AI Dev API completions.</summary>
-    public string EndpointUrl { get; set; } = "https://api.meta.ai/v1/chat/completions";
+    /// <summary>Base URL for the Meta AI Dev API (META_AI_ENDPOINT_URL). A full .../chat/completions URL is also accepted.</summary>
+    public string EndpointUrl { get; set; } = "https://api.meta.ai/v1";
+
+    /// <summary>The one URL every Meta call is sent to: {base}/chat/completions.</summary>
+    public string ChatUrl => BuildChatUrl(EndpointUrl);
+
+    /// <summary>Strips trailing slashes and any /chat/completions, /responses or /messages from the base, then adds /chat/completions.</summary>
+    public static string BuildChatUrl(string? baseUrl)
+    {
+        var b = (baseUrl ?? "").Trim().TrimEnd('/');
+        string[] suffixes = ["/chat/completions", "/responses", "/messages"];
+        for (var changed = true; changed;)
+        {
+            changed = false;
+            foreach (var s in suffixes)
+            {
+                if (b.EndsWith(s, StringComparison.OrdinalIgnoreCase))
+                {
+                    b = b[..^s.Length].TrimEnd('/');
+                    changed = true;
+                }
+            }
+        }
+        return b + "/chat/completions";
+    }
 
     /// <summary>Model identifier (e.g. muse-spark-1.3, muse-wonder-1.0).</summary>
     public string Model { get; set; } = "muse-spark-1.3";
@@ -31,13 +54,13 @@ public sealed class MetaAiOptions
 
         var key = options.ApiKey;
         if (string.IsNullOrWhiteSpace(key))
-            key = config["META_AI_KEY"] ?? config["MODEL_API_KEY"] ?? config["LLAMA_API_KEY"] ?? config["CHECKER_MODEL_API_KEY"];
+            key = config["META_AI_KEY"] ?? config["CHECKER_MODEL_API_KEY"];
         options.ApiKey = key;
 
-        var endpoint = config["META_AI_ENDPOINT_URL"] ?? config["LLAMA_ENDPOINT_URL"];
+        var endpoint = config["META_AI_ENDPOINT_URL"];
         if (!string.IsNullOrWhiteSpace(endpoint)) options.EndpointUrl = endpoint;
 
-        var model = config["META_AI_MODEL"] ?? config["LLAMA_MODEL"];
+        var model = config["META_AI_MODEL"];
         if (!string.IsNullOrWhiteSpace(model)) options.Model = model;
         return options;
     }
@@ -83,6 +106,29 @@ public sealed class MetaAiScamChecker : ILlamaScamChecker, IMetaScamChecker
         _options = MetaAiOptions.Load(config);
     }
 
+    /// <summary>TEMPORARY (/diag/meta): sends "Hello" the same way every other call is sent and reports URL, status and body. Remove once the Meta 404 is solved.</summary>
+    public async Task<string> DiagnoseAsync(CancellationToken ct)
+    {
+        var url = _options.ChatUrl;
+        if (string.IsNullOrWhiteSpace(_options.ApiKey)) return $"URL: {url}\nModel: {_options.Model}\nNo API key is set.";
+        if (!IsAllowedEndpoint(url)) return $"URL: {url}\nModel: {_options.Model}\nNot sent: the URL is not https://{AllowedHost}.";
+        try
+        {
+            using var req = new HttpRequestMessage(HttpMethod.Post, url);
+            req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.ApiKey);
+            req.Content = new StringContent(
+                JsonSerializer.Serialize(new { model = _options.Model, messages = new object[] { new { role = "user", content = "Hello" } }, max_tokens = 200 }),
+                Encoding.UTF8, "application/json");
+            using var response = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
+            var body = await MetaHttp.SnippetAsync(response, _options.ApiKey, 1000);
+            return $"URL: {response.RequestMessage?.RequestUri}\nModel: {_options.Model}\nStatus: {(int)response.StatusCode}\nBody: {body}";
+        }
+        catch (Exception ex)
+        {
+            return $"URL: {url}\nModel: {_options.Model}\nError: {ex.GetType().Name}";
+        }
+    }
+
     public Task<LlamaScamAnalysis> CheckScamAsync(string text, CancellationToken ct) =>
         CheckScamAsync(text, null, null, ct).ContinueWith(t => (LlamaScamAnalysis)t.Result, ct);
 
@@ -105,7 +151,7 @@ public sealed class MetaAiScamChecker : ILlamaScamChecker, IMetaScamChecker
             );
         }
 
-        if (!IsAllowedEndpoint(_options.EndpointUrl))
+        if (!IsAllowedEndpoint(_options.ChatUrl))
         {
             _logger.LogError("Meta AI endpoint is not https://{Host}. Nothing was sent. Failing closed.", AllowedHost);
             return FailClosed("Endpoint is not the approved Meta host", MetaFailures.BadEndpoint(_options));
@@ -191,7 +237,7 @@ public sealed class MetaAiScamChecker : ILlamaScamChecker, IMetaScamChecker
                 max_tokens = 2000 // Muse spends tokens on reasoning first; a low cap returns empty content
             };
 
-            using var httpRequest = new HttpRequestMessage(HttpMethod.Post, _options.EndpointUrl);
+            using var httpRequest = new HttpRequestMessage(HttpMethod.Post, _options.ChatUrl);
             httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.ApiKey);
             httpRequest.Content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
 
@@ -199,7 +245,7 @@ public sealed class MetaAiScamChecker : ILlamaScamChecker, IMetaScamChecker
             if (!response.IsSuccessStatusCode)
             {
                 // Status only. The body could echo the inspected message, so it is never logged.
-                _logger.LogError("Meta AI API returned non-success code {StatusCode} for {Url} (model {Model})", (int)response.StatusCode, _options.EndpointUrl, _options.Model);
+                await MetaHttp.LogFailureAsync(_logger, "scam check", response, _options);
                 var retry = response.Headers.RetryAfter?.Delta is { } d ? (int?)Math.Ceiling(d.TotalSeconds) : null;
                 return FailClosed("Meta AI API returned non-success status " + (int)response.StatusCode,
                     MetaFailures.Status(response.StatusCode, retry, _options));

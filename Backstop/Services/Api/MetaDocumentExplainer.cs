@@ -235,7 +235,7 @@ public sealed class MetaDocumentExplainer : IDocumentExplainer
             _logger.LogWarning("No Meta AI API key configured. Explain cannot run.");
             return (null, MetaFailures.NoKey(_options));
         }
-        if (!MetaAiScamChecker.IsAllowedEndpoint(_options.EndpointUrl))
+        if (!MetaAiScamChecker.IsAllowedEndpoint(_options.ChatUrl))
         {
             _logger.LogError("Meta AI endpoint is not https://{Host}. Nothing was sent.", MetaAiScamChecker.AllowedHost);
             return (null, MetaFailures.BadEndpoint(_options));
@@ -261,14 +261,14 @@ public sealed class MetaDocumentExplainer : IDocumentExplainer
                 temperature = 0.3,
                 max_tokens = 4000, // Muse spends tokens on reasoning first; a low cap returns empty content
             };
-            using var req = new HttpRequestMessage(HttpMethod.Post, _options.EndpointUrl);
+            using var req = new HttpRequestMessage(HttpMethod.Post, _options.ChatUrl);
             req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.ApiKey);
             req.Content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
 
             using var response = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cts.Token);
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogError("Meta AI (Explain) returned status {StatusCode} for {Url} (model {Model})", (int)response.StatusCode, _options.EndpointUrl, _options.Model);
+                await MetaHttp.LogFailureAsync(_logger, "Explain", response, _options);
                 return (null, MetaFailures.Status(response.StatusCode, response.Headers.RetryAfter?.Delta is { } d ? (int?)Math.Ceiling(d.TotalSeconds) : null, _options));
             }
             if (response.Content.Headers.ContentLength is > MaxResponseBytes)

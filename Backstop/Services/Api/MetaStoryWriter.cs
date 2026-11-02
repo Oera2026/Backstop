@@ -52,7 +52,7 @@ public sealed class MetaStoryWriter : IStoryWriter
             _logger.LogWarning("No Meta AI API key configured. Stories cannot be written.");
             return Fail(MetaFailures.NoKey(_options));
         }
-        if (!MetaAiScamChecker.IsAllowedEndpoint(_options.EndpointUrl))
+        if (!MetaAiScamChecker.IsAllowedEndpoint(_options.ChatUrl))
         {
             _logger.LogError("Meta AI endpoint is not https://{Host}. Nothing was sent.", MetaAiScamChecker.AllowedHost);
             return Fail(MetaFailures.BadEndpoint(_options));
@@ -90,14 +90,14 @@ public sealed class MetaStoryWriter : IStoryWriter
                 max_tokens = 4000, // Muse spends tokens on reasoning first; scenes need room
             };
 
-            using var req = new HttpRequestMessage(HttpMethod.Post, _options.EndpointUrl);
+            using var req = new HttpRequestMessage(HttpMethod.Post, _options.ChatUrl);
             req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.ApiKey);
             req.Content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
 
             using var response = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cts.Token);
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogError("Meta AI (stories) returned status {StatusCode} for {Url} (model {Model})", (int)response.StatusCode, _options.EndpointUrl, _options.Model);
+                await MetaHttp.LogFailureAsync(_logger, "stories", response, _options);
                 return Fail(MetaFailures.Status(response.StatusCode, response.Headers.RetryAfter?.Delta is { } d ? (int?)Math.Ceiling(d.TotalSeconds) : null, _options));
             }
             if (response.Content.Headers.ContentLength is > MaxResponseBytes) return Fail(MetaFailures.BadReply("Response too large", _options));

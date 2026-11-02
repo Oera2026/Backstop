@@ -28,7 +28,7 @@ internal static class MetaFailures
     public static FailureInfo NoKey(MetaAiOptions? o) => new(
         "The checker is not switched on yet. Please tell the person who looks after this app.",
         Detail("NO_API_KEY", "No Meta AI key is set, so no call was made.", o,
-            "Fix: set META_AI_KEY (or MODEL_API_KEY) in the host's environment variables, then restart."));
+            "Fix: set META_AI_KEY in the host's environment variables, then restart."));
 
     public static FailureInfo BadEndpoint(MetaAiOptions o) => new(
         "The checker is set up wrongly, so it was not used. Please tell the person who looks after this app.",

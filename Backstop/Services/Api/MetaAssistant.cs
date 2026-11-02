@@ -77,7 +77,7 @@ public sealed class MetaAssistant : IAssistant
             _logger.LogWarning("No Meta AI API key configured. Ask Me cannot answer.");
             return Fail("API key not configured", MetaFailures.NoKey(_options));
         }
-        if (!MetaAiScamChecker.IsAllowedEndpoint(_options.EndpointUrl))
+        if (!MetaAiScamChecker.IsAllowedEndpoint(_options.ChatUrl))
         {
             _logger.LogError("Meta AI endpoint is not https://{Host}. Nothing was sent.", MetaAiScamChecker.AllowedHost);
             return Fail("Endpoint is not the approved Meta host", MetaFailures.BadEndpoint(_options));
@@ -138,14 +138,14 @@ public sealed class MetaAssistant : IAssistant
                 max_tokens = 2000, // Muse spends tokens on reasoning first; a low cap returns empty content
             };
 
-            using var req = new HttpRequestMessage(HttpMethod.Post, _options.EndpointUrl);
+            using var req = new HttpRequestMessage(HttpMethod.Post, _options.ChatUrl);
             req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.ApiKey);
             req.Content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
 
             using var response = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cts.Token);
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogError("Meta AI (Ask Me) returned status {StatusCode} for {Url} (model {Model})", (int)response.StatusCode, _options.EndpointUrl, _options.Model);
+                await MetaHttp.LogFailureAsync(_logger, "Ask Me", response, _options);
                 return Fail("Status " + (int)response.StatusCode, MetaFailures.Status(response.StatusCode, response.Headers.RetryAfter?.Delta is { } d ? (int?)Math.Ceiling(d.TotalSeconds) : null, _options));
             }
             if (response.Content.Headers.ContentLength is > MaxResponseBytes) return Fail("Response too large");
