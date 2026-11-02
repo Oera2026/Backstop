@@ -50,6 +50,13 @@
             {
                 <p class="form-error" role="alert">@_error</p>
             }
+            @if (Role == ProfileRole.User)
+            {
+                <nav class="profile__links" aria-label="Help and settings">
+                    <a class="btn btn-quiet" href="help" @onclick="Close"><Icon Name="question" /> Help</a>
+                    <a class="btn btn-quiet" href="settings" @onclick="Close"><Icon Name="lines" /> Settings</a>
+                </nav>
+            }
             <button type="button" class="btn btn-primary profile__done" @onclick="Close"><Icon Name="check" /> Done</button>
             <a class="btn btn-text profile__out" href="/account/logout" data-enhance-nav="false" target="_self">Sign out</a>
         </div>

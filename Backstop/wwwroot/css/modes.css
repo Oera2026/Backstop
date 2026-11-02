@@ -14,7 +14,7 @@
 .appnav__wide-only { display: none; }
 .appnav__item {
   display: grid; justify-items: center; align-items: center; align-content: center; gap: .15rem; min-height: 64px; padding: .35rem .1rem;
-  color: var(--navy); text-decoration: none; font-weight: 800; font-size: .72rem; line-height: 1.1; text-align: center;
+  color: var(--navy); text-decoration: none; font-weight: 800; font-size: calc(.85rem * var(--tx)); line-height: 1.1; text-align: center;
   border-top: 4px solid transparent;
 }
 .appnav__item .icon { width: 1.6rem; height: 1.6rem; display: block; }
@@ -718,4 +718,13 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 @media (max-width: 359px) { .page .home .tiles { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 699px) {
   :root[data-size="large"] .page .home .tiles, :root[data-size="xlarge"] .page .home .tiles { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ---------- Phones: Help and Settings live in the profile menu, so the header holds only the logo and your picture ---------- */
+.profile__links { display: none; }
+@media (max-width: 959px) {
+  .site-header:not(.site-header--helper) .site-nav a[href="/help"],
+  .site-header:not(.site-header--helper) .site-nav a[href="/settings"] { display: none; }
+  .profile__links { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+  .profile { right: max(.75rem, env(safe-area-inset-right)); }
 }
