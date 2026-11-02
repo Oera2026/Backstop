@@ -1,0 +1,23 @@
+@implements IDisposable
+@inject DemoTour Tour
+@inject NavigationManager Nav
+
+@* Demo visitors only: turns the guide off and on. *@
+<AuthorizeView Roles="@Roles.Demo">
+    <button type="button" class="guide-toggle" aria-pressed="@(Tour.Active ? "true" : "false")" @onclick="Toggle"><Icon Name="question" /> Guide</button>
+</AuthorizeView>
+
+@code {
+    protected override void OnInitialized() => Tour.Changed += OnChanged;
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    private void Toggle()
+    {
+        if (Tour.Active) { Tour.Close(); return; }
+        Tour.Start(Tour.Side);
+        if (Tour.PathForCurrent() is { } path) Nav.NavigateTo(path);
+    }
+
+    public void Dispose() => Tour.Changed -= OnChanged;
+}

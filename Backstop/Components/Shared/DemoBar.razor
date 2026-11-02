@@ -3,17 +3,8 @@
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 
-@* Demo visitors only: a User / Helper switch, and a guide that goes through one side page by page, lighting up what it talks about. *@
+@* Demo visitors only: a guide that goes through one side page by page, lighting up what it talks about. *@
 <AuthorizeView Roles="@Roles.Demo">
-    <div class="demobar" role="region" aria-label="Demo guide">
-        <div class="demobar__row">
-            <div class="demobar__switch" role="group" aria-label="View as">
-                <button type="button" class="demobar__side" aria-pressed="@(Tour.Side == TourSide.User ? "true" : "false")" @onclick="@(() => Switch(TourSide.User))">User</button>
-                <button type="button" class="demobar__side" aria-pressed="@(Tour.Side == TourSide.Helper ? "true" : "false")" @onclick="@(() => Switch(TourSide.Helper))">Helper</button>
-            </div>
-<button type="button" class="btn btn-quiet demobar__guide" aria-pressed="@(Tour.Active ? "true" : "false")" @onclick="ToggleGuide"><Icon Name="question" /> Guide</button>
-        </div>
-    </div>
     @if (Tour.Active)
     {
         var s = Tour.Current;
@@ -56,7 +47,8 @@
         _isDemo = AuthState is not null && (await AuthState).User.IsInRole(Roles.Demo);
         Tour.Changed += OnChanged;
         Nav.LocationChanged += OnMoved;
-        // A fresh tab starts on the side the visitor is looking at.
+        // Every load of the app starts the guide again, from its first slide, on the side being looked at.
+        if (_isDemo && !Tour.Begun) { Tour.Begin(SideOf(Here)); return; }
         if (Tour.Side != SideOf(Here) && !DemoTour.Matches(Tour.Current, Here)) Tour.Start(SideOf(Here));
         Tour.Follow(Here);
     }
@@ -74,17 +66,12 @@
         if (!_isDemo) return;
         try
         {
-            // After a reload, pick up where this tab was.
-            if (firstRender && DemoTour.TryParse(await JS.InvokeAsync<string>("backstopTour.load"), out var side, out var index, out var active))
-            {
-                Tour.Restore(side, index, active);
-                Tour.Follow(Here);
-            }
+            // The first slide may be on another page: go there.
+            if (firstRender && Tour.Active && !DemoTour.Matches(Tour.Current, Here)) { Go(); return; }
             // Light up what this slide is about whenever the slide or the page changes.
             var key = Tour.Active ? $"{Tour.Side}|{Tour.Index}|{Here}" : "off";
             if (key == _key) return;
             _key = key;
-            await JS.InvokeVoidAsync("backstopTour.save", Tour.Save());
             if (!Tour.Active) await JS.InvokeVoidAsync("backstopTour.hide");
             else await JS.InvokeVoidAsync("backstopTour.show", Tour.Current.Selector);
         }
@@ -109,18 +96,7 @@
 
     private void Back() { Tour.Back(); Go(); }
 
-    private void ToggleGuide()
-    {
-        if (Tour.Active) { Tour.Close(); return; }
-        Tour.Start(Tour.Side);
-        Go();
-    }
 
-    private void Switch(TourSide side)
-    {
-        Tour.Start(side);
-        Nav.NavigateTo(Tour.PathForCurrent() ?? "/");
-    }
 
     public async ValueTask DisposeAsync()
     {

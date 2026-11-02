@@ -132,22 +132,26 @@ body { transition: background-color .3s ease, color .3s ease; }
 
 /* ---------- Skeletons: grey shapes where content will be, so the page does not jump ---------- */
 .skel { display: grid; gap: 1rem; margin: 1.25rem 0; }
-.skel__row { display: flex; align-items: center; gap: 1rem; min-height: 96px; padding: 1rem; border: var(--line) solid var(--rule); border-radius: var(--radius-lg); background: var(--bg); }
-.skel__lines { display: grid; gap: .6rem; flex: 1; min-width: 0; }
-.skel__article { display: grid; gap: .75rem; }
-.skel__pic, .skel__bar, .skel__block { position: relative; overflow: hidden; background: var(--band); border-radius: var(--radius); }
+.skel__lines { display: grid; gap: .6rem; min-width: 0; }
+.skel .rows { margin: 0; }
+.skel__verdict { display: flex; align-items: center; gap: 1rem; min-height: 7.5rem; padding: 1.25rem; margin: .5rem 0 1.5rem; border-radius: var(--radius-lg); background: var(--band); }
+.skel__verdict .skel__lines { flex: 1; }
+.skel__verdict .skel__pic { background: var(--bg); width: 4.25rem; height: 4.25rem; }
+.skel__card, .skel__panel { display: grid; gap: .75rem; }
+.skel__panel { background: var(--surface); border: var(--line) solid var(--border); border-radius: var(--radius-lg); padding: 1.25rem; margin: 1rem 0; }
+.skel__reading { display: grid; }
+.skel__pic, .skel__bar { position: relative; overflow: hidden; background: var(--band); border-radius: var(--radius); }
 .skel__pic { flex: none; width: 3.5rem; height: 3.5rem; }
 .skel__bar { height: 1rem; }
 .skel__bar--short { width: 55%; }
-.skel__bar--title { height: 1.8rem; width: 70%; margin-bottom: .5rem; }
-.skel__block { height: 8rem; margin-top: .75rem; }
-.skel__pic::after, .skel__bar::after, .skel__block::after {
+.skel__bar--title { height: 1.8rem; width: 70%; margin-bottom: .6rem; }
+.skel__pic::after, .skel__bar::after {
   content: ""; position: absolute; inset: 0; transform: translateX(-100%);
   background: linear-gradient(90deg, transparent, var(--surface), transparent); animation: shimmer 1.4s ease-in-out infinite;
 }
 @keyframes shimmer { to { transform: translateX(100%); } }
-@media (prefers-reduced-motion: reduce) { .skel__pic::after, .skel__bar::after, .skel__block::after { animation: none; } }
-:root[data-motion="calm"] .skel__pic::after, :root[data-motion="calm"] .skel__bar::after, :root[data-motion="calm"] .skel__block::after { animation: none; }
+@media (prefers-reduced-motion: reduce) { .skel__pic::after, .skel__bar::after { animation: none; } }
+:root[data-motion="calm"] .skel__pic::after, :root[data-motion="calm"] .skel__bar::after { animation: none; }
 
 /* Shown while the app starts, so the first look is a page shape and not a blank screen. Hidden once a page is drawn. */
 .boot { padding: 1.25rem max(.75rem, env(safe-area-inset-left)); max-width: 52rem; margin: 0 auto; }

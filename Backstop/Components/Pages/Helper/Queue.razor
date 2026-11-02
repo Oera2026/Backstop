@@ -16,9 +16,33 @@
     </div>
 }
 
-@Section("Needs you now", "alert", digest.In(HelperGroup.Urgent))
-@Section("To decide", "hourglass", digest.In(HelperGroup.Decide))
-@Section("Calls to make", "phone", digest.In(HelperGroup.Calls))
+@{
+    // The one thing to do first, then everything else in a short list.
+    var todo = digest.In(HelperGroup.Urgent).Concat(digest.In(HelperGroup.Decide)).Concat(digest.In(HelperGroup.Calls)).ToList();
+    var hero = todo.FirstOrDefault(i => i.Href is not null && !i.CallRequested);
+    var others = todo.Where(i => i != hero).ToList();
+}
+
+@if (hero is not null)
+{
+    <h2 class="group-h" id="next-h"><Icon Name="alert" /> Next up</h2>
+    <section class="hero hero--@hero.Tone" aria-labelledby="hero-title">
+        <div class="hero__body">
+            <span class="pic @Pic(hero.Tone)" aria-hidden="true"><Icon Name="@hero.Icon" /></span>
+            <div class="hero__words">
+                <h3 id="hero-title">@hero.Title</h3>
+                <p>@hero.Detail</p>
+                @if (hero.Word.Length > 0)
+                {
+                    <span class="badge badge--@hero.Tone"><Icon Name="@hero.Icon" /><span>@hero.Word</span></span>
+                }
+            </div>
+        </div>
+        <a class="btn btn-primary hero__go" href="@hero.Href">Review it <Icon Name="arrow-right" /></a>
+    </section>
+}
+
+@Section(hero is null ? "To do" : "Also waiting", "hourglass", others)
 @{ var rest = digest.In(HelperGroup.Info).Count; }
 @if (rest > 0 || Guardian.Allows(HelperCapability.SeeSharedMemories) || Guardian.Allows(HelperCapability.SeeActivitySummary))
 {
@@ -76,7 +100,7 @@
     private RenderFragment Section(string heading, string icon, IReadOnlyList<HelperItem> items) => items.Count == 0 ? @<text></text> :
     @<section aria-labelledby="@SectionId(heading)">
         <h2 id="@SectionId(heading)" class="group-h"><Icon Name="@icon" /> @heading <span class="group-count">@items.Count</span></h2>
-        <ul class="rows" aria-label="@heading">
+        <ul class="rows rows--compact" aria-label="@heading">
             @foreach (var i in items)
             {
                 <li>

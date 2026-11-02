@@ -1,0 +1,190 @@
+@page "/helper/welcome"
+@layout WelcomeLayout
+@inherits ModeComponentBase
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+
+<PageTitle>Welcome – Backstop Helper</PageTitle>
+
+<RoleGate Allow="@Roles.HelperSide">
+    <p class="progress" role="status">
+        <span class="progress__dots" aria-hidden="true">
+            @for (var i = 1; i <= Steps; i++)
+            {
+                <span class="progress__dot @(i <= _step ? "progress__dot--on" : "")"></span>
+            }
+        </span>
+        <span>Step @_step of @Steps</span>
+    </p>
+
+    @if (_step > 1 && _step < Steps)
+    {
+        <BackLink OnClick="Back" Text="Back" />
+    }
+
+    <h1 @ref="_heading" tabindex="-1">@Title</h1>
+
+    @switch (_step)
+    {
+        case 1:
+            <p class="lead">@UserName's mail is held until it is checked. When the checker is not sure, it comes to you.</p>
+            <ol class="flowlist">
+                <li><span class="pic pic--blue" aria-hidden="true"><Icon Name="mail" /></span> A message arrives.</li>
+                <li><span class="pic pic--blue" aria-hidden="true"><Icon Name="inspect" /></span> Backstop checks it.</li>
+                <li><span class="pic pic--safe" aria-hidden="true"><Icon Name="people" /></span> If it is unsure, you decide.</li>
+            </ol>
+            <div class="actions">
+                <button type="button" class="btn btn-primary" @onclick="Next">Next <Icon Name="arrow-right" /></button>
+                <button type="button" class="btn btn-text" @onclick="Finish">Skip</button>
+            </div>
+            break;
+
+        case 2:
+            <p class="lead">Try it. A practice message is waiting for you.</p>
+            <section class="hero hero--block" aria-label="Practice message">
+                <div class="hero__body">
+                    <span class="pic pic--block" aria-hidden="true"><Icon Name="alert" /></span>
+                    <div class="hero__words">
+                        <h2>Dave at Hartley Plumbing</h2>
+                        <p>New bank details, please keep this between us</p>
+                        <span class="badge badge--block"><Icon Name="alert" /><span>Looks like a scam</span></span>
+                    </div>
+                </div>
+            </section>
+            <div class="actions">
+                <button type="button" class="btn btn-primary" @onclick="Next">Review it <Icon Name="arrow-right" /></button>
+            </div>
+            break;
+
+        case 3:
+            <p class="lead">Look at the warning signs. Then decide.</p>
+            <div class="banner banner--block" role="status">
+                <Icon Name="alert" />
+                <div>
+                    <p class="verdict__head">This looks like a scam.</p>
+                    <p class="verdict__sub">We are very sure. We suggest you block it.</p>
+                </div>
+            </div>
+            <section class="card" aria-label="What looked wrong">
+                <ul class="flags">
+                    <li class="flag"><span class="flag__icon"><Icon Name="user" /></span><span><strong>Asks for private details</strong><br /><span class="flag__text">Bank details are best kept to yourself.</span></span></li>
+                    <li class="flag"><span class="flag__icon"><Icon Name="eye-off" /></span><span><strong>Asks you to keep this secret</strong><br /><span class="flag__text">Being asked not to tell family is a warning sign.</span></span></li>
+                </ul>
+            </section>
+
+            @if (_pick is null)
+            {
+                <div class="actions actions--helper">
+                    <button type="button" class="btn btn-block" @onclick="@(() => _pick = "block")"><Icon Name="cross" /> Block</button>
+                    <button type="button" class="btn btn-quiet" @onclick="@(() => _pick = "confirm")"><Icon Name="check" /> Approve</button>
+                    <button type="button" class="btn btn-text" @onclick="@(() => _pick = "call")"><Icon Name="phone" /> Call them first</button>
+                </div>
+            }
+            else if (_pick == "confirm")
+            {
+                <div class="banner banner--check" role="alert">
+                    <Icon Name="alert" />
+                    <p>We think this is risky. Approve it anyway?</p>
+                </div>
+                <div class="actions">
+                    <button type="button" class="btn btn-primary" @onclick="@(() => _pick = null)"><Icon Name="arrow-left" /> No, go back</button>
+                    <button type="button" class="btn btn-quiet" @onclick="@(() => _pick = "approved")"><Icon Name="check" /> Yes, approve</button>
+                </div>
+            }
+            else if (_pick == "approved")
+            {
+                <div class="banner banner--block" role="alert">
+                    <Icon Name="cross" />
+                    <p>@UserName would now see this scam. Check the warning signs, then try again.</p>
+                </div>
+                <div class="actions">
+                    <button type="button" class="btn btn-primary" @onclick="@(() => _pick = null)"><Icon Name="refresh" /> Try again</button>
+                </div>
+            }
+            else
+            {
+                <div class="banner banner--safe" role="status">
+                    <Icon Name="check" />
+                    <p>@(_pick == "block" ? $"Blocked. {UserName} never sees it." : $"Good choice when you are not sure. Ring {UserName} before you decide.")</p>
+                </div>
+                <div class="actions">
+                    <button type="button" class="btn btn-primary" @onclick="Next">Next <Icon Name="arrow-right" /></button>
+                </div>
+            }
+            break;
+
+        case 4:
+            <p class="lead">This is what you can do for @UserName.</p>
+            <ul class="can">
+                @Can("Decide held mail", Guardian.Allows(HelperCapability.ReviewHeldMail))
+                @Can("Hear about risky mail", Guardian.Allows(HelperCapability.RiskAlerts))
+                @Can("See what they ask Check", Guardian.Allows(HelperCapability.SeeCheckRequests))
+                @Can("Read their chats", Guardian.Allows(HelperCapability.SeeChats))
+            </ul>
+            <div class="actions">
+                <button type="button" class="btn btn-primary" @onclick="Next">Next <Icon Name="arrow-right" /></button>
+            </div>
+            break;
+
+        case 5:
+            <p class="lead">Four places, along the bottom or down the side.</p>
+            <ul class="can can--nav">
+                <li><span class="pic pic--navy" aria-hidden="true"><Icon Name="hourglass" /></span><span><strong>Waiting</strong> What needs you now.</span></li>
+                <li><span class="pic pic--blue" aria-hidden="true"><Icon Name="people" /></span><span><strong>Messages</strong> Talk with @UserName.</span></li>
+                <li><span class="pic pic--blue" aria-hidden="true"><Icon Name="clock" /></span><span><strong>History</strong> What you decided.</span></li>
+                <li><span class="pic pic--blue" aria-hidden="true"><Icon Name="lines" /></span><span><strong>Settings</strong> Words and colours.</span></li>
+            </ul>
+            <div class="actions">
+                <button type="button" class="btn btn-primary" @onclick="Next">Next <Icon Name="arrow-right" /></button>
+            </div>
+            break;
+
+        default:
+            <p class="lead">Your queue is ready.</p>
+            <div class="actions">
+                <button type="button" class="btn btn-primary" @onclick="Finish"><Icon Name="hourglass" /> See what is waiting</button>
+                <button type="button" class="btn btn-quiet" @onclick="Again"><Icon Name="refresh" /> Practise again</button>
+            </div>
+            break;
+    }
+</RoleGate>
+
+@code {
+    private const int Steps = 6;
+
+    private int _step = 1;
+    private string? _pick;
+    private bool _focus;
+    private ElementReference _heading;
+
+    private string Title => _step switch
+    {
+        1 => $"You are {UserName}'s helper",
+        2 => "Something is waiting",
+        3 => "You decide",
+        4 => "What you can do",
+        5 => "Finding your way",
+        _ => "You are ready",
+    };
+
+    private static RenderFragment Can(string text, bool allowed) =>
+    @<li class="can__row"><span class="pic @(allowed ? "pic--safe" : "pic--block")" aria-hidden="true"><Icon Name="@(allowed ? "check" : "cross")" /></span><span><strong>@text</strong> <span class="can__word">@(allowed ? "Yes" : "No")</span></span></li>;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_focus) return;
+        _focus = false;
+        try { await _heading.FocusAsync(); } catch (Exception) { }
+    }
+
+    private void Go(int step) { _step = Math.Clamp(step, 1, Steps); _pick = null; _focus = true; }
+    private void Next() => Go(_step + 1);
+    private void Back() => Go(_step - 1);
+    private void Again() => Go(1);
+
+    private async Task Finish()
+    {
+        try { await JS.InvokeVoidAsync("backstopSettings.markHelperWelcomed"); } catch (Exception) { }
+        Nav.NavigateTo("/helper?tour=1");
+    }
+}

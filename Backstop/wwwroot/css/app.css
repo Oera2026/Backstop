@@ -222,7 +222,7 @@ textarea { min-height: 10rem; resize: vertical; }
 .preview-meta { font-size: calc(.9rem * var(--tx)); color: var(--text-2); margin-bottom: .25rem; font-weight: 600; }
 .actions--helper { margin-bottom: .25rem; }
 .actions--helper { flex-direction: row; flex-wrap: wrap; align-items: stretch; gap: .6rem; }
-.actions--helper .btn-block, .actions--helper .btn-quiet { flex: 1 1 8rem; padding-inline: 1rem; }
+.actions--helper .btn-block, .actions--helper .btn-quiet { flex: 1 1 6.5rem; padding-inline: .75rem; }
 .actions--helper .btn-text { flex: 1 1 100%; min-height: 48px; }
 .banner .verdict__head { font-size: calc(1.5rem * var(--tx)); font-weight: 800; line-height: 1.15; letter-spacing: -.02em; margin-bottom: .25rem; }
 .banner .verdict__sub { font-weight: 700; }

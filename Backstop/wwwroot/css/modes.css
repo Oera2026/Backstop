@@ -429,14 +429,6 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 @media (max-width: 959px) { .settings-foot { position: static; border-top: 0; padding-inline: 0; } }
 
 /* ---------- Ask Me dock: the same chat in a panel on the right ---------- */
-.dock-tab {
-  position: fixed; right: 0; bottom: calc(5rem + env(safe-area-inset-bottom)); z-index: 35;
-  display: inline-flex; align-items: center; gap: .6rem; min-height: 56px; padding: 0 1.1rem;
-  font: inherit; font-weight: 800; color: var(--on-navy); background: var(--navy);
-  border: 0; border-radius: var(--radius) 0 0 var(--radius); cursor: pointer;
-}
-@media (hover: hover) { .dock-tab:hover { background: var(--navy-hover); } }
-@media (min-width: 960px) { .dock-tab { bottom: auto; top: 50%; transform: translateY(-50%); } }
 
 .dock {
   position: fixed; inset: 0 0 calc(4rem + env(safe-area-inset-bottom)) 0; z-index: 40;
@@ -545,14 +537,6 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 .login .actions .btn { width: 100%; justify-content: center; }
 
 /* Demo guide: User / Helper switch and the walk-around. One compact row; the step words fold away. */
-.demobar { background: var(--surface); border-bottom: var(--line) solid var(--rule); padding: .5rem max(.75rem, env(safe-area-inset-left)); }
-.framed .demobar { display: none; }
-.demobar__row { display: flex; flex-wrap: nowrap; align-items: center; justify-content: space-between; gap: .5rem .75rem; }
-.demobar__switch { display: inline-flex; border: var(--line) solid var(--navy); border-radius: var(--radius-lg); overflow: hidden; }
-.demobar__side { min-height: 56px; min-width: 4.5rem; padding: 0 1rem; font: inherit; font-weight: 700; background: var(--bg); color: var(--navy); border: 0; cursor: pointer; }
-.demobar__side[aria-pressed="true"] { background: var(--navy); color: var(--on-navy); }
-.demobar__side:focus-visible { outline: 3px solid var(--focus); outline-offset: -3px; }
-.demobar__nav { display: flex; gap: .5rem; }
 .card--spaced { margin-block-start: 1.5rem; }
 .more-toggle { margin-block: 1rem; }
 .actions--helper .btn-primary { flex: 1 1 100%; }
@@ -618,5 +602,80 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 .sidecard--helper .sidecard__go { background: var(--safe); }
 @media (hover: hover) { .sidecard:hover { box-shadow: 0 4px 14px var(--scrim); } }
 .sidecard:focus-visible { outline: 4px solid var(--focus); outline-offset: 3px; }
-.demobar__guide { flex: none; }
-.demobar__guide[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--navy); }
+
+/* Helper queue: one thing to do first, a short list after it */
+.hero { display: grid; gap: 1rem; padding: 1.25rem; margin: 0 0 1.5rem; border: var(--line) solid var(--border); border-radius: var(--radius-lg); background: var(--surface); }
+.hero--block { background: var(--block-soft); border-color: var(--block); }
+.hero--check { background: var(--check-soft); border-color: var(--check-edge); }
+.hero--safe { background: var(--safe-soft); border-color: var(--safe); }
+.hero__body { display: flex; gap: 1rem; align-items: flex-start; }
+.hero__body .pic { width: 4rem; height: 4rem; }
+.hero__words { display: grid; gap: .5rem; justify-items: start; min-width: 0; }
+.hero__words h3 { margin: 0; font-size: calc(1.5rem * var(--tx)); line-height: 1.2; }
+.hero__words p { margin: 0; font-weight: 600; }
+.hero__go { width: 100%; justify-content: center; }
+@media (min-width: 600px) { .hero__go { width: auto; justify-self: start; } }
+.rows--compact .row { min-height: 72px; padding: .75rem 1rem; }
+.rows--compact .row .pic { width: 3rem; height: 3rem; }
+.rows--compact .row .pic .icon { width: 1.6rem; height: 1.6rem; }
+@media (max-width: 560px) {
+  .rows--compact .row { display: grid; grid-template-columns: auto 1fr; align-items: start; gap: .5rem .75rem; }
+  .rows--compact .row__side { grid-column: 2; display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+  .rows--compact .row .btn { grid-column: 1 / -1; }
+}
+
+/* Header: one compact bar, who you are helping inside it */
+.header-for { display: inline-flex; align-items: center; gap: .5rem; margin: 0 auto 0 .75rem; padding: .25rem .9rem; font-weight: 800; font-size: calc(.95rem * var(--tx)); color: var(--text); background: var(--band); border-radius: 999px; }
+.site-header--helper { flex-wrap: nowrap; }
+.guide-toggle { display: inline-flex; align-items: center; gap: .4rem; min-height: 56px; padding: 0 .9rem; font: inherit; font-weight: 800; color: inherit; background: transparent; border: var(--line) solid currentColor; border-radius: var(--radius); cursor: pointer; }
+.guide-toggle[aria-pressed="true"] { background: var(--accent-soft); color: var(--navy); border-color: var(--accent-soft); }
+.guide-toggle:focus-visible { outline: 3px solid var(--marker); outline-offset: 2px; }
+@media (max-width: 959px) {
+  .brand__word { display: none; }
+  .nav-signout { display: none !important; }
+  .site-header { flex-wrap: nowrap; padding-right: 4.5rem; }
+  .header-for { margin-left: .5rem; }
+  .guide-toggle { padding: 0 .6rem; }
+}
+
+/* Ask Me: a big amber button in the bottom right corner, always in the same place */
+.dock-tab {
+  position: fixed; z-index: 45; right: max(.75rem, env(safe-area-inset-right)); bottom: calc(4.75rem + env(safe-area-inset-bottom));
+  display: inline-flex; align-items: center; gap: .7rem; min-height: 64px; padding: 0 1.5rem 0 1.2rem;
+  font: inherit; font-size: calc(1.2rem * var(--tx)); font-weight: 800; color: var(--on-marker); background: var(--marker);
+  border: 3px solid var(--navy); border-radius: 999px; box-shadow: 0 6px 18px var(--scrim); cursor: pointer;
+}
+.dock-tab .icon { width: 1.8rem; height: 1.8rem; stroke-width: 2.4; }
+@media (hover: hover) { .dock-tab:hover { box-shadow: 0 8px 22px var(--scrim); filter: brightness(.96); } }
+.dock-tab:focus-visible { outline: 4px solid var(--focus); outline-offset: 4px; }
+@media (min-width: 960px) { .dock-tab { bottom: 1.5rem; right: 1.5rem; } }
+/* A soft ring that breathes a few times, so a new visitor sees it */
+.dock-tab::after { content: ""; position: absolute; inset: -8px; border-radius: inherit; border: 3px solid var(--marker); opacity: 0; animation: ask-ring 2s ease-out 1s 3; pointer-events: none; }
+@keyframes ask-ring { 0% { opacity: .9; transform: scale(.96); } 100% { opacity: 0; transform: scale(1.12); } }
+@media (prefers-reduced-motion: reduce) { .dock-tab::after { animation: none; } }
+:root[data-motion="calm"] .dock-tab::after { animation: none; }
+
+/* Your picture: on a phone it sits in the top corner of the header, out of the way of the page */
+@media (max-width: 959px) {
+  .profile { top: max(.4rem, env(safe-area-inset-top)); right: max(.5rem, env(safe-area-inset-right)); left: auto; bottom: auto; }
+  .profile__btn { min-height: 48px; padding: .15rem; border-radius: 999px; }
+  .profile__btn .pic { width: 2.75rem; height: 2.75rem; }
+  .profile__panel { left: auto; right: 0; top: calc(100% + .5rem); bottom: auto; }
+}
+.profile__out { justify-self: center; }
+
+/* Helper pages use the room they have: the chat sits beside the list of people */
+@media (min-width: 960px) {
+  .shell > .page--wide { --col: 64rem; }
+  .shell .page--wide .msgs { grid-template-columns: 20rem 1fr; }
+}
+
+/* Helper welcome */
+.flowlist { list-style: none; margin: 1.25rem 0; padding: 0; display: grid; gap: .75rem; }
+.flowlist li { display: flex; align-items: center; gap: 1rem; padding: .75rem 1rem; font-weight: 700; background: var(--surface); border: var(--line) solid var(--rule); border-radius: var(--radius-lg); }
+.flowlist .pic { width: 3rem; height: 3rem; }
+.can { list-style: none; margin: 1.25rem 0; padding: 0; display: grid; gap: .6rem; }
+.can li { display: flex; align-items: center; gap: 1rem; padding: .75rem 1rem; background: var(--surface); border: var(--line) solid var(--rule); border-radius: var(--radius-lg); }
+.can .pic { width: 3rem; height: 3rem; flex: none; }
+.can__word { font-weight: 800; margin-inline-start: .5rem; }
+.can--nav li > span:last-child strong { display: block; }

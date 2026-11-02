@@ -28,12 +28,20 @@
 <body>
     <div class="boot" aria-hidden="true">
         <span class="skel__bar skel__bar--title"></span>
-        <div class="skel">
-            @for (var i = 0; i < 3; i++)
-            {
-                <div class="skel__row"><span class="skel__pic"></span><span class="skel__lines"><span class="skel__bar skel__bar--short"></span><span class="skel__bar"></span></span></div>
-            }
-        </div>
+        @* Lists get rows, everything else gets a reading shape, so the first look matches the page that arrives. *@
+        @if (IsListPath)
+        {
+            <ul class="rows">
+                @for (var i = 0; i < 3; i++)
+                {
+                    <li class="row"><span class="skel__pic"></span><span class="row__main skel__lines"><span class="skel__bar skel__bar--short"></span><span class="skel__bar"></span></span></li>
+                }
+            </ul>
+        }
+        else
+        {
+            <div class="skel__panel"><span class="skel__bar"></span><span class="skel__bar"></span><span class="skel__bar"></span><span class="skel__bar skel__bar--short"></span></div>
+        }
     </div>
     <Routes @rendermode="PageRenderMode" TimeZone="@HttpContext?.Request.Cookies["backstop.tz"]" />
     <ReconnectModal />
@@ -51,6 +59,9 @@
     // Pages are drawn once, when the live connection opens. Drawing them on the server first and then again
     // makes everything flash and jump; the start-up shapes above fill the gap instead.
     private static readonly IComponentRenderMode InteractiveNoPrerender = new InteractiveServerRenderMode(prerender: false);
+
+    private static readonly string[] ListPaths = ["", "messages", "stories", "remember", "contacts", "sent", "helper", "helper/messages", "helper/history"];
+    private bool IsListPath => ListPaths.Contains((HttpContext?.Request.Path.Value ?? "").Trim('/').ToLowerInvariant());
 
     // The sign-in page is plain server-rendered HTML (its form posts to /account/login); everything else is interactive.
     private IComponentRenderMode? PageRenderMode =>

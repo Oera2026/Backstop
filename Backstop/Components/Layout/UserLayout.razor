@@ -3,12 +3,13 @@
 <a class="skip-link" href="#main">Skip to the message</a>
 <header class="site-header" role="banner">
     <a class="brand" href="home" aria-label="Backstop, go to the home screen">
-        <Logo /> <span>Backstop</span>
+        <Logo /> <span class="brand__word">Backstop</span>
     </a>
     <nav aria-label="Help and settings" class="site-nav">
+        <GuideToggle />
         <a href="/help">Help</a>
         <a href="/settings">Settings</a>
-        <a href="/account/logout" data-enhance-nav="false" target="_self">Sign out</a>
+        <a class="nav-signout" href="/account/logout" data-enhance-nav="false" target="_self">Sign out</a>
     </nav>
 </header>
 <RoleGate Allow="@Roles.UserSide">

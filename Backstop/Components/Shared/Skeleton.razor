@@ -1,28 +1,49 @@
-@* Grey shapes where the page will be, so nothing jumps when the real content arrives. Rows for lists, Article for one thing. *@
+@* Grey shapes in the same places the page will fill in, built from the page's own row, card and verdict boxes so nothing jumps.
+   Rows: a list of messages or people. Verdict: a result with a coloured answer and a card under it. Reading: a title and a text. *@
 <div class="skel" role="status" aria-busy="true">
     <span class="sr-note">@Text</span>
-    @if (Article)
+    @switch (Shape)
     {
-        <div class="skel__article" aria-hidden="true">
-            <span class="skel__bar skel__bar--title"></span>
-            <span class="skel__bar"></span>
-            <span class="skel__bar"></span>
-            <span class="skel__bar skel__bar--short"></span>
-            <span class="skel__block"></span>
-        </div>
-    }
-    else
-    {
-        @for (var i = 0; i < Count; i++)
-        {
-            <div class="skel__row" aria-hidden="true">
+        case SkeletonShape.Verdict:
+            <div class="skel__verdict" aria-hidden="true">
                 <span class="skel__pic"></span>
                 <span class="skel__lines">
+                    <span class="skel__bar skel__bar--title"></span>
                     <span class="skel__bar skel__bar--short"></span>
-                    <span class="skel__bar"></span>
                 </span>
             </div>
-        }
+            <div class="card skel__card" aria-hidden="true">
+                <span class="skel__bar skel__bar--short"></span>
+                <span class="skel__bar"></span>
+                <span class="skel__bar"></span>
+                <span class="skel__bar skel__bar--short"></span>
+            </div>
+            break;
+        case SkeletonShape.Reading:
+            <div class="skel__reading" aria-hidden="true">
+                <span class="skel__bar skel__bar--title"></span>
+                <div class="skel__panel">
+                    <span class="skel__bar"></span>
+                    <span class="skel__bar"></span>
+                    <span class="skel__bar"></span>
+                    <span class="skel__bar skel__bar--short"></span>
+                </div>
+            </div>
+            break;
+        default:
+            <ul class="rows" aria-hidden="true">
+                @for (var i = 0; i < Count; i++)
+                {
+                    <li class="row">
+                        <span class="skel__pic"></span>
+                        <span class="row__main skel__lines">
+                            <span class="skel__bar skel__bar--short"></span>
+                            <span class="skel__bar"></span>
+                        </span>
+                    </li>
+                }
+            </ul>
+            break;
     }
 </div>
 
@@ -30,8 +51,11 @@
     /// <summary>Said to screen readers instead of the grey shapes.</summary>
     [Parameter] public string Text { get; set; } = "Loading…";
 
-    /// <summary>One piece of content (a result, a story) instead of a list.</summary>
-    [Parameter] public bool Article { get; set; }
+    [Parameter] public SkeletonShape Shape { get; set; } = SkeletonShape.Rows;
 
     [Parameter] public int Count { get; set; } = 3;
+}
+
+@code {
+    public enum SkeletonShape { Rows, Verdict, Reading }
 }

@@ -43,7 +43,8 @@ public sealed class DemoTour
     public static readonly IReadOnlyList<TourStep> HelperSteps =
     [
         new("/helper", "Waiting for you", "Mail the checker was unsure about waits here.", "main h1"),
-        new("/helper", "A message", "Tap one to see why it was held.", ".rows a.row", true),
+        new("/helper", "Next up", "The most urgent message comes first.", ".hero, .rows a.row"),
+        new("/helper", "Review it", "Tap Review it to see why it was held.", ".hero__go, .rows a.row", true),
 
         new("helper/:id", "Who sent it", "See who it is from and what it says.", ".evidence h1"),
         new("helper/:id", "The checker's view", "A short reason, in plain words.", ".evidence .lead"),
@@ -72,6 +73,9 @@ public sealed class DemoTour
     public bool IsFirst => Index == 0;
     public bool IsLast => Index == Steps.Count - 1;
 
+    /// <summary>True once the guide has started for this visit. A new load of the app is a new visit.</summary>
+    public bool Begun { get; private set; }
+
     public event Action? Changed;
 
     private static string Norm(string path) => path.Split('?', '#')[0].Trim('/').ToLowerInvariant();
@@ -87,6 +91,8 @@ public sealed class DemoTour
     public void Next() { if (!IsLast) { Index++; Changed?.Invoke(); } }
     public void Back() { if (!IsFirst) { Index--; Changed?.Invoke(); } }
     public void Close() { Active = false; Changed?.Invoke(); }
+
+    public void Begin(TourSide side) { Begun = true; Start(side); }
 
     /// <summary>Begins the walk-around for one side, from its first slide.</summary>
     public void Start(TourSide side)

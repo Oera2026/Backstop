@@ -4,6 +4,7 @@
   var KEY = 'backstop.settings';
   var DEFAULTS = { size: 'normal', theme: 'light', contrast: 'standard', spacing: 'normal', motion: 'normal', rate: 'normal' };
   var WKEY = 'backstop.welcomed';
+  var HKEY = 'backstop.helperWelcomed';
   var RATES = { slow: 0.7, normal: 0.9, fast: 1.1 };
 
   function read() {
@@ -38,6 +39,7 @@
     speechRate: function () { return RATES[read().rate] || RATES.normal; },
     // First run: the welcome screens show once per device.
     welcomed: welcomed,
+    markHelperWelcomed: function () { try { localStorage.setItem(HKEY, "1"); } catch (e) { /* storage blocked */ } },
     markWelcomed: function () { try { localStorage.setItem(WKEY, "1"); } catch (e) { /* storage blocked */ } }
   };
 
@@ -55,6 +57,12 @@
 
   // First visit to the home page goes to the welcome screens. The demo panel shows pages in frames, so frames are left alone.
   if (location.pathname === "/" && window.self === window.top && !welcomed() && location.search.indexOf("tour=1") < 0) location.replace("/welcome");
+})();
+
+// First visit to the helper queue goes to the helper welcome. Frames (the demo panel) are left alone.
+(function () {
+  var done; try { done = localStorage.getItem("backstop.helperWelcomed") === "1"; } catch (e) { done = true; }
+  if (location.pathname === "/helper" && window.self === window.top && !done) location.replace("/helper/welcome");
 })();
 
 // Inside the demo panel the guide bar would repeat itself, so hide it in frames.

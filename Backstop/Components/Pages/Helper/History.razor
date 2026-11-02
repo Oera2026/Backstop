@@ -35,7 +35,8 @@ else
 @if (Guardian.Allows(HelperCapability.SeeClearedMail))
 {
     var cleared = Guardian.GetCleared();
-    <h2>Mail @UserName can read</h2>
+    <details class="card fold">
+    <summary>Mail @UserName can read (@cleared.Count)</summary>
     <ul class="rows rows--compact" aria-label="Mail that was cleared">
         @foreach (var m in _showAll ? cleared : cleared.Take(8).ToList())
         {
@@ -55,6 +56,7 @@ else
     {
         <p class="actions"><button type="button" class="btn btn-quiet" @onclick="@(() => _showAll = !_showAll)"><Icon Name="@(_showAll ? "minus" : "plus")" /> @(_showAll ? "Show fewer" : $"Show all {cleared.Count}")</button></p>
     }
+</details>
 }
 
 @if (Guardian.Allows(HelperCapability.SeeFullActivity))
