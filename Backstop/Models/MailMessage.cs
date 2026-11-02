@@ -6,18 +6,19 @@ namespace Backstop.Models;
 /// </summary>
 public enum MessageState { Received, Scanning, Cleared, Held, Blocked, Failed }
 
-public enum Confidence { Low, Medium, High }
+/// <summary>How strong the warning signs are. None for cleared mail. It comes from the rules score and the checks that ran, never from a guess.</summary>
+public enum Concern { None, Unclear, Some, Strong }
 
 public enum TierStatus { Pending, Running, Passed, Flagged, Skipped, Failed }
 
 /// <summary>One thing that looked wrong, written for the helper in plain language.</summary>
 public sealed record Flag(string Icon, string Title, string Explanation);
 
-/// <summary>Result of the link check (by address only; the link is never opened). All URLs are already defanged for display.</summary>
-public sealed record LinkCheck(string DefangedUrl, IReadOnlyList<string> Hops, string? TrackerWarning, string Verdict);
+/// <summary>Result of the link check, by address only (the link is never opened). Signals are only the address checks that found something. The URL is already defanged for display.</summary>
+public sealed record LinkCheck(string DefangedUrl, IReadOnlyList<string> Signals);
 
-/// <summary>One stage of the checking pipeline and how long it took.</summary>
-public sealed record TierResult(string Name, int LatencyMs, TierStatus Status, string Note);
+/// <summary>One stage of the checking pipeline and what it found. No timings: none are invented.</summary>
+public sealed record TierResult(string Name, TierStatus Status, string Note);
 
 public sealed class MailMessage
 {
@@ -34,7 +35,10 @@ public sealed class MailMessage
     public string Summary { get; set; } = "";
     public List<Flag> Flags { get; set; } = [];
     public List<LinkCheck> Links { get; set; } = [];
-    public Confidence Confidence { get; set; } = Confidence.Low;
+    public Concern Concern { get; set; } = Concern.Unclear;
+
+    /// <summary>The real score from the local rules (sum of the weights of the warning signs found). Not a probability.</summary>
+    public int RulesScore { get; set; }
     public List<TierResult> Tiers { get; set; } = [];
 
     /// <summary>

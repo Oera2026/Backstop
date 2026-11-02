@@ -620,10 +620,17 @@ public class LlamaScamCheckerTests
         {
             var safeAi = new StubMeta(new MetaScamAnalysis(Verdict.LooksSafe, "Fine.", [], true));
             var mail = new MockMailService(new MailStore(), safeAi);
+            // What the demo author expects (regression only). The scenarios themselves carry no outcome.
+            var expected = new Dictionary<string, MessageState>
+            {
+                ["family-photos"] = MessageState.Cleared, ["gp-reminder"] = MessageState.Cleared, ["remote-support"] = MessageState.Held,
+                ["off-channel"] = MessageState.Held, ["payment-redirect"] = MessageState.Held, ["prompt-injection"] = MessageState.Held,
+                ["link-chain"] = MessageState.Blocked,
+            };
             foreach (var s in MockData.Scenarios)
             {
                 var m = await mail.ReceiveAsync(s.Id, false);
-                Assert(m is not null && m.State == s.Expected, $"{s.Id}: expected {s.Expected} but got {m?.State}");
+                Assert(m is not null && m.State == expected[s.Id], $"{s.Id}: expected {expected[s.Id]} but got {m?.State}");
                 Assert(m!.Tiers.Count == 4, $"{s.Id}: all four checks ran");
             }
             // An email nobody wrote a scenario for: decided by its words alone.
@@ -671,13 +678,13 @@ public class LlamaScamCheckerTests
             var guardian = new MockGuardianService(store);
             var m = (await mail.ReceiveAsync(new InboundMail("Sam Lee", "sam.lee@example.org", "Tea", "See you at three."), false))!;
             Assert(m.State == MessageState.Held && m.AwaitingScan && mail.GetInbox().All(x => x.Id != m.Id), "AI down: withheld and waiting for a scan");
-            Assert(await mail.RescanAsync() == 0 && m.State == MessageState.Held, "AI still down: rescan leaves it held");
+            Assert(await mail.RescanAsync(m.Id) == 0 && m.State == MessageState.Held, "AI still down: rescan leaves it held");
             guardian.Approve(m.Id);
             Assert(m.State == MessageState.Held, "A helper cannot approve mail the AI has not checked");
             ai.Answer = new MetaScamAnalysis(Verdict.LooksSafe, "Fine.", [], true);
-            Assert(await mail.RescanAsync() == 1 && m.State == MessageState.Cleared && !m.AwaitingScan, "AI answers safe: released by the rescan");
+            Assert(await mail.RescanAsync(m.Id) == 1 && m.State == MessageState.Cleared && !m.AwaitingScan, "AI answers safe: released by the rescan");
             var scam = (await mail.ReceiveAsync(new InboundMail("Sam Lee", "sam.lee@example.org", "Gift", "Buy a gift card and send me the codes."), true))!;
-            await mail.RescanAsync();
+            await mail.RescanAsync(scam.Id);
             Assert(scam.State == MessageState.Held && !scam.AwaitingScan, "AI answers, local rules worried: held for the helper, not cleared");
             guardian.Block(scam.Id);
             Assert(scam.State == MessageState.Blocked && guardian.GetMailActivity().Count == 1, "Block works and is written to the activity log");
@@ -877,6 +884,51 @@ public class LlamaScamCheckerTests
                 .CheckContentAsync(new CheckRequest(CheckKind.Message, "Your prize is waiting: bit.ly/win"));
             Assert(bare.Verdict != Verdict.LooksSafe, "Check judges the address in a short link");
             Console.WriteLine("PASS: Links are found, judged by address and defanged.");
+        }
+
+        // 14. No AI checker (no key, null checker): harmless text is HELD, never LooksSafe and never "checked".
+        {
+            var noAi = new MockBackstopApi(new MockGuardianService(new MailStore()), new MockApiOptions(), null);
+            var harmless = await noAi.CheckContentAsync(new CheckRequest(CheckKind.Message, "Hi Mum, see you on Sunday at one. Love, Priya"));
+            Assert(harmless.Status == ReviewStatus.Held && harmless.Verdict != Verdict.LooksSafe && harmless.Failure is not null, "Check without a checker must hold, never LooksSafe");
+            var talk = await noAi.CheckContentAsync(new CheckRequest(CheckKind.Conversation, "Daniel: Hello Margaret, lovely garden.\nMargaret: Thank you."));
+            Assert(talk.Status == ReviewStatus.Held && talk.Verdict != Verdict.LooksSafe, "A chat check without a checker must hold");
+
+            // Chat from another user: Joan's reply is harmless, but with no checker it is held and the user sees nothing.
+            await noAi.SendChatAsync("p-joan", "Hello Joan");
+            await Task.Delay(3200);
+            Assert(await noAi.GetHeldChatCountAsync() == 1, "A chat message that could not be checked is held");
+            Assert((await noAi.GetChatMessagesAsync("p-joan")).All(m => m.FromMe), "Nothing from Joan is delivered unchecked");
+            Console.WriteLine("PASS: No checker means held, for Check and Chat.");
+        }
+
+        // 15. Items 3, 4, 5, 9: no invented confidence, link signals or timings; the seeded held mail is unscanned and cannot be approved.
+        {
+            var store = new MailStore();
+            var guardian = new MockGuardianService(store);
+            var seeded = store.Query(m => m.State == MessageState.Held).Single();
+            Assert(seeded.State == MessageState.Held && seeded.AwaitingScan && seeded.Tiers.Count == 0, "Seeded held mail is marked not scanned and has no made-up tier record");
+            guardian.Approve(seeded.Id);
+            Assert(seeded.State == MessageState.Held, "Seeded held mail cannot be approved before a real scan");
+
+            var safeAi = new StubMeta(new MetaScamAnalysis(Verdict.LooksSafe, "Fine.", [], true));
+            var mail = new MockMailService(new MailStore(), safeAi);
+            var cleared = (await mail.ReceiveAsync(new InboundMail("Sam Lee", "sam.lee@example.org", "Tea", "See you at three."), false))!;
+            Assert(cleared.State == MessageState.Cleared && cleared.Concern == Concern.None && cleared.RulesScore == 0, "Cleared mail shows no concern level and a real rules score of 0");
+            var gift = (await mail.ReceiveAsync(new InboundMail("Sam Lee", "sam.lee@example.org", "Gift", "Buy a gift card and send me the codes. Keep this between us."), false))!;
+            Assert(gift.RulesScore > 0 && gift.RulesScore == MockRiskRules.Scan($"{gift.Subject}\n{gift.Body}").Flags.Where(f => f.Id != "link").Sum(f => MockRiskRules.Weight(f.Id)), "The rules score is the real sum of the rule weights");
+
+            var scan = LinkFinder.Inspect("Go to bit.ly/x or http://192.0.2.7/login or www.example.net/hello");
+            Assert(scan.Links.Count == 3, "Bare, IP and www. links are all found");
+            Assert(scan.Links[0].Signals.Any(s => s.Contains("shortened")), "Shortener signal is real");
+            Assert(scan.Links[1].Signals.Any(s => s.Contains("number instead")) && scan.Links[1].Signals.Any(s => s.Contains("signing in")), "IP host and risky-word signals are real");
+            Assert(scan.Links[2].Signals.Count == 0, "A plain address has no signals, and no 'looks ordinary' claim");
+            Assert(scan.Links.All(l => l.DefangedUrl.Contains("[.]")), "Every link is defanged");
+
+            var steps = new List<TierResult>();
+            await mail.ReceiveAsync(new InboundMail("Sam Lee", "sam.lee@example.org", "Tea", "See you at three."), false, (i, t) => steps.Add(t));
+            Assert(steps.Count >= 4 && steps.All(t => t.Name.Length > 0), "The timeline reports the checks that ran");
+            Console.WriteLine("PASS: No invented confidence, link chains or timings; seeded held mail is unscanned.");
         }
 
         Console.WriteLine("\nALL TESTS PASSED SUCCESSFULLY.");

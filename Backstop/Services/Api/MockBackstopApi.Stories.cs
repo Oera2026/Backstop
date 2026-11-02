@@ -3,7 +3,7 @@ using Backstop.Services.Api.Fixtures;
 
 namespace Backstop.Services.Api;
 
-// MOCK: how Stories and "Make sense of it" are "written". A real back end sends the situation to a language
+// MOCK: how Stories are "written". A real back end sends the situation to a language
 // model and checks the answer before it is shown. Here each situation is matched by its words.
 public sealed partial class MockBackstopApi
 {
@@ -70,18 +70,6 @@ public sealed partial class MockBackstopApi
         Changed?.Invoke();
     }
 
-    public async Task<SituationExplanation> MakeSenseOfAsync(string whatHappened, CancellationToken ct = default)
-    {
-        await Wait(1400, ct);
-        if (string.IsNullOrWhiteSpace(whatHappened)) throw new BackstopApiException("Please tell me what happened.");
-
-        var text = whatHappened.Trim();
-        var t = StoryFixtures.MatchSense(text);
-        return new SituationExplanation(NewId("q"), text, Fill(t.Summary),
-            t.Possibilities.Select(p => p with { Text = Fill(p.Text) }).ToList(),
-            t.WhatYouCanDo.Select(Fill).ToList(), t.YouCouldSay.Select(Fill).ToList(),
-            t.TalkToSomeone is null ? null : Fill(t.TalkToSomeone));
-    }
 
     // A held story shows the user no words (the same rule as held mail). A blocked story is invisible.
     private static Story ForUser(Story s) => s.Status == StoryStatus.Held ? s with { Title = "Your story", When = null, Pages = [] } : s;

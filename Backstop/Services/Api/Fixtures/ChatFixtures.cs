@@ -5,7 +5,7 @@ namespace Backstop.Services.Api.Fixtures;
 /// <summary>MOCK: made-up people and made-up replies. Nothing here is real.</summary>
 public static class ChatFixtures
 {
-    /// <summary>The helper who is also the household's trusted person. Her side is the real /helper view.</summary>
+    /// <summary>The helper who is also the household's trusted person. Their side is the real /helper view.</summary>
     public const string TrustedId = "p-priya";
 
     public static IReadOnlyList<ChatPerson> People { get; } =

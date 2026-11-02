@@ -127,7 +127,7 @@
     private Scenario? Current => Mail.Scenarios.FirstOrDefault(s => s.Id == _scenarioId);
 
     private static TierResult[] Fresh() =>
-        [.. MockData.TierNames.Select(n => new TierResult(n, 0, TierStatus.Pending, "Waiting"))];
+        [.. MockData.TierNames.Select(n => new TierResult(n, TierStatus.Pending, "Waiting"))];
 
     private string OutcomeText => _result?.State switch
     {

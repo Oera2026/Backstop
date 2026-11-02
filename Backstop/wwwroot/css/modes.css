@@ -276,7 +276,7 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 .activity .icon { margin-top: .2rem; color: var(--navy); }
 .activity time { display: block; color: var(--text-2); font-weight: 600; font-size: calc(.85rem * var(--tx)); }
 
-/* Stories and Make sense of it */
+/* Stories */
 .storyfig { margin: 0 0 1rem; }
 .storyfig .figure__frame { max-width: 26rem; margin-inline: auto; }
 .storypage__h { margin: 0 0 .4rem; font-size: calc(1.2rem * var(--tx)); }

@@ -3,7 +3,7 @@ using Backstop.Models;
 namespace Backstop.Services.Api.Fixtures;
 
 /// <summary>
-/// Stories and "Make sense of it" wording. MOCK: a real back end writes these with a language model, in the
+/// Stories wording. MOCK: a real back end writes these with a language model, in the
 /// user's own situation. Here each situation is matched by its words. ALL DATA IS SYNTHETIC.
 /// Stories follow the usual social-story shape: what will happen, what people do, how it may feel, what I can do.
 /// </summary>
@@ -85,81 +85,10 @@ public static class StoryFixtures
         new("Afterwards", "When it is over I can rest. I did it.", "home"),
     ]);
 
-    // ---------- Make sense of it ----------
-
-    public sealed record SenseTemplate(string[] Words, string Summary, Possibility[] Possibilities, string[] WhatYouCanDo, string[] YouCouldSay, string? TalkToSomeone);
-
-    public static IReadOnlyList<SenseTemplate> Sense { get; } =
-    [
-        new(["reply", "replied", "answer", "ignored", "ghost", "text back", "message back", "no response"],
-            "Someone has not replied to you. This happens a lot, and it usually does not mean they are cross.",
-            [
-                new("Often", "They are busy, or they saw your message and forgot to answer."),
-                new("Often", "Their phone is off, or they have not looked at it."),
-                new("Sometimes", "They are not sure what to say yet."),
-            ],
-            ["Wait one or two days.", "Then you can send one short, kind message.", "If you are still worried, ask {helper} what she thinks."],
-            ["\"Hi, I hope you are well. Are you still free on Saturday?\"", "\"No rush. Just checking in.\""],
-            null),
-        new(["catch up", "sometime", "we should", "let's do", "see you around", "keep in touch"],
-            "Some people say this to be polite. It can be a friendly way to say goodbye.",
-            [
-                new("Often", "They mean it kindly, but they do not have a plan yet."),
-                new("Sometimes", "They would like to meet, and they are waiting for someone to suggest a day."),
-                new("Sometimes", "It is just a friendly way to end the chat."),
-            ],
-            ["If you would like to meet, you can suggest a day.", "If they say yes, put it in your calendar.", "If you are not sure, ask them, \"Did you mean a real day?\""],
-            ["\"Would Thursday afternoon suit you?\"", "\"I'd like that. Shall we pick a day?\""],
-            null),
-        new(["cancel", "cancelled", "can't come", "cant come", "let me down", "not coming", "postponed"],
-            "Someone cancelled. That can feel disappointing, and it is okay to feel that way.",
-            [
-                new("Often", "Something came up for them, like work, health or family."),
-                new("Often", "They are sorry too, and still want to meet another time."),
-                new("Sometimes", "They are tired or overwhelmed and need some space."),
-            ],
-            ["It is okay to feel sad or cross for a bit.", "You can reply kindly and ask for a new day.", "You could do something small you enjoy instead."],
-            ["\"That's okay. Thanks for telling me. Can we pick another day?\""],
-            null),
-        new(["sarcas", "joke", "laughed", "laughing", "teased", "tease", "banter", "rude"],
-            "Some people say things they do not mean literally. It can be a joke, and it can be hard to tell.",
-            [
-                new("Often", "They meant it as a joke and were not trying to upset you."),
-                new("Sometimes", "They said it badly, and did not think how it sounded."),
-                new("Sometimes", "They were being unkind. This is less common."),
-            ],
-            ["You can ask, \"Did you mean that as a joke?\"", "You can walk away if you do not like it.", "Tell {helper} if it keeps happening."],
-            ["\"I didn't understand that. What did you mean?\"", "\"I don't like that. Please stop.\""],
-            null),
-        new(["shout", "angry", "argu", "cross with me", "upset with me", "hurt", "hit", "bully"],
-            "It sounds like something upsetting happened. It matters, and it is not your fault.",
-            [
-                new("Sometimes", "The other person was stressed or tired and it came out badly."),
-                new("Sometimes", "There was a misunderstanding on both sides."),
-                new("Sometimes", "They were not being fair. You do not have to put up with that."),
-            ],
-            ["Go somewhere calm and take some slow breaths.", "You do not have to decide anything now.", "Please tell {helper} or someone you trust."],
-            ["\"I need a break. Can we talk later?\"", "\"I did not like that. Please speak to me kindly.\""],
-            "This sounds upsetting. Please tell {helper} or someone you trust, today if you can."),
-    ];
-
-    public static SenseTemplate GenericSense { get; } = new([],
-        "Something happened that you would like to understand. It is good to ask.",
-        [
-            new("Often", "The other person did not mean to upset or confuse you."),
-            new("Sometimes", "They were busy, tired or in a hurry."),
-            new("Sometimes", "There was a misunderstanding. People often read things differently."),
-        ],
-        ["You can ask the person what they meant.", "You can take some time before you answer.", "You can ask {helper} what she thinks."],
-        ["\"Can you tell me what you meant?\"", "\"I am not sure I understood. Can you say it another way?\""],
-        null);
-
     public static bool IsSensitive(string text) =>
         SensitiveWords.Any(w => text.Contains(w, StringComparison.OrdinalIgnoreCase));
 
     public static StoryTemplate Match(string text) =>
         Templates.FirstOrDefault(t => t.Words.Any(w => text.Contains(w, StringComparison.OrdinalIgnoreCase))) ?? Generic;
 
-    public static SenseTemplate MatchSense(string text) =>
-        Sense.FirstOrDefault(t => t.Words.Any(w => text.Contains(w, StringComparison.OrdinalIgnoreCase))) ?? GenericSense;
 }

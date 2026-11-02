@@ -113,11 +113,9 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         Func<ILlamaScamChecker, Task<MetaScamAnalysis>> ask, bool aiRequired,
         Verdict floorVerdict, string floorReason, List<RiskFlag> flags)
     {
+        // Fail closed for every kind of content: without the AI checker nothing is called checked, and it is held.
         if (llamaChecker is null)
-        {
-            if (!aiRequired) return (floorVerdict, floorReason, ReviewStatus.NotAsked, null);
-            return HoldForReview(flags, floorVerdict, "We could not check this picture, so your helper will look at it.", new("The picture checker is not switched on yet. Please tell the person who looks after this app.", "Code: NO_CHECKER\nWhat: No IMetaScamChecker is registered."));
-        }
+            return HoldForReview(flags, floorVerdict, "We could not check this, so your helper will look at it.", new("The checker is not switched on yet. Please tell the person who looks after this app.", "Code: NO_CHECKER\nWhat: No IMetaScamChecker is registered."));
 
         MetaScamAnalysis ai;
         try { ai = await ask(llamaChecker); }
@@ -668,7 +666,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
 
     private static ReviewItem FromMail(MailMessage m) => new(
         m.Id, ReviewSource.Inbox, m.Subject, Defang.ForHelper(m.Body),
-        m.Confidence == Confidence.High ? Verdict.DontReply : Verdict.BeCareful,
+        m.Concern == Concern.Strong ? Verdict.DontReply : Verdict.BeCareful,
         m.Flags.Select(f => new RiskFlag(f.Title, f.Icon, f.Title, f.Explanation)).ToList(),
         m.Summary, m.CallRequested, m.ReceivedAt);
 

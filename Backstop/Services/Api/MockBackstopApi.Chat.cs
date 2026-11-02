@@ -154,7 +154,9 @@ public sealed partial class MockBackstopApi
 
             try
             {
-                if (llamaChecker is not null)
+                // No checker means nothing was checked: the message is held, never delivered (fail closed).
+                if (llamaChecker is null) checkedOk = false;
+                else
                 {
                     var ai = await llamaChecker.CheckScamAsync(display, null, null, ct);
                     if (!ai.Success)

@@ -33,15 +33,3 @@ public sealed record Story(
     StoryStatus Status,
     DateTimeOffset MadeAt);
 
-/// <summary>One way to read what happened. Likelihood is a word ("Often", "Sometimes"), never a percentage.</summary>
-public sealed record Possibility(string Likelihood, string Text);
-
-public sealed record SituationExplanation(
-    string Id,
-    string WhatHappened,
-    string Summary,
-    IReadOnlyList<Possibility> Possibilities,
-    IReadOnlyList<string> WhatYouCanDo,
-    IReadOnlyList<string> YouCouldSay,
-    // Shown when the situation sounds upsetting: points the user to their trusted person.
-    string? TalkToSomeone);

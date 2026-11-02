@@ -9,7 +9,7 @@
 
     @if (Message.State == MessageState.Held)
     {
-        <div class="banner @(Message.Confidence == Confidence.High ? "banner--block" : "banner--check")">
+        <div class="banner @(Message.Concern == Concern.Strong ? "banner--block" : "banner--check")">
             <Icon Name="alert" />
             <div>
                 <p class="verdict__head">@VerdictHead</p>
@@ -56,20 +56,18 @@
             {
                 <div class="linkcheck">
                     <p><Icon Name="link" /> <code>@l.DefangedUrl</code></p>
-                    <p>@l.Verdict</p>
-                    @if (l.Hops.Count > 1)
+                    @if (l.Signals.Count == 0)
                     {
-                        <p>Went through @l.Hops.Count websites:</p>
-                        <ol class="hops">
-                            @foreach (var h in l.Hops)
-                            {
-                                <li><code>@h</code></li>
-                            }
-                        </ol>
+                        <p>No warning signs in the address.</p>
                     }
-                    @if (l.TrackerWarning is not null)
+                    else
                     {
-                        <p class="warn"><Icon Name="eye" /> <span><strong>Tracker warning.</strong> @l.TrackerWarning</span></p>
+                        <ul>
+                            @foreach (var s in l.Signals)
+                            {
+                                <li>@s</li>
+                            }
+                        </ul>
                     }
                 </div>
             }
@@ -110,7 +108,7 @@
             {
                 @* Block only stands out when the checker is very sure. When it is not sure, both choices weigh the same. *@
                 <div class="actions actions--helper">
-                    <button type="button" class="btn @(Message.Confidence == Confidence.High ? "btn-block" : "btn-quiet btn-danger")" @onclick="@(() => Start("Blocked"))">
+                    <button type="button" class="btn @(Message.Concern == Concern.Strong ? "btn-block" : "btn-quiet btn-danger")" @onclick="@(() => Start("Blocked"))">
                         <Icon Name="cross" /> Block
                     </button>
                     @if (Message.AwaitingScan)
@@ -171,18 +169,19 @@
     private int _secs;
     private CancellationTokenSource? _cts;
 
-    private string VerdictHead => Message.Confidence switch
+    private string VerdictHead => Message.Concern switch
     {
-        Confidence.High => "This looks like a scam.",
-        Confidence.Medium => "This might be a scam.",
+        Concern.Strong => "This looks like a scam.",
+        Concern.Some => "This might be a scam.",
         _ => "We cannot tell if this is safe.",
     };
 
-    private string VerdictSub => Message.Confidence switch
+    // The rules score is the real number from the local rules. It is not a chance of anything.
+    private string VerdictSub => Message.Concern switch
     {
-        Confidence.High => "We are very sure. We suggest you block it.",
-        Confidence.Medium => "We are fairly sure. Please read it with care.",
-        _ => "We are not sure. Please read it with care.",
+        Concern.Strong => $"Rules score: {Message.RulesScore}. We suggest you block it.",
+        Concern.Some => $"Rules score: {Message.RulesScore}. Please read it with care.",
+        _ => $"Rules score: {Message.RulesScore}. Please read it with care.",
     };
 
     private string DecisionText => (Message.State, Message.HelperDecision) switch
@@ -193,7 +192,7 @@
         _ => "Done. You approved this message. It is now in the user's inbox.",
     };
 
-    private string ConfirmText => Message.Confidence == Confidence.Low
+    private string ConfirmText => Message.Concern is Concern.Unclear or Concern.None
         ? "Approve this message? The user will see it."
         : "We think this is risky. Approve it anyway? The user will see it.";
 

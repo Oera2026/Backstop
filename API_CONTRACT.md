@@ -175,7 +175,6 @@ Changing the level or format calls `POST /explanations` again with the same `ori
 | `GetStoryAsync` | GET | `/stories/{id}` | – | `Story` or 404 |
 | `GetStoriesAsync` | GET | `/stories` | – | `Story[]`, newest first |
 | `DeleteStoryAsync` | DELETE | `/stories/{id}` | – | 204 |
-| `MakeSenseOfAsync` | POST | `/situations` | `{ whatHappened: string }` | `SituationExplanation` |
 
 `Story { id, title, when?, pages: [ { heading, text, picture } ], status: Ready|Held|Blocked, madeAt }`.
 A sensitive topic comes back `Held` with no `pages` (and a generic title) until the trusted person decides. Held and

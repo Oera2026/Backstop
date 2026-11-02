@@ -62,8 +62,6 @@ public interface IBackstopApi
     /// <summary>The user's stories, newest first. Blocked stories are left out.</summary>
     Task<IReadOnlyList<Story>> GetStoriesAsync(CancellationToken ct = default);
     Task DeleteStoryAsync(string id, CancellationToken ct = default);
-    /// <summary>"Make sense of it": reads what happened and gives more than one way to see it.</summary>
-    Task<SituationExplanation> MakeSenseOfAsync(string whatHappened, CancellationToken ct = default);
 
     // --- Chat ---
     /// <summary>The people the user may message. Set by the helper; the user cannot add to it.</summary>

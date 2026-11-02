@@ -17,10 +17,10 @@ public sealed partial class MockBackstopApi
 
     private static (string Tone, string Icon, string Word) MailRisk(MailMessage m) =>
         m.AwaitingScan ? ("check", "refresh", "Not checked yet") :
-        m.Confidence switch
+        m.Concern switch
         {
-            Confidence.High => ("block", "alert", "Looks like a scam"),
-            Confidence.Medium => ("check", "alert", "Might be a scam"),
+            Concern.Strong => ("block", "alert", "Looks like a scam"),
+            Concern.Some => ("check", "alert", "Might be a scam"),
             _ => ("check", "hourglass", "Not sure"),
         };
 

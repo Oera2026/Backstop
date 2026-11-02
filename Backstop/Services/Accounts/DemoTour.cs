@@ -51,7 +51,6 @@ public sealed class DemoTour
         S("Ask Me", "check", "Check it", "Backstop looks for signs of a scam.", ".actions .btn-primary"),
         S("Ask Me", "explain", "Explain something", "Paste hard words. Get easy ones back.", "#explain-text"),
         S("Ask Me", "show-me", "Show me how", "Say what you want to do. You get steps.", "#goal"),
-        S("Ask Me", "make-sense", "What happened?", "Tell it what happened. It helps you make sense of it.", "#sense-what"),
         S("Ask Me", "stories", "Stories", "A short story about something coming up.", "main h1"),
         S("Ask Me", "stories/new", "A new story", "Say what is coming up.", "#story-what"),
 

@@ -11,7 +11,6 @@ public static class LinkFinder
 {
     public const int MaxLinks = 10;
     public const int MaxLength = 200;
-    public const string Ordinary = "The address looks ordinary.";
 
     public sealed record Scan(IReadOnlyList<LinkCheck> Links, int Problems, bool Deceptive);
 
@@ -43,29 +42,29 @@ public static class LinkFinder
         var deceptive = false;
         foreach (var raw in all.Take(MaxLinks))
         {
-            var (verdict, bad, trick) = Judge(raw);
+            var (signals, bad, trick) = Judge(raw);
             var shown = Defang.Url(raw.Length > MaxLength ? raw[..MaxLength] : raw);
-            links.Add(new LinkCheck(shown, [], null, verdict));
+            links.Add(new LinkCheck(shown, signals));
             if (bad) problems++;
             deceptive |= trick;
         }
         if (all.Count > MaxLinks)
         {
-            links.Add(new LinkCheck($"{all.Count - MaxLinks} more", [], null, "There are a lot of links in this message."));
+            links.Add(new LinkCheck($"{all.Count - MaxLinks} more", ["There are a lot of links in this message."]));
             problems++;
         }
         return new Scan(links, problems, deceptive);
     }
 
-    /// <summary>Returns the plain-language verdict, whether it is a problem, and whether the address is disguised.</summary>
-    public static (string Verdict, bool Problem, bool Disguised) Judge(string raw)
+    /// <summary>Returns the address signals that fired (empty when none did), whether any is a problem, and whether the address is disguised.</summary>
+    public static (IReadOnlyList<string> Signals, bool Problem, bool Disguised) Judge(string raw)
     {
-        if (raw.Length > MaxLength) return ("The address is very long.", true, true);
+        if (raw.Length > MaxLength) return (["The address is very long."], true, true);
 
         var hasScheme = raw.Contains("://");
         var candidate = hasScheme ? raw : "http://" + raw;
         if (!Uri.TryCreate(candidate, UriKind.Absolute, out var uri) || string.IsNullOrEmpty(uri.Host))
-            return ("The address is not a proper web address.", true, true);
+            return (["The address is not a proper web address."], true, true);
 
         var host = uri.IdnHost.ToLowerInvariant();
         var bare = host.StartsWith("www.") ? host[4..] : host;
@@ -87,6 +86,6 @@ public static class LinkFinder
 
         // A plain http page alone is not enough to worry about.
         var problem = notes.Any(n => n != "It is not a secure page.");
-        return notes.Count == 0 ? (Ordinary, false, false) : (string.Join(" ", notes), problem, disguised);
+        return (notes, problem, disguised);
     }
 }

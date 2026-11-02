@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Text.RegularExpressions;
 using Backstop.Models;
 using Backstop.Services.Api;
@@ -27,7 +26,8 @@ public static partial class MailAnalyzer
     public sealed record Decision(
         MessageState State,
         string Summary,
-        Confidence Confidence,
+        Concern Concern,
+        int RulesScore,
         IReadOnlyList<Flag> Flags,
         TierResult PolicyTier);
 
@@ -37,30 +37,26 @@ public static partial class MailAnalyzer
         var text = $"{mail.Subject}\n{mail.Body}";
 
         // Rules: the same phrase rules Check uses. The link rule is left to the Link check tier.
-        var clock = Stopwatch.StartNew();
         var scan = MockRiskRules.Scan(text);
         var found = scan.Flags.Where(f => f.Id != "link").ToList();
         var score = found.Sum(f => MockRiskRules.Weight(f.Id));
-        clock.Stop();
         var rulesTier = found.Count == 0
-            ? new TierResult("Rules", (int)clock.ElapsedMilliseconds, TierStatus.Passed, "No warning words or phrases found.")
-            : new TierResult("Rules", (int)clock.ElapsedMilliseconds, TierStatus.Flagged,
+            ? new TierResult("Rules", TierStatus.Passed, "No warning words or phrases found.")
+            : new TierResult("Rules", TierStatus.Flagged,
                 string.Join(" ", found.Select(f => f.Title.TrimEnd('.') + ".")));
 
         // Link check: judged by the address only.
-        clock.Restart();
         var linkScan = LinkFinder.Inspect(text);
         var links = linkScan.Links;
         var problems = linkScan.Problems;
         var deceptive = linkScan.Deceptive;
-        clock.Stop();
         var linkTier = links.Count == 0
-            ? new TierResult("Link check", (int)clock.ElapsedMilliseconds, TierStatus.Skipped, "No links.")
+            ? new TierResult("Link check", TierStatus.Skipped, "No links.")
             : problems == 0
-                ? new TierResult("Link check", (int)clock.ElapsedMilliseconds, TierStatus.Passed,
-                    $"{links.Count} link{(links.Count == 1 ? "" : "s")}. The addresses look ordinary.")
-                : new TierResult("Link check", (int)clock.ElapsedMilliseconds, TierStatus.Flagged,
-                    string.Join(" ", links.Where(l => l.Verdict != LinkFinder.Ordinary).Select(l => l.Verdict).Distinct()));
+                ? new TierResult("Link check", TierStatus.Passed,
+                    $"{links.Count} link{(links.Count == 1 ? "" : "s")} checked by address. No warning signs in the address.")
+                : new TierResult("Link check", TierStatus.Flagged,
+                    string.Join(" ", links.SelectMany(l => l.Signals).Distinct()));
 
         var flags = found.Select(f => new Flag(f.Icon, f.Title, f.Explanation)).ToList();
         if (deceptive)
@@ -105,7 +101,6 @@ public static partial class MailAnalyzer
     /// </summary>
     public static Decision Decide(Analysis a, MetaScamAnalysis? ai)
     {
-        var clock = Stopwatch.StartNew();
         var aiAnswered = ai is { Success: true };
         var aiWorried = aiAnswered && (ai!.Verdict != Verdict.LooksSafe || ai.NeedsHuman || ai.AtRisk);
         var atRisk = a.AtRisk || (ai?.AtRisk ?? false);
@@ -122,7 +117,6 @@ public static partial class MailAnalyzer
         { state = MessageState.Held; note = "The AI check did not give an answer, so a helper looks first."; }
         else
         { state = MessageState.Held; note = atRisk ? "Someone may need help, so a helper looks first." : "A check found a problem, so a helper looks first."; }
-        clock.Stop();
 
         var flags = new List<Flag>(a.Flags);
         if (aiWorried)
@@ -139,13 +133,14 @@ public static partial class MailAnalyzer
         else if (a.SenderProblem) summary = "The sender of this message looks wrong.";
         else summary = "The automatic check could not finish, so please look at this message with care.";
 
-        var confidence = state == MessageState.Cleared ? Confidence.High
-            : a.RulesScore >= 3 || a.DeceptiveLink ? Confidence.High
-            : a.RulesScore > 0 || a.LinkProblems > 0 || a.SenderProblem ? Confidence.Medium
-            : Confidence.Low;
+        // Worked out from the checks that ran. Cleared mail claims nothing about risk.
+        var concern = state == MessageState.Cleared ? Concern.None
+            : a.RulesScore >= 3 || a.DeceptiveLink || (aiWorried && ai!.Verdict == Verdict.DontReply) ? Concern.Strong
+            : a.RulesScore > 0 || a.LinkProblems > 0 || a.SenderProblem || aiWorried ? Concern.Some
+            : Concern.Unclear;
 
-        var tier = new TierResult("Policy", (int)clock.ElapsedMilliseconds,
+        var tier = new TierResult("Policy",
             state == MessageState.Cleared ? TierStatus.Passed : TierStatus.Flagged, note);
-        return new Decision(state, summary, confidence, flags, tier);
+        return new Decision(state, summary, concern, a.RulesScore, flags, tier);
     }
 }
