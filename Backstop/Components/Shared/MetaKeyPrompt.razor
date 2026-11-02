@@ -1,0 +1,45 @@
+@using Backstop.Services.Api
+@inject IConfiguration Config
+@inject IHostEnvironment Env
+
+@if (_open)
+{
+    <div class="key-prompt" role="dialog" aria-modal="true" aria-labelledby="key-prompt-title">
+        <form class="key-prompt__card" @onsubmit="Save">
+            <h2 id="key-prompt-title">Meta AI key</h2>
+            <div class="field">
+                <label for="meta-key">Paste your key</label>
+                <input id="meta-key" type="password" autocomplete="off" maxlength="500" required
+                       @bind="_key" @bind:event="oninput" />
+            </div>
+            @if (_error)
+            {
+                <p class="form-error" role="alert">Please paste a key first.</p>
+            }
+            <div class="actions">
+                <button type="submit" class="btn btn-primary">Save key</button>
+                <button type="button" class="btn btn-quiet" @onclick="Close">Not now</button>
+            </div>
+        </form>
+    </div>
+}
+
+@code {
+    private bool _open;
+    private bool _error;
+    private string? _key;
+
+    // Local runs only, and only when no key came from the environment.
+    protected override void OnInitialized() =>
+        _open = Env.IsDevelopment() && string.IsNullOrWhiteSpace(MetaAiOptions.Load(Config).ApiKey);
+
+    private void Save()
+    {
+        if (string.IsNullOrWhiteSpace(_key)) { _error = true; return; }
+        MetaKeyStore.Set(_key);
+        _key = null;
+        _open = false;
+    }
+
+    private void Close() { _key = null; _open = false; }
+}

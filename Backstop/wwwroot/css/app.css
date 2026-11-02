@@ -461,3 +461,23 @@ input.is-locked { background: var(--surface); border-style: dashed; cursor: not-
 .emptystate__title { font-weight: 800; font-size: calc(1.2rem * var(--tx)); }
 
 .actions--quiet { margin-top: .5rem; }
+
+/* Local start-up prompt for the Meta AI key */
+.key-prompt {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: var(--scrim);
+}
+.key-prompt__card {
+  width: min(100%, 28rem);
+  padding: 1.5rem;
+  background: var(--bg);
+  color: var(--text);
+  border: var(--line) solid var(--border);
+  border-radius: var(--radius-lg);
+}
+.key-prompt__card h2 { margin-top: 0; }

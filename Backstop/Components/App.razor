@@ -45,6 +45,10 @@
     </div>
     <Routes @rendermode="PageRenderMode" TimeZone="@HttpContext?.Request.Cookies["backstop.tz"]" />
     <ReconnectModal />
+    @if (!InFrame)
+    {
+        <MetaKeyPrompt @rendermode="InteractiveNoPrerender" />
+    }
     <script src="@Assets["js/backstop.js"]"></script>
     <script src="@Assets["js/tour.js"]"></script>
     <script src="@Assets["js/camera.js"]"></script>
@@ -59,6 +63,9 @@
     // Pages are drawn once, when the live connection opens. Drawing them on the server first and then again
     // makes everything flash and jump; the start-up shapes above fill the gap instead.
     private static readonly IComponentRenderMode InteractiveNoPrerender = new InteractiveServerRenderMode(prerender: false);
+
+    // The demo panel frames / and /helper; the prompt belongs to the outer page only.
+    private bool InFrame => HttpContext?.Request.Headers["Sec-Fetch-Dest"].ToString() == "iframe";
 
     private static readonly string[] ListPaths = ["", "messages", "stories", "remember", "contacts", "sent", "helper", "helper/messages", "helper/history"];
     private bool IsListPath => ListPaths.Contains((HttpContext?.Request.Path.Value ?? "").Trim('/').ToLowerInvariant());
