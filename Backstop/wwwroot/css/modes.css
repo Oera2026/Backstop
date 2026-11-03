@@ -755,8 +755,9 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
   .try-panel { margin-bottom: 0; }
   .try-panel--email { grid-area: email; align-self: stretch; display: flex; flex-direction: column; min-height: 0; }
   .try-panel--link { grid-area: link; }
-  .try-email { flex: 1; min-height: 0; grid-template-columns: minmax(13rem, 16rem) minmax(0, 1fr); column-gap: 1.5rem; align-items: stretch; }
-  .page--try .try-samples { grid-template-columns: 1fr; margin: 0; gap: .5rem; align-content: start; }
+  .try-email { flex: 1; min-height: 0; grid-template-columns: minmax(18rem, 21rem) minmax(0, 1fr); column-gap: 1.5rem; align-items: stretch; }
+  .page--try .try-samples { grid-template-columns: 1fr 1fr; margin: 0; gap: .4rem; align-content: start; }
+  .page--try .try-sample { padding-inline: .4rem; font-size: calc(.85rem * var(--tx)); line-height: 1.25; }
   .try-mailform { display: flex; flex-direction: column; min-height: 0; }
   .try-mailform .field:has(textarea) { flex: 1; display: flex; flex-direction: column; min-height: 0; }
   .try-mailform textarea { flex: 1; min-height: 8rem; resize: none; }
@@ -765,13 +766,20 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
   .try-pair { grid-template-columns: 1fr 1fr; }
   .try-mode { margin-bottom: .25rem; }
   .try-mode__opt { min-height: 48px; }
-  .try-panel > .lead { margin-bottom: .75rem; }
+  .try-panel > .lead { margin-bottom: .6rem; line-height: 1.4; }
+  /* Smaller boxes so the whole page fits one screen. Buttons keep their 56px. */
+  .try-panel { padding: .9rem 1.1rem; }
+  .page--try input[type="text"] { min-height: 46px; padding: .4rem .8rem; }
+  .page--try .field label { margin-bottom: .15rem; line-height: 1.4; }
+  .page--try .try-form .field { margin-bottom: .55rem; }
+  .try-head h1 { font-size: calc(1.6rem * var(--tx)); }
+  .try-panel > h2 { font-size: calc(1.15rem * var(--tx)); }
+  .try-mode legend { margin-bottom: 0; }
+  .try-mode__opt { min-height: 40px; }
+  .try-mailform textarea { min-height: 6rem; }
+  .try-mailform .actions, .try-linkform .actions { margin-top: .25rem; }
 }
-/* On a short screen the examples run two across, so the panel does not need more height than the form. */
-@media (min-width: 64rem) and (max-height: 56rem) {
-  .try-email { grid-template-columns: minmax(16rem, 22rem) minmax(0, 1fr); }
-  .page--try .try-samples { grid-template-columns: 1fr 1fr; }
-}/* The wait is shown at the foot of the screen, wherever the visitor has scrolled to */
+/* The wait is shown at the foot of the screen, wherever the visitor has scrolled to */
 .try-status { position: fixed; inset-inline: .75rem; bottom: max(.75rem, env(safe-area-inset-bottom)); max-width: 30rem; margin-inline: auto; z-index: 30; padding: 0 1.25rem; background: var(--bg); border: var(--line) solid var(--border); border-radius: var(--radius-lg); }
 .try-status .loading { min-height: 0; padding: .75rem 0; row-gap: .5rem; }
 .try-status .loading__late { max-height: 0; overflow: hidden; animation: try-late .5s ease-out 5s forwards; }
