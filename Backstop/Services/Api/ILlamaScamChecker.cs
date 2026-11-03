@@ -16,6 +16,14 @@ public sealed record MetaScamAnalysis(
 public interface IMetaScamChecker
 {
     Task<MetaScamAnalysis> CheckScamAsync(string? text, byte[]? imageBytes = null, string? mimeType = null, CancellationToken ct = default);
+
+    /// <summary>
+    /// Same check, with facts from Backstop's own Link check (the public Try it page only). They are about the addresses in the
+    /// message, were not written by the sender, and can only make the answer stricter. A checker that does not know about them
+    /// ignores them.
+    /// </summary>
+    Task<MetaScamAnalysis> CheckScamWithLinksAsync(string? text, IReadOnlyList<string> linkFindings, CancellationToken ct = default) =>
+        CheckScamAsync(text, null, null, ct);
 }
 
 // Keep ILlamaScamChecker as a backwards-compatible alias for existing code

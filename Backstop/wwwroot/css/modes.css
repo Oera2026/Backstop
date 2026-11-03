@@ -739,3 +739,9 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 .try-signals { display: block; overflow-wrap: anywhere; }
 @media (max-width: 480px) { .try-samples { grid-template-columns: 1fr 1fr; } }
 .login-try { margin: .75rem 0 0; } .login-try .btn { width: 100%; justify-content: center; }
+.try-linkform { margin-top: 2rem; }
+.try-linkform h2 { font-size: calc(1.2rem * var(--tx)); }
+.try-link { border-top: var(--line) solid var(--border); padding-top: .75rem; margin-top: .75rem; }
+.try-chain { margin: .25rem 0 .5rem; padding-left: 1.4rem; overflow-wrap: anywhere; }
+.try-chain__note { font-weight: 700; }
+.try-link__final { margin: 0 0 .5rem; overflow-wrap: anywhere; }

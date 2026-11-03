@@ -41,6 +41,26 @@
     </div>
 </form>
 
+@* A message is checked as a whole above. This box is for one link on its own. *@
+<form class="try-form try-linkform" @onsubmit="CheckLink">
+    <h2>Check one link</h2>
+    <div class="field">
+        <label for="try-link">Link</label>
+        <input id="try-link" type="text" @bind="_link" maxlength="2000" autocomplete="off" inputmode="url" />
+    </div>
+    <div class="field">
+        <label for="try-linktext">Words shown for the link (optional)</label>
+        <input id="try-linktext" type="text" @bind="_linkText" maxlength="300" autocomplete="off" />
+    </div>
+    @if (_linkProblem is not null)
+    {
+        <p class="form-error" role="alert">@_linkProblem</p>
+    }
+    <div class="actions">
+        <button type="submit" class="btn btn-primary" disabled="@_busy"><Icon Name="link" /> Check link</button>
+    </div>
+</form>
+
 @if (_busy)
 {
     <LoadingState Text="Checking it…" />
@@ -65,6 +85,40 @@ else if (_result is { } r)
             </ul>
         }
 
+        @if (r.Links is { Count: > 0 })
+        {
+            <h3>Links found</h3>
+            @foreach (var l in r.Links)
+            {
+                <div class="try-link">
+                    <p><span class="badge badge--@LinkKind(l)"><Icon Name="@LinkIcon(l)" /><span>@LinkWord(l)</span></span></p>
+                    <ol class="try-chain">
+                        @foreach (var hop in l.Chain)
+                        {
+                            <li>@hop.DefangedUrl <span class="try-chain__note">(@hop.Note)</span></li>
+                        }
+                        @if (l.Chain.Count == 0)
+                        {
+                            <li>@l.StartUrl</li>
+                        }
+                    </ol>
+                    @if (l.FinalUrl is not null)
+                    {
+                        <p class="try-link__final"><strong>Ends at</strong> @l.FinalUrl</p>
+                    }
+                    @if (l.Signals.Count > 0)
+                    {
+                        <ul class="plain-list try-signals">
+                            @foreach (var s in l.Signals)
+                            {
+                                <li>@s</li>
+                            }
+                        </ul>
+                    }
+                </div>
+            }
+        }
+
         <h3>What your trusted helper sees</h3>
         <p>@r.HelperSees</p>
 
@@ -77,8 +131,18 @@ else if (_result is { } r)
 @code {
     private bool _outgoing, _busy, _focusResult;
     private string _from = "", _subject = "", _body = "";
-    private string? _problem;
+    private string _link = "", _linkText = "";
+    private string? _problem, _linkProblem;
     private TryResult? _result;
+
+    private static string LinkKind(LinkReport l) => l.Verdict switch { LinkVerdict.NoWarnings => "safe", LinkVerdict.Suspicious => "check", _ => "block" };
+    private static string LinkIcon(LinkReport l) => l.Verdict switch { LinkVerdict.NoWarnings => "check", LinkVerdict.Suspicious => "hourglass", _ => "cross" };
+    private static string LinkWord(LinkReport l) => l.Verdict switch
+    {
+        LinkVerdict.NoWarnings => l.Fetched ? "No warning signs" : "No warning signs in the address",
+        LinkVerdict.Suspicious => "Be careful",
+        _ => l.Verified ? "Looks dangerous" : "Could not verify, treated as unsafe",
+    };
     private ElementReference _resultBox;
 
     private async Task UseSample(TrySample s)
@@ -90,17 +154,21 @@ else if (_result is { } r)
         await Check();
     }
 
-    private async Task Check()
+    private Task Check() => Run(() => Mail.TryCheckAsync(new InboundMail(_from, _from, _subject, _body), _outgoing), forLink: false);
+
+    private Task CheckLink() => Run(() => Mail.TryCheckLinkAsync(_link, _linkText), forLink: true);
+
+    private async Task Run(Func<Task<TryResult>> check, bool forLink)
     {
         if (_busy) return;
         _busy = true;
-        _problem = null;
+        _problem = _linkProblem = null;
         _result = null;
         StateHasChanged();
         try
         {
-            var r = await Mail.TryCheckAsync(new InboundMail(_from, _from, _subject, _body), _outgoing);
-            if (r.Problem is not null) _problem = r.Problem;
+            var r = await check();
+            if (r.Problem is not null) { if (forLink) _linkProblem = r.Problem; else _problem = r.Problem; }
             else { _result = r; _focusResult = true; }
         }
         catch (Exception)

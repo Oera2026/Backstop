@@ -88,6 +88,15 @@ builder.Services.AddHttpClient<MetaStoryWriter>().ConfigurePrimaryHttpMessageHan
 // Explain and questions about a document: the same Meta endpoint, the same rules.
 builder.Services.AddHttpClient<MetaDocumentExplainer>().ConfigurePrimaryHttpMessageHandler(NoRedirectHandler).AddStandardResilienceHandler(Resilience);
 
+// Link check (the public /try page only; real mail never opens a link). Optional blocklist lookups: Google Safe Browsing and URLhaus,
+// skipped silently when their keys are empty. The fixed hosts are the only places those lookups go.
+builder.Services.AddHttpClient<Backstop.Services.Links.LinkReputation>(c => c.Timeout = TimeSpan.FromSeconds(8))
+    .ConfigurePrimaryHttpMessageHandler(NoRedirectHandler);
+builder.Services.AddTransient<Backstop.Services.Links.ILinkReputation>(sp => sp.GetRequiredService<Backstop.Services.Links.LinkReputation>());
+builder.Services.AddSingleton<Backstop.Services.Links.ILinkInspector>(sp => new Backstop.Services.Links.LinkInspector(
+    Backstop.Services.Links.LinkInspector.CreateClient(), null, sp.GetRequiredService<Backstop.Services.Links.ILinkReputation>(),
+    sp.GetRequiredService<ILoggerFactory>().CreateLogger("LinkCheck")));
+
 // Behind the host's load balancer: read the real client address and scheme from X-Forwarded-*.
 // The app runs as a single instance behind one proxy, so the proxy lists are cleared.
 builder.Services.Configure<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>(o =>

@@ -55,6 +55,9 @@ public interface IMailService
     /// </summary>
     Task<TryResult> TryCheckAsync(InboundMail mail, bool outgoing, CancellationToken ct = default);
 
+    /// <summary>The Try it page's standalone link box. Same checks as a message that holds only that link.</summary>
+    Task<TryResult> TryCheckLinkAsync(string url, string? shownText, CancellationToken ct = default);
+
     /// <summary>
     /// Runs the checking pipeline for a demo scenario. <paramref name="onTier"/> is called when a tier starts
     /// (status Running) and when it finishes. Any error ends in Failed -> Held.

@@ -4,7 +4,7 @@ using Backstop.Models;
 namespace Backstop.Services;
 
 /// <summary>
-/// Finds links in text and judges each one by its address only. A link is never opened, because the app may only
+/// Finds links in text and judges each one by its address only. Real mail links are never opened (only /try uses ILinkInspector). The app may only
 /// talk to Meta and Supabase. Finds full links (https://…), www. links and bare addresses (bit.ly/x, shop.example.net/book).
 /// </summary>
 public static class LinkFinder

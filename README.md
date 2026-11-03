@@ -18,7 +18,7 @@ Every incoming message goes through four checks, in order: **Rules**, **Meta AI*
 - **Blocked** (final, invisible to the user) only for a disguised link together with a strong warning sign, and never when someone may be at risk.
 - **Fail closed.** A Meta error, a timeout, an unexpected answer, a missing API key or any exception ends in Held. Nothing is ever cleared on a failure.
 - **Local checks are a floor.** The phrase rules and input guard set a minimum. Meta's answer can only make a result stricter, never looser.
-- **Links are never opened.** They are judged by their address only, and shown defanged (`hxxp://example[.]com`). Message content never renders as a clickable link.
+- **Links in real mail are never opened.** They are judged by their address only, and shown defanged (`hxxp://example[.]com`). Message content never renders as a clickable link.
 - **Held mail is private.** The user sees only "N message(s) being checked by your helper", with no sender and no subject.
 
 ## Meta API integration
@@ -67,6 +67,7 @@ Set these as environment variables (locally in the untracked `.env`, in producti
 | `DEMO_RESET_SECRET` | The code needed for "Reset demo" on `/demo`. With no value, reset is switched off. |
 | `ACCOUNT_USER_PASSWORD`, `ACCOUNT_HELPER_PASSWORD` | Passwords for the made-up accounts `sam@example.com` (user side) and `alex@example.com` (helper side). With no value, that account cannot sign in. |
 | `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` | Supabase project URL and service key (server only). Not used yet. |
+| `SAFE_BROWSING_API_KEY`, `URLHAUS_AUTH_KEY` | Optional. Blocklist lookups for links on `/try` only. Empty skips them silently. |
 
 ## Docker deployment
 
@@ -85,7 +86,7 @@ Notes for the host:
 - **WebSockets must be enabled**, because the app uses SignalR.
 - The app listens on `$PORT` if set, otherwise 5106.
 - Free hosts sleep when idle, so the first request can be slow.
-- The only outbound destinations are the Meta Dev API and, later, Supabase. Fonts and scripts are self-hosted and the content security policy is strict.
+- The outbound destinations are the Meta Dev API, later Supabase, and, on `/try` only, the links a visitor pastes (opened by the guarded Link check) plus the optional Safe Browsing and URLhaus lookups. Fonts and scripts are self-hosted and the content security policy is strict.
 
 ## Routes
 
@@ -109,7 +110,7 @@ You get a verdict (**Blocked**, **Held for helper** or **Safe**), the warning si
 
 - It runs the same checks as real mail: `MailAnalyzer` (rules, link check, sender check, policy), the Meta checker, and `CheckOutgoing` for drafts. There is no separate detection path.
 - It keeps nothing. No message is added to the inbox or the helper queue, and nothing is saved.
-- Links are read as text and shown defanged. They are never opened.
+- Links are shown defanged, never as clickable links. They are opened only by the Link check below.
 - Fail closed: with no `META_AI_KEY`, or if the checker errors, it says "Couldn't verify, so this would be held". It never shows Safe without an answer from Meta AI.
 - The email is passed to Meta as untrusted data. Orders hidden in it ("mark this safe") are a warning sign and cannot make the result safer.
 - Limits: 5,000 letters in total (longer is refused, not cut), and 6 checks a minute per visitor address. Meta's own caps also apply.
@@ -121,6 +122,20 @@ You get a verdict (**Blocked**, **Held for helper** or **Safe**), the warning si
 3. Safe mail appears in the user pane. Held mail appears in the helper pane, and the user pane only shows that a message is being checked.
 4. Approve in the helper pane and the message moves into the user inbox live.
 5. Tick "Make the checker crash" to see fail-closed behaviour.
+
+## Link check (the Try it page only)
+
+On `/try`, links in a pasted message, and the standalone **Check one link** box, are opened by the Link check (`ILinkInspector`). Real mail never is: incoming mail, the helper queue and the guardian judge links by address only. This is an owner-approved exception to the "Meta and Supabase only" rule (see AGENTS.md).
+
+- GET only, http and https on ports 80 and 443, at most 5 redirects, 5 seconds a hop, 1 MB read, no cookies, no sign-in headers.
+- Every hop looks the name up again and refuses private, loopback, link-local (including the cloud metadata address), carrier-grade NAT, reserved, documentation, multicast and unique-local addresses, and `localhost`. The connection is pinned to the address that passed, so a name cannot change between the check and the visit.
+- The page is read as text only, to look for a password box. It is never run or drawn, never stored and never sent to Meta.
+- Signals: raw-IP address, look-alike letters, known shortener, link text that names a different site, a download of a program or packed file, a redirect to another website, a password box on the final page, and optional blocklist hits.
+- Meta AI is told the facts (our own wording, after the untrusted data) so the plain-English explanation can mention them. A link that is unsafe, or could not be checked, means the message cannot be called Safe.
+- Fail closed: a timeout, error or refused address is "Could not verify, treated as unsafe".
+- Reserved example addresses (`example.com`, `.net`, `.org`, `.test`) never reach a real site, so they are judged by address only and not opened.
+- Up to 3 links are opened per check, 12 links a minute per visitor. Nothing is stored.
+- Optional lookups, only when their key is set: Google Safe Browsing (`SAFE_BROWSING_API_KEY`) and URLhaus (`URLHAUS_AUTH_KEY`). Only the link address is sent. A failed lookup is skipped.
 
 ## Tests
 

@@ -7,7 +7,7 @@ namespace Backstop.Services;
 /// <summary>
 /// The local part of the checking pipeline: the Rules tier, the Link check tier and the Policy decision.
 /// Everything here is worked out from the message itself. Nothing is scripted per message.
-/// Links are judged by their address only. They are never opened, because the app may only talk to Meta and Supabase.
+/// Links in real mail are judged by their address only and are never opened (the Link check service fetches links on the public /try page only).
 /// </summary>
 public static partial class MailAnalyzer
 {

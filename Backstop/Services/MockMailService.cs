@@ -1,11 +1,12 @@
 using System.Text.RegularExpressions;
 using Backstop.Models;
 using Backstop.Services.Api;
+using Backstop.Services.Links;
 
 namespace Backstop.Services;
 
 /// <summary>MOCK user-side service with live Meta AI Dev API checking where available.</summary>
-public sealed partial class MockMailService(MailStore store, IMetaScamChecker? metaChecker = null) : IMailService
+public sealed partial class MockMailService(MailStore store, IMetaScamChecker? metaChecker = null, ILinkInspector? linkInspector = null) : IMailService
 {
     public event Action? Changed
     {
