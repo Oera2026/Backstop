@@ -20,6 +20,10 @@
     </div>
 
     <div class="home__list">
+        @if (Mail.RecentHelperBlocks is var blocked and > 0)
+        {
+            <p class="note" role="status"><Icon Name="cross" /> <span>@(blocked == 1 ? "Your helper blocked this one." : $"Your helper blocked {blocked} messages.")</span></p>
+        }
         @* Privacy rule still holds: the user only ever sees Cleared mail (GetInbox). Held mail is simply not listed. *@
         @{ var inbox = Mail.GetInbox(); }
         @if (inbox.Count == 0)

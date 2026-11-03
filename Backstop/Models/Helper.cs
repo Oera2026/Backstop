@@ -37,3 +37,9 @@ public sealed record HistoryEntry(DateTimeOffset At, string Icon, string Title, 
 
 /// <summary>The user got stuck on a step and asked for help. It stays until the helper says they helped.</summary>
 public sealed record HelpRequest(string Id, DateTimeOffset At, string Title, int Step, bool Done);
+
+/// <summary>The answer to a helper's one-tap decision. When not Ok, nothing was started and the message stays held.</summary>
+public sealed record DecisionResult(bool Ok, string? Error = null);
+
+/// <summary>A decision inside its undo window. Nothing has changed for anyone yet. <see cref="SecondsLeft"/> counts down to 0.</summary>
+public sealed record PendingDecision(bool Safe, int SecondsLeft);

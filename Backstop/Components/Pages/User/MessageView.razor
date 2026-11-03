@@ -30,6 +30,10 @@ else
             }
         </div>
     </article>
+    @if (m.HelperDecision == "Approved")
+    {
+        <p class="note"><Icon Name="check" /> <span>Your helper checked this one. It's safe.</span></p>
+    }
     @if (noReply)
     {
         <p class="note"><Icon Name="cross" /> <span>You cannot reply to this message.</span></p>

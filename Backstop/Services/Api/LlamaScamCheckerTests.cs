@@ -1114,6 +1114,9 @@ public class LlamaScamCheckerTests
         // 35. Watch-for tips: fallback library, cleaning, injection, Safe shows none.
         await WatchForTests.RunAsync();
 
+        // 36. Helper one-tap decisions: undo window, release, block, fail closed, tier limits.
+        await HelperDecisionTests.RunAsync();
+
         Console.WriteLine("\nALL TESTS PASSED SUCCESSFULLY.");
     }
 

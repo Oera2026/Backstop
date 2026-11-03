@@ -95,8 +95,98 @@ public sealed class MockGuardianService(MailStore store) : IGuardianService
     }
 
     // Only a Held message can be decided. Blocked is final. Mail the AI has not checked yet cannot be approved.
-    public void Approve(string id) => Decide(id, MessageState.Cleared, "Approved", "check", "approved");
-    public void Block(string id) => Decide(id, MessageState.Blocked, "Blocked", "cross", "blocked");
+    public void Approve(string id) => _ = Decide(id, MessageState.Cleared, "Approved", "check", "approved");
+    public void Block(string id) => _ = Decide(id, MessageState.Blocked, "Blocked", "cross", "blocked");
+
+    // ---- One-tap decisions with a 10 second undo ----
+    // The message stays Held, and invisible to the user, until the window ends. Only then is the decision saved.
+    // That keeps "Blocked is final" and fail closed: an undo never has to bring back mail anyone has seen.
+
+    public const int DecisionSeconds = 10;
+    public int DecisionWindowSeconds => DecisionSeconds;
+
+    private readonly object _pendingGate = new();
+    private readonly Dictionary<string, (bool Safe, DateTimeOffset At)> _pending = [];
+    private readonly Dictionary<string, string> _failures = [];
+    private Timer? _timer;
+
+    /// <summary>The user's saved phone number. No number is collected or stored anywhere in the app yet, so this stays null.</summary>
+    public string? UserPhone { get; set; }
+
+    // Seams for tests: the clock, the timer, and a failure while saving.
+    internal Func<DateTimeOffset> Now { get; set; } = () => DateTimeOffset.Now;
+    internal bool AutoCommit { get; set; } = true;
+    internal Action? SaveCheck { get; set; }
+
+    public DecisionResult Propose(string id, bool safe)
+    {
+        var m = store.Find(id);
+        if (m is null || m.State != MessageState.Held) return new(false, "This message is not waiting for you any more.");
+        if (safe && m.AwaitingScan) return new(false, "The checker has not finished with this one. Please check it again first.");
+        lock (_pendingGate)
+        {
+            _pending[id] = (safe, Now());
+            _failures.Remove(id);
+        }
+        if (AutoCommit) _timer ??= new Timer(_ => CommitDue(), null, 500, 500);
+        return new(true);
+    }
+
+    public bool Undo(string id)
+    {
+        lock (_pendingGate)
+        {
+            if (!_pending.TryGetValue(id, out var p) || Now() - p.At >= TimeSpan.FromSeconds(DecisionSeconds)) return false;
+            _pending.Remove(id);
+            return true;
+        }
+    }
+
+    public PendingDecision? GetPending(string id)
+    {
+        lock (_pendingGate)
+        {
+            if (!_pending.TryGetValue(id, out var p)) return null;
+            var left = (int)Math.Ceiling(DecisionSeconds - (Now() - p.At).TotalSeconds);
+            return new(p.Safe, Math.Clamp(left, 0, DecisionSeconds));
+        }
+    }
+
+    public string? TakeFailure(string id)
+    {
+        lock (_pendingGate) return _failures.Remove(id, out var why) ? why : null;
+    }
+
+    /// <summary>Saves every decision whose window has passed. Runs on a timer. A decision that cannot be saved leaves the message held.</summary>
+    public void CommitDue()
+    {
+        List<(string Id, bool Safe)> due;
+        lock (_pendingGate)
+        {
+            due = _pending.Where(p => Now() - p.Value.At >= TimeSpan.FromSeconds(DecisionSeconds)).Select(p => (p.Key, p.Value.Safe)).ToList();
+            foreach (var d in due) _pending.Remove(d.Id);
+        }
+        foreach (var (id, safe) in due)
+        {
+            try
+            {
+                var saved = safe ? Decide(id, MessageState.Cleared, "Approved", "check", "approved") : Decide(id, MessageState.Blocked, "Blocked", "cross", "blocked");
+                if (!saved && store.Find(id)?.State == MessageState.Held) Fail(id);
+            }
+            catch (Exception) { Fail(id); } // fail closed: the message was not changed and stays held
+        }
+    }
+
+    private void Fail(string id)
+    {
+        lock (_pendingGate) _failures[id] = "We could not save that. The message is still held, so please try again.";
+    }
+
+    public string? GetRingHref()
+    {
+        var digits = new string((UserPhone ?? "").Where(c => char.IsAsciiDigit(c) || c == '+').ToArray());
+        return digits.Count(char.IsAsciiDigit) >= 7 && digits.LastIndexOf('+') <= 0 ? "tel:" + digits : null;
+    }
 
     public void CallFirst(string id)
     {
@@ -106,13 +196,14 @@ public sealed class MockGuardianService(MailStore store) : IGuardianService
     }
 
     // The Held check and the change are one step, so a second decision on the same message does nothing.
-    private void Decide(string id, MessageState to, string decision, string icon, string verb)
+    private bool Decide(string id, MessageState to, string decision, string icon, string verb)
     {
         string? subject = null;
         var changed = store.TryChange(id,
             m => m.State == MessageState.Held && !(to == MessageState.Cleared && m.AwaitingScan),
             m =>
             {
+                SaveCheck?.Invoke(); // a failure here leaves the message untouched, still held
                 m.State = to;
                 m.HelperDecision = decision;
                 m.CallRequested = false;
@@ -120,6 +211,7 @@ public sealed class MockGuardianService(MailStore store) : IGuardianService
                 subject = m.Subject;
             });
         if (changed) store.AddActivity(icon, $"You {verb} \"{subject}\".");
+        return changed;
     }
 
     private static class Names

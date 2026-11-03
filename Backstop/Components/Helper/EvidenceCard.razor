@@ -1,4 +1,5 @@
 @implements IDisposable
+@inject IGuardianService Guardian
 
 <article class="evidence" aria-labelledby="ev-title">
     <p class="evidence__status">
@@ -90,64 +91,57 @@
         </details>
     }
 
-    <details class="card fold" open>
+    <details class="card fold">
         <summary>The message (text only, links made safe)</summary>
         <pre class="preview">@Defang.ForHelper(Message.Body)</pre>
     </details>
 
     @if (Message.State == MessageState.Held)
     {
+        @* One tap decides. Nothing changes for the user until the undo window ends. *@
         <div class="actionbar" role="group" aria-label="Your decision">
-            @if (_pending is not null)
-            {
-                <p class="actionbar__msg" role="status">
-                    <Icon Name="hourglass" />
-                    <span>@(_pending == "Blocked" ? "Blocking" : "Approving") in @_secs seconds.</span>
-                </p>
-                <span class="countdown" style="--secs:@(UndoSeconds)s" aria-hidden="true"></span>
-                <div class="actions">
-                    <button type="button" class="btn btn-primary" @onclick="Undo"><Icon Name="arrow-left" /> Undo</button>
-                </div>
-            }
-            else if (_confirming)
-            {
-                <p class="actionbar__msg" role="alert">
-                    <Icon Name="alert" />
-                    <span>@ConfirmText</span>
-                </p>
-                <div class="actions">
-                    <button type="button" class="btn btn-primary" @onclick="CancelConfirm"><Icon Name="arrow-left" /> No, go back</button>
-                    <button type="button" class="btn btn-quiet" @onclick="@(() => Start("Approved"))"><Icon Name="check" /> Yes, approve</button>
-                </div>
-            }
-            else
-            {
+    @if (_pend is { } p)
+    {
+        <div class="toast" role="status">
+            <Icon Name="hourglass" />
+            <span>@(p.Safe ? "Safe, letting it through" : "Not safe, blocking it") in @p.SecondsLeft @(p.SecondsLeft == 1 ? "second" : "seconds").</span>
+            <button type="button" class="btn btn-primary" @onclick="Undo"><Icon Name="arrow-left" /> Undo</button>
+        </div>
+    }
+            <div class="actions actions--helper">
+                @if (Message.AwaitingScan)
+                {
+                    <button type="button" class="btn btn-quiet" disabled="@_scanning" @onclick="Rescan">
+                        <Icon Name="refresh" /> @(_scanning ? "Checking…" : "Check again")
+                    </button>
+                }
+                else
+                {
+                    <button type="button" class="btn btn-primary" @onclick="@(() => Choose(true))">
+                        <Icon Name="check" /> Safe, let it through
+                    </button>
+                }
                 @* Block only stands out when the checker is very sure. When it is not sure, both choices weigh the same. *@
-                <div class="actions actions--helper">
-                    <button type="button" class="btn @(Message.Concern == Concern.Strong ? "btn-block" : "btn-quiet btn-danger")" @onclick="@(() => Start("Blocked"))">
-                        <Icon Name="cross" /> Block
-                    </button>
-                    @if (Message.AwaitingScan)
-                    {
-                        <button type="button" class="btn btn-quiet" disabled="@_scanning" @onclick="Rescan">
-                            <Icon Name="refresh" /> @(_scanning ? "Checking…" : "Check again")
-                        </button>
-                    }
-                    else
-                    {
-                        <button type="button" class="btn btn-quiet" @onclick="AskConfirm">
-                            <Icon Name="check" /> Approve
-                        </button>
-                    }
-                    <button type="button" class="btn btn-text" @onclick="OnCallFirst">
-                        <Icon Name="phone" /> Call them first
-                    </button>
-                </div>
+                <button type="button" class="btn @(Message.Concern == Concern.Strong ? "btn-block" : "btn-quiet btn-danger")" @onclick="@(() => Choose(false))">
+                    <Icon Name="cross" /> Not safe, keep it blocked
+                </button>
+                @if (Guardian.GetRingHref() is { } tel)
+                {
+                    <a class="btn btn-text" href="@tel" @onclick="@(() => Guardian.CallFirst(Message.Id))"><Icon Name="phone" /> Ring them</a>
+                }
+            </div>
+            @if (_error is not null)
+            {
+                <p class="form-error" role="alert">@_error</p>
             }
             <p class="call-note" role="status">
                 @if (Message.CallRequested)
                 {
                     <Icon Name="phone" /><span>You will call @Message.FromName before you decide.</span>
+                }
+                else if (_undone)
+                {
+                    <span>Undone. The message is still held.</span>
                 }
             </p>
         </div>
@@ -163,12 +157,7 @@
 </article>
 
 @code {
-    private const int UndoSeconds = 6;
-
     [Parameter, EditorRequired] public MailMessage Message { get; set; } = default!;
-    [Parameter] public EventCallback OnApprove { get; set; }
-    [Parameter] public EventCallback OnBlock { get; set; }
-    [Parameter] public EventCallback OnCallFirst { get; set; }
     [Parameter] public EventCallback OnRescan { get; set; }
 
     private bool _scanning;
@@ -187,11 +176,6 @@
         try { await OnRescan.InvokeAsync(); }
         finally { _scanning = false; }
     }
-
-    private bool _confirming;
-    private string? _pending;
-    private int _secs;
-    private CancellationTokenSource? _cts;
 
     private string VerdictHead => Message.Concern switch
     {
@@ -216,47 +200,59 @@
         _ => "Done. You approved this message. It is now in the user's inbox.",
     };
 
-    private string ConfirmText => Message.Concern is Concern.Unclear or Concern.None
-        ? "Approve this message? The user will see it."
-        : "We think this is risky. Approve it anyway? The user will see it.";
+    // The decision itself lives in the service. It waits out the undo window there, so leaving this page does not lose it,
+    // and nothing is saved, or shown to the user, until the window ends.
+    private PendingDecision? _pend;
+    private string? _error;
+    private bool _undone, _looping;
+    private CancellationTokenSource? _cts;
 
-    private void AskConfirm() => _confirming = true;
-    private void CancelConfirm() => _confirming = false;
-
-    // Nothing is committed until the countdown ends. Leaving the page cancels it,
-    // so the message stays held (fail closed).
-    private async Task Start(string decision)
+    protected override void OnParametersSet()
     {
-        _confirming = false;
-        _pending = decision;
-        _secs = UndoSeconds;
-        _cts?.Cancel();
-        _cts = new CancellationTokenSource();
-        var token = _cts.Token;
-        try
-        {
-            while (_secs > 0)
-            {
-                await Task.Delay(1000, token);
-                _secs--;
-                StateHasChanged();
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            return;
-        }
+        _pend = Guardian.GetPending(Message.Id);
+        if (_pend is not null) Watch();
+    }
 
-        var chosen = _pending;
-        _pending = null;
-        if (chosen == "Blocked") await OnBlock.InvokeAsync();
-        else if (chosen == "Approved") await OnApprove.InvokeAsync();
+    private void Choose(bool safe)
+    {
+        _error = null;
+        _undone = false;
+        var r = Guardian.Propose(Message.Id, safe);
+        if (!r.Ok) { _error = r.Error; return; }
+        _pend = Guardian.GetPending(Message.Id);
+        Watch();
     }
 
     private void Undo()
     {
-        _cts?.Cancel();
-        _pending = null;
+        if (Guardian.Undo(Message.Id)) { _pend = null; _undone = true; }
+        else _pend = Guardian.GetPending(Message.Id); // too late: it is being saved
+    }
+
+    // Counts the toast down, and shows the error if the decision could not be saved (the message stays held).
+    private void Watch()
+    {
+        if (_looping) return;
+        _looping = true;
+        _cts = new CancellationTokenSource();
+        _ = Loop(_cts.Token);
+    }
+
+    private async Task Loop(CancellationToken token)
+    {
+        try
+        {
+            while (!token.IsCancellationRequested)
+            {
+                await Task.Delay(500, token);
+                _pend = Guardian.GetPending(Message.Id);
+                if (_pend is null) _error = Guardian.TakeFailure(Message.Id);
+                await InvokeAsync(StateHasChanged);
+                if (_pend is null) break;
+            }
+        }
+        catch (OperationCanceledException) { }
+        finally { _looping = false; }
     }
 
     public void Dispose() => _cts?.Cancel();

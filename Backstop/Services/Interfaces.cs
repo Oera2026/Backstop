@@ -14,6 +14,9 @@ public interface IMailService
     /// <summary>How many messages the helper is checking. The user is told only this number.</summary>
     int HeldCount { get; }
 
+    /// <summary>How many messages the helper blocked in the last day. Only a number: nothing about them is shown.</summary>
+    int RecentHelperBlocks { get; }
+
     /// <summary>Returns the message only if it is Cleared. Fail closed: otherwise null.</summary>
     MailMessage? GetClearedMessage(string id);
 
@@ -117,6 +120,27 @@ public interface IGuardianService
     void Approve(string id);
     void Block(string id);
     void CallFirst(string id);
+
+    /// <summary>How long a one-tap decision can be undone, in seconds. Nothing changes for the user until it has passed.</summary>
+    int DecisionWindowSeconds { get; }
+
+    /// <summary>
+    /// One tap: "Safe, let it through" (<paramref name="safe"/>) or "Not safe, keep it blocked". The message stays held and unseen
+    /// for the undo window, then the decision is saved. Refuses (and starts nothing) for mail that is not held or not checked yet.
+    /// </summary>
+    DecisionResult Propose(string id, bool safe);
+
+    /// <summary>Takes back a decision still inside its window. False when there is none, or the window has passed.</summary>
+    bool Undo(string id);
+
+    /// <summary>The decision waiting out its window for this message, or null.</summary>
+    PendingDecision? GetPending(string id);
+
+    /// <summary>Plain words when the last decision on this message could not be saved (it stays held). Returned once.</summary>
+    string? TakeFailure(string id);
+
+    /// <summary>A tel: link to the user's saved phone number, or null when there is none (the Ring them button is then hidden).</summary>
+    string? GetRingHref();
 
     /// <summary>FYI notices the helper has not dismissed (for example: the user wrote to someone new).</summary>
     IReadOnlyList<HelperNotice> GetNotices();

@@ -14,15 +14,9 @@ else
 {
     <PageTitle>Check: @m.Subject – Backstop Helper</PageTitle>
     <EvidenceCard Message="m"
-                  OnApprove="@(() => Decide(() => Guardian.Approve(m.Id)))"
-                  OnBlock="@(() => Decide(() => Guardian.Block(m.Id)))"
-                  OnCallFirst="@(() => Guardian.CallFirst(m.Id))"
                   OnRescan="@(() => Mail.RescanAsync(m.Id))" />
 }
 
 @code {
     [Parameter] public string Id { get; set; } = "";
-
-    // The card stays open and shows the "Done" message, so the helper sees the result.
-    private void Decide(Action decision) => decision();
 }
