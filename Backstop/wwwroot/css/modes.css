@@ -751,7 +751,7 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
     column-gap: 1.5rem; row-gap: 1.25rem; align-items: start;
   }
   .try-head { grid-area: head; }
-  .try-head h1 { margin: 0; line-height: 1.2; }
+  .try-head h1, .try-head > :last-child { margin: 0; line-height: 1.2; }
   .try-panel { margin-bottom: 0; }
   .try-panel--email { grid-area: email; align-self: stretch; display: flex; flex-direction: column; min-height: 0; }
   .try-panel--link { grid-area: link; }
@@ -774,8 +774,9 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
   .page--try .try-form .field { margin-bottom: .55rem; }
   .try-head h1 { font-size: calc(1.6rem * var(--tx)); }
   .try-panel > h2 { font-size: calc(1.15rem * var(--tx)); }
+  .try-mode { flex-direction: column; flex-wrap: nowrap; gap: 0; }
   .try-mode legend { margin-bottom: 0; }
-  .try-mode__opt { min-height: 40px; }
+  .try-mode__opt { min-height: 36px; }
   .try-mailform textarea { min-height: 6rem; }
   .try-mailform .actions, .try-linkform .actions { margin-top: .25rem; }
 }
