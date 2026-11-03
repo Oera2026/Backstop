@@ -502,7 +502,7 @@ public sealed class MetaAiScamChecker : ILlamaScamChecker, IMetaScamChecker, IMe
 
             return new MetaScamAnalysis(final, reason, flags, Success: true, NeedsHuman: needsHuman, AtRisk: atRisk);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             return FailClosed("Failed to parse Meta AI output");
         }

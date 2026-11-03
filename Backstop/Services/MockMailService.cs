@@ -116,7 +116,7 @@ public sealed partial class MockMailService(MailStore store, IMetaScamChecker? m
     public bool HoldOutgoing(string to, string subject, string body, IReadOnlyList<string> reasons)
     {
         to = to.Trim();
-        if (!InputGuard.IsPlainAddress(to) || !InputGuard.IsSingleLine(subject, 200) || (body?.Length ?? 0) > 20000) return false;
+        if (body is null || !InputGuard.IsPlainAddress(to) || !InputGuard.IsSingleLine(subject, 200) || body.Length > 20000) return false; // fail closed: no body, nothing queued
         if (NoReply.IsNoReply(to)) return false; // fail closed: nobody reads it, so nothing is queued
         store.HoldOutgoing(to, subject, body, reasons);
         return true;
