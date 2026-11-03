@@ -174,3 +174,11 @@ Roughly 4,000 lines of C# in `Services/` and `Models/`, about 100 Razor componen
 - Checker failure investigation: no production logs are available in this repo, so the exact cause for that email could not be read. Found in code: the link check ran to completion (up to 3 links x 6 hops x 5 seconds) before the Meta call, with no shared limit, then Meta has its own 30 second timeout. Added a 12 second budget for all links in a message (`LinkBudget`); a link still open then is "could not verify". The model call cannot run in parallel with the link check because the model is given the link findings. Long addresses were already cut to 400 characters before going to Meta (`LlamaScamChecker.Facts`).
 - Eval: the email is a hard negative in `LinkCheckTests` ("Eval hard negative", expected Safe and "Looks fine"). It uses real shop and shortener names, in test code only, as the list under test; it is not a `/try` sample button because samples must use example domains.
 - Tests: `Services/Api/LinkCheckTests.cs` (inside block 32 of `--test-llama`) and an updated line in `Services/WatchForTests.cs`.
+
+## 13. Serious violations are blocked outright (added 2026-11-03)
+
+- `MailAnalyzer.SeriousSignals` (currently `injection`: an email giving orders to the checker) blocks a message with no helper and no AI. To make another sign serious, add its signal id to that list. `MailAnalyzer.BlocksOutright` is a serious sign, or a disguised link with a strong warning (the old rule). Never when someone may be at risk: that still goes to a person.
+- The AI is not asked in that case. It could only agree, and skipping it makes the answer instant and keeps the attack text away from Meta. On `/try` the links are not opened either for a serious sign. Real mail records the Meta AI step as Skipped.
+- Blocked even when the checker is missing or failing, because the decision is local. Blocked stays final and invisible to the user.
+- Behaviour change: demo scenario 6 ("tries to trick the checker") is now Blocked, not Held; tests updated. Any /try email with an order to the checker is Blocked.
+- Tests: `LinkCheckTests` ("Serious violations are blocked outright").

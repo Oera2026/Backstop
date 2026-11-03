@@ -627,7 +627,7 @@ public class LlamaScamCheckerTests
             var expected = new Dictionary<string, MessageState>
             {
                 ["family-photos"] = MessageState.Cleared, ["gp-reminder"] = MessageState.Cleared, ["remote-support"] = MessageState.Held,
-                ["off-channel"] = MessageState.Held, ["payment-redirect"] = MessageState.Held, ["prompt-injection"] = MessageState.Held,
+                ["off-channel"] = MessageState.Held, ["payment-redirect"] = MessageState.Held, ["prompt-injection"] = MessageState.Blocked,
                 ["link-chain"] = MessageState.Blocked,
                 ["mum-new-address"] = MessageState.Held, ["lookalike-bank"] = MessageState.Held, ["reply-to-mismatch"] = MessageState.Held, ["contact-new-address"] = MessageState.Held,
             };
@@ -995,8 +995,7 @@ public class LlamaScamCheckerTests
             {
                 var plain = await safeAi.TryCheckAsync(s.Mail, false);
                 var injected = await safeAi.TryCheckAsync(s.Mail with { Body = s.Mail.Body + order }, false);
-                Assert(injected.Verdict != TryVerdict.Safe, $"Try {s.Id}: an order to the checker is never safe");
-                if (plain.Verdict != TryVerdict.Safe) Assert(injected.Verdict == plain.Verdict, $"Try {s.Id}: an order to the checker does not change the verdict");
+                Assert(injected.Verdict == TryVerdict.Blocked && injected.Verified, $"Try {s.Id}: an order to the checker is blocked outright, and needs no AI answer");
             }
 
             // Limits: total size, empty, a plain address for drafts, and a cap per visitor.

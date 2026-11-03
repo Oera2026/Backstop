@@ -138,11 +138,14 @@ public sealed partial class MockMailService
 
     private async Task<TryResult> TryIncomingCoreAsync(MailAnalyzer.Analysis analysis, string subject, string body, CancellationToken ct)
     {
-        var (reports, notChecked) = await InspectLinksAsync($"{subject}\n{body}", ct);
+        // A serious warning sign blocks the message on its own, so nothing is opened and nothing is sent to Meta.
+        var (reports, notChecked) = MailAnalyzer.IsSerious(analysis) ? ([], 0) : await InspectLinksAsync($"{subject}\n{body}", ct);
         // The links were opened, so what was found replaces the guess made from the address alone. Without that, a harmless shortener
         // would still be called "hidden" and hold the message by itself, however clean the trip turned out to be.
         analysis = MailAnalyzer.WithInspectedLinks(analysis, reports);
-        var ai = await AskMetaAsync(subject, body, reports.Count > 0 ? Findings(reports, notChecked) : [], ct, MailAnalyzer.SenderFindings(analysis));
+        // Blocked by the local checks alone: the AI could only agree, so it is not asked and the answer is instant.
+        var ai = MailAnalyzer.BlocksOutright(analysis) ? null
+            : await AskMetaAsync(subject, body, reports.Count > 0 ? Findings(reports, notChecked) : [], ct, MailAnalyzer.SenderFindings(analysis));
         // Same decision as real mail. With no AI answer it is Held, as a real message would be.
         var decision = MailAnalyzer.Decide(analysis, ai);
         // The sender warnings have their own "Sender checks" section, so the one-line flag for them is not repeated.
@@ -168,6 +171,10 @@ public sealed partial class MockMailService
             }
             return r with { WatchFor = decision.WatchFor ?? WatchFor.Choose(ai.WatchFor, tipIds, r.Explanation) };
         }
+
+        if (ai is null && decision.State == MessageState.Blocked)
+            return Tipped(new(TryVerdict.Blocked, true, signals, decision.Summary,
+                "It would be in their Blocked list. You would never see it.", Links: reports));
 
         if (ai is null)
             return Tipped(new(TryVerdict.Held, false, signals, "Couldn't verify, so this would be held.",

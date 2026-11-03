@@ -210,13 +210,23 @@ public sealed partial class MockMailService(MailStore store, IMetaScamChecker? m
             // Tier 1: Meta AI reads the email (text only, to save cost). A failure, a timeout, an odd answer or no
             // key all throw, and the catch below holds the message. Nothing is cleared without this answer.
             Step(1, onTier);
-            if (simulateFailure) throw new InvalidOperationException("Simulated checker failure");
-            if (metaChecker is null) throw new InvalidOperationException("No Meta AI checker is configured");
-            var ai = await metaChecker.CheckScamWithEvidenceAsync($"{mail.Subject}\n\n{mail.Body}", [], MailAnalyzer.SenderFindings(analysis));
-            if (!ai.Success)
-                throw new InvalidOperationException("Meta AI check failed or timed out: " + (ai.FailureNote ?? "Unknown error"));
-            var aiTier = new TierResult("Meta AI",
-                ai.Verdict == Verdict.LooksSafe && !ai.NeedsHuman && !ai.AtRisk ? TierStatus.Passed : TierStatus.Flagged, ai.Reason);
+            MetaScamAnalysis? ai = null;
+            TierResult aiTier;
+            if (MailAnalyzer.BlocksOutright(analysis))
+            {
+                // Already the strictest result, so the AI is not asked: the answer is instant and the text never leaves the app.
+                aiTier = new TierResult("Meta AI", TierStatus.Skipped, "Not needed: the other checks already block this.");
+            }
+            else
+            {
+                if (simulateFailure) throw new InvalidOperationException("Simulated checker failure");
+                if (metaChecker is null) throw new InvalidOperationException("No Meta AI checker is configured");
+                ai = await metaChecker.CheckScamWithEvidenceAsync($"{mail.Subject}\n\n{mail.Body}", [], MailAnalyzer.SenderFindings(analysis));
+                if (!ai.Success)
+                    throw new InvalidOperationException("Meta AI check failed or timed out: " + (ai.FailureNote ?? "Unknown error"));
+                aiTier = new TierResult("Meta AI",
+                    ai.Verdict == Verdict.LooksSafe && !ai.NeedsHuman && !ai.AtRisk ? TierStatus.Passed : TierStatus.Flagged, ai.Reason);
+            }
             done.Add(aiTier);
             onTier?.Invoke(1, aiTier);
 
