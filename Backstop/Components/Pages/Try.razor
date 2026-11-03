@@ -9,83 +9,89 @@
 <div class="try-grid">
     <div class="try-head">
         <h1>Try it</h1>
+    </div>
+
+    @* Two separate tools. The email check, with its examples, and the single-link check each get their own panel. *@
+    <section class="card try-panel try-panel--email" aria-labelledby="try-email-h">
+        <h2 id="try-email-h">Check an email</h2>
         <p class="lead">Paste an email, or pick an example. See what Backstop would do with it.</p>
-    </div>
-
-    <div class="try-samples" role="group" aria-label="Examples">
-        @foreach (var s in Mail.TrySamples)
-        {
-            <button type="button" class="btn btn-quiet try-sample" disabled="@_busy" @onclick="() => UseSample(s)">@s.Label</button>
-        }
-    </div>
-
-    <form class="try-form try-mailform" @onsubmit="Check">
-        <fieldset class="try-mode">
-            <legend>This email is</legend>
-            <label class="try-mode__opt"><input type="radio" name="mode" checked="@(!_outgoing)" @onchange="() => _outgoing = false" /> <span>Coming in</span></label>
-            <label class="try-mode__opt"><input type="radio" name="mode" checked="@_outgoing" @onchange="() => _outgoing = true" /> <span>Going out</span></label>
-        </fieldset>
-        <div class="try-pair">
-            <div class="field">
-                <label for="try-from">@(_outgoing ? "To" : "From")</label>
-                <input id="try-from" type="text" @bind="_from" maxlength="300" autocomplete="off" />
+        <div class="try-email">
+            <div class="try-samples" role="group" aria-label="Examples">
+                @foreach (var s in Mail.TrySamples)
+                {
+                    <button type="button" class="btn btn-quiet try-sample" disabled="@_busy" @onclick="() => UseSample(s)">@s.Label</button>
+                }
             </div>
-            @if (!_outgoing)
-            {
-                <div class="field">
-                    <label for="try-replyto">Replies go to (optional)</label>
-                    <input id="try-replyto" type="text" @bind="_replyTo" maxlength="300" autocomplete="off" />
+
+            <form class="try-form try-mailform" @onsubmit="Check">
+                <fieldset class="try-mode">
+                    <legend>This email is</legend>
+                    <label class="try-mode__opt"><input type="radio" name="mode" checked="@(!_outgoing)" @onchange="() => _outgoing = false" /> <span>Coming in</span></label>
+                    <label class="try-mode__opt"><input type="radio" name="mode" checked="@_outgoing" @onchange="() => _outgoing = true" /> <span>Going out</span></label>
+                </fieldset>
+                <div class="try-pair">
+                    <div class="field">
+                        <label for="try-from">@(_outgoing ? "To" : "From")</label>
+                        <input id="try-from" type="text" @bind="_from" maxlength="300" autocomplete="off" />
+                    </div>
+                    @if (!_outgoing)
+                    {
+                        <div class="field">
+                            <label for="try-replyto">Replies go to (optional)</label>
+                            <input id="try-replyto" type="text" @bind="_replyTo" maxlength="300" autocomplete="off" />
+                        </div>
+                    }
                 </div>
-            }
+                <div class="field">
+                    <label for="try-subject">Subject</label>
+                    <input id="try-subject" type="text" @bind="_subject" maxlength="200" autocomplete="off" />
+                </div>
+                <div class="field">
+                    <label for="try-body">Message</label>
+                    <textarea id="try-body" @bind="_body" maxlength="4500"></textarea>
+                </div>
+                @if (_problem is not null)
+                {
+                    <p class="form-error" role="alert">@_problem</p>
+                }
+                <div class="actions">
+                    <button type="submit" class="btn btn-primary" disabled="@_busy"><Icon Name="inspect" /> Check it</button>
+                </div>
+            </form>
         </div>
-        <div class="field">
-            <label for="try-subject">Subject</label>
-            <input id="try-subject" type="text" @bind="_subject" maxlength="200" autocomplete="off" />
-        </div>
-        <div class="field">
-            <label for="try-body">Message</label>
-            <textarea id="try-body" @bind="_body" maxlength="4500"></textarea>
-        </div>
-        @if (_problem is not null)
-        {
-            <p class="form-error" role="alert">@_problem</p>
-        }
-        <div class="actions">
-            <button type="submit" class="btn btn-primary" disabled="@_busy"><Icon Name="inspect" /> Check it</button>
-        </div>
-    </form>
+    </section>
 
     @if (_result is { } mailResult && !_forLink)
     {
         <TryResultCard Result="mailResult" @ref="_card" />
     }
 
-    @* A message is checked as a whole above. This box is for one link on its own. *@
-    <form class="try-form try-linkform" @onsubmit="CheckLink">
-        <h2>Check one link</h2>
-        <div class="field">
-            <label for="try-link">Link</label>
-            <input id="try-link" type="text" @bind="_link" maxlength="2000" autocomplete="off" inputmode="url" />
-        </div>
-        <div class="field">
-            <label for="try-linktext">Words shown for the link (optional)</label>
-            <input id="try-linktext" type="text" @bind="_linkText" maxlength="300" autocomplete="off" />
-        </div>
-        @if (_linkProblem is not null)
-        {
-            <p class="form-error" role="alert">@_linkProblem</p>
-        }
-        <div class="actions">
-            <button type="submit" class="btn btn-primary" disabled="@_busy"><Icon Name="link" /> Check link</button>
-        </div>
-    </form>
+    <section class="card try-panel try-panel--link" aria-labelledby="try-link-h">
+        <h2 id="try-link-h">Check one link</h2>
+        <form class="try-form try-linkform" @onsubmit="CheckLink">
+            <div class="field">
+                <label for="try-link">Link</label>
+                <input id="try-link" type="text" @bind="_link" maxlength="2000" autocomplete="off" inputmode="url" />
+            </div>
+            <div class="field">
+                <label for="try-linktext">Words shown for the link (optional)</label>
+                <input id="try-linktext" type="text" @bind="_linkText" maxlength="300" autocomplete="off" />
+            </div>
+            @if (_linkProblem is not null)
+            {
+                <p class="form-error" role="alert">@_linkProblem</p>
+            }
+            <div class="actions">
+                <button type="submit" class="btn btn-primary" disabled="@_busy"><Icon Name="link" /> Check link</button>
+            </div>
+        </form>
+    </section>
 
     @if (_result is { } linkResult && _forLink)
     {
         <TryResultCard Result="linkResult" @ref="_card" />
     }
 </div>
-
 @* Fixed to the foot of the screen so the wait is seen wherever the visitor has scrolled to. *@
 @if (_busy)
 {
