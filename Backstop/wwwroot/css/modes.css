@@ -729,6 +729,23 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 
 /* Try it: the public page for judges. White, one blue accent, one column. */
 .page--try { max-width: 44rem; margin-inline: auto; }
+.try-grid { display: grid; grid-template-columns: minmax(0, 1fr); }
+.try-head > :last-child { margin-bottom: 1.25rem; }
+/* Wide: forms on the left, the answer on the right. The right column is always there, so nothing
+   moves when an answer arrives. The last row is flexible so the tall answer does not stretch the forms. */
+@media (min-width: 70rem) {
+  .page--try { max-width: 62rem; }
+  .try-grid { grid-template-columns: minmax(0, 28rem) minmax(0, 1fr); grid-template-rows: repeat(4, auto) 1fr; column-gap: 2.5rem; align-items: start; }
+  .try-grid > * { grid-column: 1; }
+  .try-grid > .try-slot { grid-column: 2; grid-row: 1 / -1; margin-top: 0; }
+}
+/* The wait is shown at the foot of the screen, wherever the visitor has scrolled to */
+.try-status { position: fixed; inset-inline: .75rem; bottom: max(.75rem, env(safe-area-inset-bottom)); max-width: 30rem; margin-inline: auto; z-index: 30; padding: 0 1.25rem; background: var(--bg); border: var(--line) solid var(--border); border-radius: var(--radius-lg); }
+.try-status .loading { min-height: 0; padding: .75rem 0; row-gap: .5rem; }
+.try-status .loading__late { max-height: 0; overflow: hidden; animation: try-late .5s ease-out 5s forwards; }
+@keyframes try-late { to { opacity: 1; max-height: 4rem; } }
+.try-slot { scroll-margin-top: 5rem; }
+.try-status .working { width: 2.75rem; height: 2.75rem; }
 .try-samples { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: .6rem; margin: 0 0 1.5rem; }
 .try-sample { justify-content: center; text-align: center; }
 .try-mode { border: 0; padding: 0; margin: 0 0 1.25rem; display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; }

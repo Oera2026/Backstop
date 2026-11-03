@@ -1,0 +1,99 @@
+@inject IJSRuntime JS
+<section class="card try-result try-slot" aria-labelledby="try-verdict" tabindex="-1" @ref="_box">
+    <p>
+        <span class="badge badge--@Kind(Result)"><Icon Name="@IconFor(Result)" /><span>@Word(Result)</span></span>
+    </p>
+    <h2 id="try-verdict">@Headline(Result)</h2>
+    <p>@Result.Explanation</p>
+    @if (Result.Verdict != TryVerdict.Safe || !Result.Verified)
+    {
+        <WatchForTip Tip="@Result.WatchFor" />
+    }
+
+    @if (Result.Signals.Count > 0)
+    {
+        <h3>What was flagged</h3>
+        <ul class="plain-list try-signals">
+            @foreach (var s in Result.Signals)
+            {
+                <li><strong>@s.Title</strong>@if (s.Detail.Length > 0){<span> @s.Detail</span>}</li>
+            }
+        </ul>
+    }
+
+    @if (Result.SenderChecks is { Count: > 0 })
+    {
+        <h3>Sender checks</h3>
+        <SenderChecks Signals="Result.SenderChecks" />
+    }
+
+    @if (Result.Links is { Count: > 0 })
+    {
+        <h3>Links found</h3>
+        @foreach (var l in Result.Links)
+        {
+            <div class="try-link">
+                <p><span class="badge badge--@LinkKind(l)"><Icon Name="@LinkIcon(l)" /><span>@LinkWord(l)</span></span></p>
+                <ol class="try-chain">
+                    @foreach (var hop in l.Chain)
+                    {
+                        <li>@hop.DefangedUrl <span class="try-chain__note">(@hop.Note)</span></li>
+                    }
+                    @if (l.Chain.Count == 0)
+                    {
+                        <li>@l.StartUrl</li>
+                    }
+                </ol>
+                @if (l.FinalUrl is not null)
+                {
+                    <p class="try-link__final"><strong>Ends at</strong> @l.FinalUrl</p>
+                }
+                @if (l.Signals.Count > 0)
+                {
+                    <ul class="plain-list try-signals">
+                        @foreach (var s in l.Signals)
+                        {
+                            <li>@s</li>
+                        }
+                    </ul>
+                }
+            </div>
+        }
+    }
+
+    <h3>What your trusted helper sees</h3>
+    <p>@Result.HelperSees</p>
+
+    <div class="actions">
+        <ReadAloud Text="@Speech(Result)" />
+    </div>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public TryResult Result { get; set; } = default!;
+
+    private ElementReference _box;
+
+    /// <summary>Moves keyboard and screen-reader focus to the verdict and shows it from the top.</summary>
+    public async Task FocusAsync()
+    {
+        try { await JS.InvokeVoidAsync("backstop.focusAtTop", _box); } catch (Exception) { }
+    }
+
+    private static string LinkKind(LinkReport l) => l.Verdict switch { LinkVerdict.NoWarnings => "safe", LinkVerdict.Suspicious => "check", _ => "block" };
+    private static string LinkIcon(LinkReport l) => l.Verdict switch { LinkVerdict.NoWarnings => "check", LinkVerdict.Suspicious => "hourglass", _ => "cross" };
+    private static string LinkWord(LinkReport l) => l.Verdict switch
+    {
+        LinkVerdict.NoWarnings => l.Fetched ? "No warning signs" : "No warning signs in the address",
+        LinkVerdict.Suspicious => "Be careful",
+        _ => l.Verified ? "Looks dangerous" : "Could not verify, treated as unsafe",
+    };
+
+    private static string Kind(TryResult r) => r.Verdict switch { TryVerdict.Safe when r.Verified => "safe", TryVerdict.Blocked => "block", _ => "check" };
+    private static string IconFor(TryResult r) => r.Verdict switch { TryVerdict.Safe when r.Verified => "check", TryVerdict.Blocked => "cross", _ => "hourglass" };
+    private static string Word(TryResult r) => !r.Verified ? "Held for helper" : r.Verdict switch { TryVerdict.Safe => "Safe", TryVerdict.Blocked => "Blocked", _ => "Held for helper" };
+    private static string Headline(TryResult r) => !r.Verified ? "Couldn't verify, so this would be held."
+        : r.Verdict switch { TryVerdict.Safe => "Backstop would let this through.", TryVerdict.Blocked => "Backstop would block this.", _ => "Backstop would hold this for a helper." };
+    // Only the plain explanation and the next step, never the signals.
+    private static string Speech(TryResult r) => $"{r.Explanation} {r.HelperSees}".Trim();
+}

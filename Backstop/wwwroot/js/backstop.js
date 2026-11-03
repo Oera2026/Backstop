@@ -11,6 +11,14 @@ window.backstop = {
       el.scrollIntoView({ block: "end", behavior: calm ? "auto" : "smooth" });
     }));
   },
+  // Put keyboard and screen-reader focus on a block and show it from its top. The browser's own focus scroll
+  // lands on the end of a block that is taller than the screen.
+  focusAtTop(el) {
+    if (!el) return;
+    const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches || document.documentElement.dataset.motion === "calm";
+    el.focus({ preventScroll: true });
+    el.scrollIntoView({ block: "start", behavior: calm ? "auto" : "smooth" });
+  },
   canSpeak() {
     return 'speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined';
   },

@@ -4,163 +4,101 @@
 
 <PageTitle>Try it – Backstop</PageTitle>
 
-<h1>Try it</h1>
-<p class="lead">Paste an email, or pick an example. See what Backstop would do with it.</p>
+@* One grid. On a wide screen the forms sit on the left and the answer on the right. On a phone
+   the answer comes straight after the form that asked for it. *@
+<div class="try-grid">
+    <div class="try-head">
+        <h1>Try it</h1>
+        <p class="lead">Paste an email, or pick an example. See what Backstop would do with it.</p>
+    </div>
 
-<div class="try-samples" role="group" aria-label="Examples">
-    @foreach (var s in Mail.TrySamples)
+    <div class="try-samples" role="group" aria-label="Examples">
+        @foreach (var s in Mail.TrySamples)
+        {
+            <button type="button" class="btn btn-quiet try-sample" disabled="@_busy" @onclick="() => UseSample(s)">@s.Label</button>
+        }
+    </div>
+
+    <form class="try-form" @onsubmit="Check">
+        <fieldset class="try-mode">
+            <legend>This email is</legend>
+            <label class="try-mode__opt"><input type="radio" name="mode" checked="@(!_outgoing)" @onchange="() => _outgoing = false" /> <span>Coming in</span></label>
+            <label class="try-mode__opt"><input type="radio" name="mode" checked="@_outgoing" @onchange="() => _outgoing = true" /> <span>Going out</span></label>
+        </fieldset>
+        <div class="field">
+            <label for="try-from">@(_outgoing ? "To" : "From")</label>
+            <input id="try-from" type="text" @bind="_from" maxlength="300" autocomplete="off" />
+        </div>
+        @if (!_outgoing)
+        {
+            <div class="field">
+                <label for="try-replyto">Reply-to (optional)</label>
+                <input id="try-replyto" type="text" @bind="_replyTo" maxlength="300" autocomplete="off" />
+            </div>
+        }
+        <div class="field">
+            <label for="try-subject">Subject</label>
+            <input id="try-subject" type="text" @bind="_subject" maxlength="200" autocomplete="off" />
+        </div>
+        <div class="field">
+            <label for="try-body">Message</label>
+            <textarea id="try-body" @bind="_body" maxlength="4500"></textarea>
+        </div>
+        @if (_problem is not null)
+        {
+            <p class="form-error" role="alert">@_problem</p>
+        }
+        <div class="actions">
+            <button type="submit" class="btn btn-primary" disabled="@_busy"><Icon Name="inspect" /> Check it</button>
+        </div>
+    </form>
+
+    @if (_result is { } mailResult && !_forLink)
     {
-        <button type="button" class="btn btn-quiet try-sample" disabled="@_busy" @onclick="() => UseSample(s)">@s.Label</button>
+        <TryResultCard Result="mailResult" @ref="_card" />
+    }
+
+    @* A message is checked as a whole above. This box is for one link on its own. *@
+    <form class="try-form try-linkform" @onsubmit="CheckLink">
+        <h2>Check one link</h2>
+        <div class="field">
+            <label for="try-link">Link</label>
+            <input id="try-link" type="text" @bind="_link" maxlength="2000" autocomplete="off" inputmode="url" />
+        </div>
+        <div class="field">
+            <label for="try-linktext">Words shown for the link (optional)</label>
+            <input id="try-linktext" type="text" @bind="_linkText" maxlength="300" autocomplete="off" />
+        </div>
+        @if (_linkProblem is not null)
+        {
+            <p class="form-error" role="alert">@_linkProblem</p>
+        }
+        <div class="actions">
+            <button type="submit" class="btn btn-primary" disabled="@_busy"><Icon Name="link" /> Check link</button>
+        </div>
+    </form>
+
+    @if (_result is { } linkResult && _forLink)
+    {
+        <TryResultCard Result="linkResult" @ref="_card" />
     }
 </div>
 
-<form class="try-form" @onsubmit="Check">
-    <fieldset class="try-mode">
-        <legend>This email is</legend>
-        <label class="try-mode__opt"><input type="radio" name="mode" checked="@(!_outgoing)" @onchange="() => _outgoing = false" /> <span>Coming in</span></label>
-        <label class="try-mode__opt"><input type="radio" name="mode" checked="@_outgoing" @onchange="() => _outgoing = true" /> <span>Going out</span></label>
-    </fieldset>
-    <div class="field">
-        <label for="try-from">@(_outgoing ? "To" : "From")</label>
-        <input id="try-from" type="text" @bind="_from" maxlength="300" autocomplete="off" />
-    </div>
-    @if (!_outgoing)
-    {
-        <div class="field">
-            <label for="try-replyto">Reply-to (optional)</label>
-            <input id="try-replyto" type="text" @bind="_replyTo" maxlength="300" autocomplete="off" />
-        </div>
-    }
-    <div class="field">
-        <label for="try-subject">Subject</label>
-        <input id="try-subject" type="text" @bind="_subject" maxlength="200" autocomplete="off" />
-    </div>
-    <div class="field">
-        <label for="try-body">Message</label>
-        <textarea id="try-body" @bind="_body" maxlength="4500"></textarea>
-    </div>
-    @if (_problem is not null)
-    {
-        <p class="form-error" role="alert">@_problem</p>
-    }
-    <div class="actions">
-        <button type="submit" class="btn btn-primary" disabled="@_busy"><Icon Name="inspect" /> Check it</button>
-    </div>
-</form>
-
-@* A message is checked as a whole above. This box is for one link on its own. *@
-<form class="try-form try-linkform" @onsubmit="CheckLink">
-    <h2>Check one link</h2>
-    <div class="field">
-        <label for="try-link">Link</label>
-        <input id="try-link" type="text" @bind="_link" maxlength="2000" autocomplete="off" inputmode="url" />
-    </div>
-    <div class="field">
-        <label for="try-linktext">Words shown for the link (optional)</label>
-        <input id="try-linktext" type="text" @bind="_linkText" maxlength="300" autocomplete="off" />
-    </div>
-    @if (_linkProblem is not null)
-    {
-        <p class="form-error" role="alert">@_linkProblem</p>
-    }
-    <div class="actions">
-        <button type="submit" class="btn btn-primary" disabled="@_busy"><Icon Name="link" /> Check link</button>
-    </div>
-</form>
-
+@* Fixed to the foot of the screen so the wait is seen wherever the visitor has scrolled to. *@
 @if (_busy)
 {
-    <LoadingState Text="Checking it…" />
-}
-else if (_result is { } r)
-{
-    <section class="card try-result" aria-labelledby="try-verdict" tabindex="-1" @ref="_resultBox">
-        <p>
-            <span class="badge badge--@Kind(r)"><Icon Name="@IconFor(r)" /><span>@Word(r)</span></span>
-        </p>
-        <h2 id="try-verdict">@Headline(r)</h2>
-        <p>@r.Explanation</p>
-        @if (r.Verdict != TryVerdict.Safe || !r.Verified)
-        {
-            <WatchForTip Tip="@r.WatchFor" />
-        }
-
-        @if (r.Signals.Count > 0)
-        {
-            <h3>What was flagged</h3>
-            <ul class="plain-list try-signals">
-                @foreach (var s in r.Signals)
-                {
-                    <li><strong>@s.Title</strong>@if (s.Detail.Length > 0){<span> @s.Detail</span>}</li>
-                }
-            </ul>
-        }
-
-        @if (r.SenderChecks is { Count: > 0 })
-        {
-            <h3>Sender checks</h3>
-            <SenderChecks Signals="r.SenderChecks" />
-        }
-
-        @if (r.Links is { Count: > 0 })
-        {
-            <h3>Links found</h3>
-            @foreach (var l in r.Links)
-            {
-                <div class="try-link">
-                    <p><span class="badge badge--@LinkKind(l)"><Icon Name="@LinkIcon(l)" /><span>@LinkWord(l)</span></span></p>
-                    <ol class="try-chain">
-                        @foreach (var hop in l.Chain)
-                        {
-                            <li>@hop.DefangedUrl <span class="try-chain__note">(@hop.Note)</span></li>
-                        }
-                        @if (l.Chain.Count == 0)
-                        {
-                            <li>@l.StartUrl</li>
-                        }
-                    </ol>
-                    @if (l.FinalUrl is not null)
-                    {
-                        <p class="try-link__final"><strong>Ends at</strong> @l.FinalUrl</p>
-                    }
-                    @if (l.Signals.Count > 0)
-                    {
-                        <ul class="plain-list try-signals">
-                            @foreach (var s in l.Signals)
-                            {
-                                <li>@s</li>
-                            }
-                        </ul>
-                    }
-                </div>
-            }
-        }
-
-        <h3>What your trusted helper sees</h3>
-        <p>@r.HelperSees</p>
-
-        <div class="actions">
-            <ReadAloud Text="@Speech(r)" />
-        </div>
-    </section>
+    <div class="try-status">
+        <LoadingState Text="Checking it…" />
+    </div>
 }
 
 @code {
-    private bool _outgoing, _busy, _focusResult;
+    private bool _outgoing, _busy, _focusResult, _forLink;
     private string _from = "", _subject = "", _body = "", _replyTo = "";
     private string _link = "", _linkText = "";
     private string? _problem, _linkProblem;
     private TryResult? _result;
-
-    private static string LinkKind(LinkReport l) => l.Verdict switch { LinkVerdict.NoWarnings => "safe", LinkVerdict.Suspicious => "check", _ => "block" };
-    private static string LinkIcon(LinkReport l) => l.Verdict switch { LinkVerdict.NoWarnings => "check", LinkVerdict.Suspicious => "hourglass", _ => "cross" };
-    private static string LinkWord(LinkReport l) => l.Verdict switch
-    {
-        LinkVerdict.NoWarnings => l.Fetched ? "No warning signs" : "No warning signs in the address",
-        LinkVerdict.Suspicious => "Be careful",
-        _ => l.Verified ? "Looks dangerous" : "Could not verify, treated as unsafe",
-    };
-    private ElementReference _resultBox;
+    private TryResultCard? _card;
 
     private async Task UseSample(TrySample s)
     {
@@ -180,6 +118,7 @@ else if (_result is { } r)
     {
         if (_busy) return;
         _busy = true;
+        _forLink = forLink;
         _problem = _linkProblem = null;
         _result = null;
         StateHasChanged();
@@ -200,16 +139,8 @@ else if (_result is { } r)
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!_focusResult || _result is null) return;
+        if (!_focusResult || _result is null || _card is null) return;
         _focusResult = false;
-        try { await _resultBox.FocusAsync(); } catch (Exception) { }
+        await _card.FocusAsync();
     }
-
-    private static string Kind(TryResult r) => r.Verdict switch { TryVerdict.Safe when r.Verified => "safe", TryVerdict.Blocked => "block", _ => "check" };
-    private static string IconFor(TryResult r) => r.Verdict switch { TryVerdict.Safe when r.Verified => "check", TryVerdict.Blocked => "cross", _ => "hourglass" };
-    private static string Word(TryResult r) => !r.Verified ? "Held for helper" : r.Verdict switch { TryVerdict.Safe => "Safe", TryVerdict.Blocked => "Blocked", _ => "Held for helper" };
-    private static string Headline(TryResult r) => !r.Verified ? "Couldn't verify, so this would be held."
-        : r.Verdict switch { TryVerdict.Safe => "Backstop would let this through.", TryVerdict.Blocked => "Backstop would block this.", _ => "Backstop would hold this for a helper." };
-    // Only the plain explanation and the next step, never the signals.
-    private static string Speech(TryResult r) => $"{r.Explanation} {r.HelperSees}".Trim();
 }
