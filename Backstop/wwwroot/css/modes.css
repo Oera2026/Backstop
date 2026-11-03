@@ -742,22 +742,23 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 @media (min-width: 64rem) {
   /* The page fills the screen below the header: the grid takes the height that is left, the email panel stretches to match it,
      and the message box takes whatever the panel has over. Nothing is sized from a guess at the screen height. */
-  .page--try { max-width: 90rem; display: flex; flex-direction: column; padding-top: .75rem; padding-bottom: 1rem; }
+  .page--try { max-width: 90rem; display: flex; flex-direction: column; padding-top: .75rem; padding-bottom: .75rem; }
   .try-grid {
     flex: 1; min-height: 0;
     grid-template-columns: minmax(0, 1fr) minmax(19rem, 26rem);
-    grid-template-rows: auto auto minmax(0, 1fr);
-    grid-template-areas: "head head" "email link" "email result";
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas: "email link" "email result";
     column-gap: 1.5rem; row-gap: 1.25rem; align-items: start;
   }
-  .try-head { grid-area: head; }
+  /* The page heading stays for screen readers and is not drawn, so the panels start at the top. */
+  .try-head { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .try-head h1, .try-head > :last-child { margin: 0; line-height: 1.2; }
   .try-panel { margin-bottom: 0; }
   .try-panel--email { grid-area: email; align-self: stretch; display: flex; flex-direction: column; min-height: 0; }
   .try-panel--link { grid-area: link; }
-  .try-email { flex: 1; min-height: 0; grid-template-columns: minmax(18rem, 21rem) minmax(0, 1fr); column-gap: 1.5rem; align-items: stretch; }
-  .page--try .try-samples { grid-template-columns: 1fr 1fr; margin: 0; gap: .4rem; align-content: start; }
-  .page--try .try-sample { padding-inline: .4rem; font-size: calc(.85rem * var(--tx)); line-height: 1.25; }
+  .try-email { flex: 1; min-height: 0; grid-template-columns: minmax(13rem, 16rem) minmax(0, 1fr); column-gap: 1.5rem; align-items: stretch; }
+  .page--try .try-samples { grid-template-columns: 1fr; margin: 0; gap: .4rem; align-content: start; }
+  .page--try .try-sample { padding-inline: .5rem; line-height: 1.25; }
   .try-mailform { display: flex; flex-direction: column; min-height: 0; }
   .try-mailform .field:has(textarea) { flex: 1; display: flex; flex-direction: column; min-height: 0; }
   .try-mailform textarea { flex: 1; min-height: 8rem; resize: none; }
