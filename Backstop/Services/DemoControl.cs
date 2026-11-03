@@ -11,6 +11,9 @@ public interface IDemoControl
 {
     /// <summary>Wipes the demo household and puts the 7 scenarios back. Needs the secret.</summary>
     DemoResetResult Reset(string? secret);
+
+    /// <summary>Empties Remember for everyone. Needs the same secret, because the demo household is shared by every visitor.</summary>
+    DemoResetResult ClearMemories(string? secret);
 }
 
 /// <summary>
@@ -28,10 +31,27 @@ public sealed class DemoControl(IMailService mail, IBackstopApi api, MockApiOpti
 
     public DemoResetResult Reset(string? secret)
     {
+        if (Refuse(secret) is { } no) return no;
+        mail.Reset();
+        api.ResetDemo();
+        options.ResetAll();
+        return new(true, null);
+    }
+
+    public DemoResetResult ClearMemories(string? secret)
+    {
+        if (Refuse(secret) is { } no) return no;
+        api.ClearMemories();
+        return new(true, null);
+    }
+
+    // Null when the secret is right. Otherwise why not, with wrong guesses counted towards the lock.
+    private DemoResetResult? Refuse(string? secret)
+    {
         var expected = config["DEMO_RESET_SECRET"];
         if (string.IsNullOrEmpty(expected))
         {
-            logger.LogWarning("Demo reset refused: DEMO_RESET_SECRET is not set.");
+            logger.LogWarning("Demo control refused: DEMO_RESET_SECRET is not set.");
             return new(false, "Reset is switched off.");
         }
 
@@ -50,11 +70,7 @@ public sealed class DemoControl(IMailService mail, IBackstopApi api, MockApiOpti
             }
             _wrong = 0;
         }
-
-        mail.Reset();
-        api.ResetDemo();
-        options.FailRequests = false;
-        return new(true, null);
+        return null;
     }
 
     /// <summary>Same time whatever the guess, and whatever its length.</summary>

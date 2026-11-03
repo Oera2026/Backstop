@@ -91,8 +91,17 @@
         <label for="api-fail">Make these modes fail (shows each screen's error state)</label>
     </div>
     <div class="actions">
-        <button type="button" class="btn btn-quiet" @onclick="Api.ClearMemories"><Icon Name="trash" /> Empty Remember</button>
+        <input id="memories-code" type="password" @bind="_memoriesCode" autocomplete="off" aria-label="Reset code" placeholder="Reset code" />
+        <button type="button" class="btn btn-quiet" @onclick="ClearMemories"><Icon Name="trash" /> Empty Remember</button>
     </div>
+    @if (_memoriesProblem is not null)
+    {
+        <p class="form-error" role="alert">@_memoriesProblem</p>
+    }
+    else if (_memoriesDone)
+    {
+        <p role="status">Done. Remember is empty.</p>
+    }
 </section>
 
 <section class="split-controls">
@@ -161,6 +170,17 @@
 
     private string _resetCode = "";
     private string? _resetProblem;
+    private string _memoriesCode = "";
+    private string? _memoriesProblem;
+    private bool _memoriesDone;
+
+    private void ClearMemories()
+    {
+        var r = Demo.ClearMemories(_memoriesCode);
+        _memoriesCode = "";
+        _memoriesProblem = r.Problem;
+        _memoriesDone = r.Done;
+    }
 
     private void ResetDemo()
     {

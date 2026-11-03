@@ -7,8 +7,32 @@ namespace Backstop.Services.Api;
 /// <summary>Demo switches for the mock. MOCK: there is no such thing in a real back end.</summary>
 public sealed class MockApiOptions
 {
-    /// <summary>Every call fails after its delay, so each screen's error state can be seen.</summary>
-    public bool FailRequests { get; set; }
+    private const int MaxVisitors = 5000;
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte> _failing = new();
+    private volatile bool _shared;
+
+    /// <summary>
+    /// Every call fails after its delay, so each screen's error state can be seen. Kept per visitor (their address), so one
+    /// visitor switching it on never breaks the demo for anyone else. With no visitor (tests, background work) one shared switch is used.
+    /// </summary>
+    public bool FailRequests
+    {
+        get => ClientIdentity.Current is { } v ? _failing.ContainsKey(v) : _shared;
+        set
+        {
+            if (ClientIdentity.Current is not { } v) { _shared = value; return; }
+            if (!value) { _failing.TryRemove(v, out _); return; }
+            if (_failing.Count >= MaxVisitors) _failing.Clear();
+            _failing[v] = 0;
+        }
+    }
+
+    /// <summary>Switches it off for every visitor. Used by Reset demo.</summary>
+    public void ResetAll()
+    {
+        _failing.Clear();
+        _shared = false;
+    }
 }
 
 /// <summary>
@@ -252,18 +276,24 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         await Wait(1600, ct);
         if (string.IsNullOrWhiteSpace(request.Goal)) throw new BackstopApiException("Please say what you want to do.");
 
-        string? photoUrl = null;
+        string? photoType = null;
         if (request.Photo is not null)
         {
-            var type = ImageSniff.ImageType(request.Photo) ?? throw new BackstopApiException("We could not use that file. Please take a photo or choose a picture.");
-            var photoId = NewId("p");
-            lock (_gate) _photos[photoId] = new ContactPhoto(request.Photo, type);
-            photoUrl = $"/mode-photo/{photoId}";
+            if (request.Photo.Length > MaxModePhotoBytes) throw new BackstopApiException("That picture is too big. Please choose a smaller one.");
+            photoType = ImageSniff.ImageType(request.Photo) ?? throw new BackstopApiException("We could not use that file. Please take a photo or choose a picture.");
         }
 
         // Example guides only: the photo is kept and shown back, never analysed. The goal's words pick a fixed guide.
         var task = GuideFixtures.Match(request.Goal);
-        if (task is null) return null;
+        if (task is null) return null; // nothing to show it with, so the photo is not kept
+
+        string? photoUrl = null;
+        if (photoType is not null)
+        {
+            var photoId = NewId("p");
+            KeepModePhoto(photoId, new ContactPhoto(request.Photo!, photoType));
+            photoUrl = $"/mode-photo/{photoId}";
+        }
         var guide = new Guide(NewId("g"), task.Title, request.Goal.Trim(), photoUrl, task.Picture, task.Steps,
             task.NeedsCare, DateTimeOffset.Now);
         lock (_gate) _guides[guide.Id] = (guide, task);
@@ -560,6 +590,31 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         lock (_gate) return _photos.GetValueOrDefault(id);
     }
 
+    // Show me photos are kept in memory on a small free host shared by every visitor, so they have a total budget.
+    // Past it the oldest go first (their guide then shows no photo). Profile pictures are separate and replace each other.
+    internal const int MaxModePhotoBytes = 10 * 1024 * 1024;
+    internal const long ModePhotoBudgetBytes = 64L * 1024 * 1024;
+    private readonly Queue<string> _modePhotoOrder = new();
+    private long _modePhotoBytes;
+
+    internal void KeepModePhoto(string id, ContactPhoto photo)
+    {
+        lock (_gate)
+        {
+            _photos[id] = photo;
+            _modePhotoOrder.Enqueue(id);
+            _modePhotoBytes += photo.Bytes.Length;
+            while (_modePhotoBytes > ModePhotoBudgetBytes && _modePhotoOrder.Count > 1)
+            {
+                var old = _modePhotoOrder.Dequeue();
+                if (_photos.Remove(old, out var gone)) _modePhotoBytes -= gone.Bytes.Length;
+            }
+        }
+    }
+
+    /// <summary>Bytes held by Show me photos now. For tests.</summary>
+    internal long ModePhotoBytes { get { lock (_gate) return _modePhotoBytes; } }
+
     // ---------------- Demo support ----------------
 
     public void ResetDemo()
@@ -567,6 +622,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         lock (_gate)
         {
             _checks.Clear(); _stories.Clear(); _guides.Clear(); _explanations.Clear(); _photos.Clear(); _savedFrom.Clear();
+            _modePhotoOrder.Clear(); _modePhotoBytes = 0;
             _memories = MemoryFixtures.Seed();
             _activity = SeedActivity();
             _help = SeedHelp();

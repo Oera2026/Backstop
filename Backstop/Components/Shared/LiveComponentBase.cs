@@ -18,12 +18,18 @@ public abstract class LiveComponentBase : ComponentBase, IDisposable
 
     protected override void OnInitialized() => Mail.Changed += OnStoreChanged;
 
+    // The store is shared by every visitor and one check changes it several times. A refresh already on its way covers any
+    // change made before it starts, so later ones are skipped until then: one redraw per burst, not one per change.
+    private int _storeQueued;
+
     private void OnStoreChanged()
     {
+        if (Interlocked.Exchange(ref _storeQueued, 1) == 1) return;
         try
         {
             _ = InvokeAsync(async () =>
             {
+                Interlocked.Exchange(ref _storeQueued, 0); // changes from here on queue a fresh refresh
                 try { await OnStoreChangedAsync(); }
                 catch (Services.Api.BackstopApiException) { /* keep what is on screen */ }
                 StateHasChanged();

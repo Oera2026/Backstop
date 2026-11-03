@@ -12,10 +12,6 @@
         @Item("/helper", "waiting", "hourglass", "Waiting", place, waiting)
         @Item("/helper/messages", "messages", "people", "Messages", place, 0)
         @Item("/helper/history", "history", "clock", "History", place, 0)
-        @if (Guardian.Allows(HelperCapability.SendAsUser))
-        {
-            @Item("/helper/write", "write", "pen", "Write", place, 0)
-        }
         @Item("/helper/settings", "settings", "lines", "Settings", place, 0)
     </ul>
 </nav>

@@ -20,16 +20,24 @@ public abstract class ModeComponentBase : LiveComponentBase
         Api.Changed += OnApiChanged;
     }
 
-    private void OnApiChanged() => _ = InvokeAsync(async () =>
+    // Same coalescing as the store's refresh: one reload per burst of changes.
+    private int _apiQueued;
+
+    private void OnApiChanged()
     {
-        try
+        if (Interlocked.Exchange(ref _apiQueued, 1) == 1) return;
+        _ = InvokeAsync(async () =>
         {
-            await OnApiChangedAsync();
-            StateHasChanged();
-        }
-        catch (BackstopApiException) { /* keep what is on screen; the next action shows the error */ }
-        catch (ObjectDisposedException) { /* circuit already closed */ }
-    });
+            Interlocked.Exchange(ref _apiQueued, 0);
+            try
+            {
+                await OnApiChangedAsync();
+                StateHasChanged();
+            }
+            catch (BackstopApiException) { /* keep what is on screen; the next action shows the error */ }
+            catch (ObjectDisposedException) { /* circuit already closed */ }
+        });
+    }
 
     /// <summary>Reload what the screen shows. Called after any change; the default does nothing.</summary>
     protected virtual Task OnApiChangedAsync() => Task.CompletedTask;

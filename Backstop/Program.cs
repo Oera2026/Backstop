@@ -78,15 +78,23 @@ static void StoryResilience(Microsoft.Extensions.Http.Resilience.HttpStandardRes
     o.CircuitBreaker.FailureRatio = 0.6;
     o.CircuitBreaker.BreakDuration = TimeSpan.FromSeconds(20);
 }
-// One shared cap on calls to Meta (single instance, so in memory is enough).
+// One shared cap on calls to Meta (single instance, so in memory is enough). Retries are counted too (MetaRetryBudget,
+// added after the resilience handler so it runs inside it, once per attempt).
 builder.Services.AddSingleton<MetaCallGuard>();
-builder.Services.AddHttpClient<MetaAiScamChecker>().ConfigurePrimaryHttpMessageHandler(NoRedirectHandler).AddStandardResilienceHandler(Resilience);
+builder.Services.AddTransient<MetaRetryBudget>();
+static void MetaClient<T>(IServiceCollection services, Action<Microsoft.Extensions.Http.Resilience.HttpStandardResilienceOptions> resilience) where T : class
+{
+    var client = services.AddHttpClient<T>().ConfigurePrimaryHttpMessageHandler(NoRedirectHandler);
+    client.AddStandardResilienceHandler(resilience);
+    client.AddHttpMessageHandler<MetaRetryBudget>();
+}
+MetaClient<MetaAiScamChecker>(builder.Services, Resilience);
 // Ask Me: the same Meta endpoint, the same rules.
-builder.Services.AddHttpClient<MetaAssistant>().ConfigurePrimaryHttpMessageHandler(NoRedirectHandler).AddStandardResilienceHandler(Resilience);
+MetaClient<MetaAssistant>(builder.Services, Resilience);
 // Social stories: the same Meta endpoint, the same rules.
-builder.Services.AddHttpClient<MetaStoryWriter>().ConfigurePrimaryHttpMessageHandler(NoRedirectHandler).AddStandardResilienceHandler(StoryResilience);
+MetaClient<MetaStoryWriter>(builder.Services, StoryResilience);
 // Explain and questions about a document: the same Meta endpoint, the same rules.
-builder.Services.AddHttpClient<MetaDocumentExplainer>().ConfigurePrimaryHttpMessageHandler(NoRedirectHandler).AddStandardResilienceHandler(Resilience);
+MetaClient<MetaDocumentExplainer>(builder.Services, Resilience);
 
 // Link check (the public /try page only; real mail never opens a link). Optional blocklist lookups: Google Safe Browsing and URLhaus,
 // skipped silently when their keys are empty. The fixed hosts are the only places those lookups go.
@@ -131,6 +139,19 @@ builder.Services.AddAuthorization();
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddScoped<DemoTour>();
 
+// Each sign-in costs a deliberately slow password hash, so one visitor gets 10 tries a minute. Over that, the page says to wait.
+builder.Services.AddRateLimiter(o =>
+{
+    o.AddPolicy("login", http => System.Threading.RateLimiting.RateLimitPartition.GetFixedWindowLimiter(
+        ClientIdentity.Resolve(http, builder.Configuration["CLIENT_IP_HEADER"]) ?? "unknown",
+        _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+    o.OnRejected = (ctx, _) =>
+    {
+        ctx.HttpContext.Response.Redirect("/login?error=wait");
+        return ValueTask.CompletedTask;
+    };
+});
+
 // MOCK: swap these registrations for real implementations later. No other code needs to change.
 builder.Services.AddScoped<AskSession>();
 builder.Services.AddSingleton<MailStore>();
@@ -173,7 +194,7 @@ app.Use(async (ctx, next) =>
     var h = ctx.Response.Headers;
     h["Content-Security-Policy"] =
         "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; " +
-        "media-src 'self' blob:; font-src 'self'; connect-src 'self' ws: wss:; object-src 'none'; base-uri 'self'; " +
+        "media-src 'self' blob:; font-src 'self'; connect-src 'self' wss:; object-src 'none'; base-uri 'self'; " +
         "form-action 'self'; frame-ancestors 'self'; frame-src 'self'";
     h["X-Content-Type-Options"] = "nosniff";
     h["X-Frame-Options"] = "SAMEORIGIN";
@@ -189,6 +210,7 @@ app.UseRequestLocalization(o =>
 });
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 app.UseAntiforgery();
 
 app.MapStaticAssets();
@@ -214,13 +236,13 @@ app.MapGet("/mode-photo/{id}", (string id, HttpContext http, IBackstopApi api) =
 });
 
 // Sign in with an email and password. Nobody is told which half was wrong.
-app.MapPost("/account/login", async (HttpContext http, AccountStore accounts, [Microsoft.AspNetCore.Mvc.FromForm] string? email, [Microsoft.AspNetCore.Mvc.FromForm] string? password) =>
+app.MapPost("/account/login", async (HttpContext http, AccountStore accounts, IConfiguration config, [Microsoft.AspNetCore.Mvc.FromForm] string? email, [Microsoft.AspNetCore.Mvc.FromForm] string? password) =>
 {
-    var account = accounts.Verify(email, password);
+    var account = accounts.Verify(email, password, ClientIdentity.Resolve(http, config["CLIENT_IP_HEADER"]));
     if (account is null) return Results.Redirect("/login?error=1");
     await http.SignInAsync(AccountStore.Principal(account.DisplayName, account.Role));
     return Results.Redirect(account.Role == Roles.Helper ? "/helper" : "/");
-});
+}).RequireRateLimiting("login");
 
 // Demo mode: one click, both sides, with the guided tour. Only two places can be asked for.
 app.MapGet("/account/demo", async (HttpContext http, string? next, string? side) =>

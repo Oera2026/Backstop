@@ -59,6 +59,15 @@ public sealed class MailMessage
     /// <summary>The helper chose "Call them first". The message stays held.</summary>
     public bool CallRequested { get; set; }
 
+    /// <summary>A helper's one-tap decision is waiting out its undo window. Nothing else (such as a rescan) may change the message meanwhile.</summary>
+    public bool DecisionPending { get; set; }
+
+    /// <summary>
+    /// A copy for readers outside the store's lock, so a check or a decision in progress can never change what a page is drawing.
+    /// The lists are replaced, never edited in place, so a shallow copy is enough.
+    /// </summary>
+    public MailMessage Snapshot() => (MailMessage)MemberwiseClone();
+
     /// <summary>"Approved" or "Blocked" when a person decided; null when the system decided.</summary>
     public string? HelperDecision { get; set; }
 

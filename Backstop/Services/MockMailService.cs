@@ -20,10 +20,16 @@ public sealed partial class MockMailService(MailStore store, IMetaScamChecker? m
         store.Query(m => m.State == MessageState.Cleared);
 
     // Failed, Received and Scanning are never shown, but they are not "held by a helper" yet either.
-    public int HeldCount => store.Query(m => m.State == MessageState.Held).Count;
+    public int HeldCount => store.Count(m => m.State == MessageState.Held);
 
-    public int RecentHelperBlocks =>
-        store.Query(m => m.State == MessageState.Blocked && m.HelperDecision == "Blocked" && m.ReceivedAt > DateTimeOffset.Now.AddDays(-1)).Count;
+    public int RecentHelperBlocks
+    {
+        get
+        {
+            var since = DateTimeOffset.Now.AddDays(-1);
+            return store.Count(m => m.State == MessageState.Blocked && m.HelperDecision == "Blocked" && m.ReceivedAt > since);
+        }
+    }
 
     public MailMessage? GetClearedMessage(string id)
     {
@@ -99,14 +105,14 @@ public sealed partial class MockMailService(MailStore store, IMetaScamChecker? m
             return new SendResult(null, false, "That is a no-reply address. Nobody reads messages sent to it.");
 
         var isNew = !store.IsKnownRecipient(to);
-        var contact = store.Contacts().FirstOrDefault(c => c.Address.Equals(to, StringComparison.OrdinalIgnoreCase));
+        var contact = store.FindContact(to);
         var sent = new SentMessage
         {
             Id = Guid.NewGuid().ToString("N")[..8],
             ToName = contact?.Name ?? "",
             ToAddress = to,
             Subject = string.IsNullOrWhiteSpace(subject) ? "(no subject)" : subject.Trim(),
-            Body = body,
+            Body = body ?? "",
         };
         var notice = isNew
             ? new HelperNotice { Id = Guid.NewGuid().ToString("N")[..8], Address = to, Subject = sent.Subject }
@@ -136,21 +142,15 @@ public sealed partial class MockMailService(MailStore store, IMetaScamChecker? m
     {
         if (store.GetContact(id) is null) return false;
         // Trust the bytes, never the file name or the browser's claim. SVG is refused on purpose (it can carry script).
-        var type = Sniff(bytes);
+        // The page caps uploads too; this is the real limit, so a caller cannot store more.
+        if (bytes is null || bytes.Length > MaxContactPhotoBytes) return false;
+        var type = ImageSniff.ImageType(bytes);
         if (type is null) return false;
         store.SetPhoto(id, new ContactPhoto(bytes, type));
         return true;
     }
 
-    private static string? Sniff(byte[] b)
-    {
-        if (b.Length < 12) return null;
-        if (b[0] == 0x89 && b[1] == 0x50 && b[2] == 0x4E && b[3] == 0x47) return "image/png";
-        if (b[0] == 0xFF && b[1] == 0xD8 && b[2] == 0xFF) return "image/jpeg";
-        if (b[0] == 'G' && b[1] == 'I' && b[2] == 'F' && b[3] == '8') return "image/gif";
-        if (b[0] == 'R' && b[1] == 'I' && b[2] == 'F' && b[3] == 'F' && b[8] == 'W' && b[9] == 'E' && b[10] == 'B' && b[11] == 'P') return "image/webp";
-        return null;
-    }
+    public const int MaxContactPhotoBytes = 3 * 1024 * 1024;
 
     public IReadOnlyList<SentMessage> GetSent() => store.Sent();
     public SentMessage? GetSent(string id) => store.FindSent(id);
@@ -212,10 +212,12 @@ public sealed partial class MockMailService(MailStore store, IMetaScamChecker? m
             Step(1, onTier);
             MetaScamAnalysis? ai = null;
             TierResult aiTier;
-            if (MailAnalyzer.BlocksOutright(analysis))
+            if (MailAnalyzer.SkipsAi(analysis))
             {
-                // Already the strictest result, so the AI is not asked: the answer is instant and the text never leaves the app.
-                aiTier = new TierResult("Meta AI", TierStatus.Skipped, "Not needed: the other checks already block this.");
+                // No AI answer could change the outcome, so it is not asked: the answer is instant and the text never leaves the app.
+                aiTier = new TierResult("Meta AI", TierStatus.Skipped, MailAnalyzer.BlocksOutright(analysis)
+                    ? "Not needed: the other checks already block this."
+                    : "Not needed: a helper looks at this whatever the AI says.");
             }
             else
             {
@@ -224,8 +226,7 @@ public sealed partial class MockMailService(MailStore store, IMetaScamChecker? m
                 ai = await metaChecker.CheckScamWithEvidenceAsync($"{mail.Subject}\n\n{mail.Body}", [], MailAnalyzer.SenderFindings(analysis));
                 if (!ai.Success)
                     throw new InvalidOperationException("Meta AI check failed or timed out: " + (ai.FailureNote ?? "Unknown error"));
-                aiTier = new TierResult("Meta AI",
-                    ai.Verdict == Verdict.LooksSafe && !ai.NeedsHuman && !ai.AtRisk ? TierStatus.Passed : TierStatus.Flagged, ai.Reason);
+                aiTier = AiTier(ai);
             }
             done.Add(aiTier);
             onTier?.Invoke(1, aiTier);
@@ -241,19 +242,7 @@ public sealed partial class MockMailService(MailStore store, IMetaScamChecker? m
             done.Add(decision.PolicyTier);
             onTier?.Invoke(3, decision.PolicyTier);
 
-            store.Update(() =>
-            {
-                msg.Flags = [.. decision.Flags];
-                msg.Links = [.. analysis.Links];
-                msg.SenderSignals = [.. analysis.SenderSignals];
-                msg.Summary = decision.Summary;
-                msg.Concern = decision.Concern;
-                msg.WatchFor = decision.WatchFor;
-                msg.RulesScore = decision.RulesScore;
-                msg.Tiers = done;
-                msg.State = decision.State;
-                msg.ReceivedAt = DateTimeOffset.Now;
-            });
+            store.Update(() => Apply(msg, analysis, decision, done));
         }
         catch (Exception)
         {
@@ -265,7 +254,26 @@ public sealed partial class MockMailService(MailStore store, IMetaScamChecker? m
                 catch (Exception) { msg.State = MessageState.Held; msg.AwaitingScan = true; }
             }
         }
-        return msg;
+        return store.Find(msg.Id) ?? msg;
+    }
+
+    private static TierResult AiTier(MetaScamAnalysis ai) =>
+        new("Meta AI", ai.Worried ? TierStatus.Flagged : TierStatus.Passed, ai.Reason);
+
+    // The finished result of a check, written onto the message. The caller holds the store's lock.
+    private static void Apply(MailMessage m, MailAnalyzer.Analysis analysis, MailAnalyzer.Decision decision, List<TierResult> tiers)
+    {
+        m.Flags = [.. decision.Flags];
+        m.Links = [.. analysis.Links];
+        m.SenderSignals = [.. analysis.SenderSignals];
+        m.Summary = decision.Summary;
+        m.Concern = decision.Concern;
+        m.WatchFor = decision.WatchFor;
+        m.RulesScore = decision.RulesScore;
+        m.Tiers = tiers;
+        m.State = decision.State;
+        m.AwaitingScan = false;
+        m.ReceivedAt = DateTimeOffset.Now;
     }
 
     // Tells a watcher (the demo panel) which check has started. There is no pause: the only waiting is the real Meta call.
@@ -327,22 +335,56 @@ public sealed partial class MockMailService(MailStore store, IMetaScamChecker? m
 
     private readonly object _scanGate = new();
     private readonly HashSet<string> _scanning = [];
+    // Timer rescans of one message back off after each miss (45s, 90s, 3m … up to 30m), so a Meta outage does not
+    // spend the daily cap on the same few messages. A helper's "Check again" always tries at once.
+    private readonly Dictionary<string, (int Misses, DateTimeOffset NextTry)> _backoff = [];
+    private static readonly TimeSpan MaxBackoff = TimeSpan.FromMinutes(30);
+    internal Func<DateTimeOffset> Clock { get; set; } = () => DateTimeOffset.Now;
+
+    // A helper who has a decision waiting out its undo window, or who said they would call first, is in charge of this message.
+    // The AI must not change it under them.
+    private static bool MayRescan(MailMessage m) =>
+        m.State == MessageState.Held && m.AwaitingScan && !m.DecisionPending && !m.CallRequested;
 
     /// <summary>
     /// Mail held because the AI never answered is checked again here. It is only released, held for a helper or
     /// blocked when the AI answers, using the same policy as a new message. No answer leaves it exactly as it was.
+    /// <paramref name="id"/> null is the timer's sweep, which skips messages still backing off.
     /// </summary>
     public async Task<int> RescanAsync(string? id = null)
     {
         if (metaChecker is null) return 0;
-        var waiting = store.Query(m => m.State == MessageState.Held && m.AwaitingScan && (id is null || m.Id == id));
+        var now = Clock();
+        var waiting = store.Query(m => MayRescan(m) && (id is null || m.Id == id));
         var answered = 0;
         foreach (var msg in waiting)
         {
-            lock (_scanGate) { if (!_scanning.Add(msg.Id)) continue; } // already being scanned
-            try { if (await RescanOne(msg)) answered++; }
+            lock (_scanGate)
+            {
+                if (id is null && _backoff.TryGetValue(msg.Id, out var b) && now < b.NextTry) continue;
+                if (!_scanning.Add(msg.Id)) continue; // already being scanned
+            }
+            var ok = false;
+            try { ok = await RescanOne(msg); }
             catch (Exception) { /* no answer: stays held and is tried again later */ }
-            finally { lock (_scanGate) _scanning.Remove(msg.Id); }
+            finally
+            {
+                lock (_scanGate)
+                {
+                    _scanning.Remove(msg.Id);
+                    if (ok) _backoff.Remove(msg.Id);
+                    else
+                    {
+                        var misses = _backoff.GetValueOrDefault(msg.Id).Misses + 1;
+                        var wait = TimeSpan.FromSeconds(Math.Min(MaxBackoff.TotalSeconds, 45 * Math.Pow(2, misses - 1)));
+                        _backoff[msg.Id] = (misses, Clock() + wait);
+                    }
+                    // Forget messages that are no longer waiting, so the table stays small.
+                    if (_backoff.Count > 200)
+                        foreach (var gone in _backoff.Keys.Where(k => store.Find(k) is not { AwaitingScan: true }).ToList()) _backoff.Remove(gone);
+                }
+            }
+            if (ok) answered++;
         }
         return answered;
     }
@@ -354,24 +396,9 @@ public sealed partial class MockMailService(MailStore store, IMetaScamChecker? m
         var ai = await metaChecker!.CheckScamWithEvidenceAsync($"{mail.Subject}\n\n{mail.Body}", [], MailAnalyzer.SenderFindings(analysis));
         if (!ai.Success) return false;
 
-        var aiTier = new TierResult("Meta AI",
-            ai.Verdict == Verdict.LooksSafe && !ai.NeedsHuman && !ai.AtRisk ? TierStatus.Passed : TierStatus.Flagged, ai.Reason);
         var decision = MailAnalyzer.Decide(analysis, ai);
-        // Only still-held, still-waiting mail changes. A helper who blocked it in the meantime wins.
-        return store.TryChange(msg.Id, m => m.State == MessageState.Held && m.AwaitingScan, m =>
-        {
-            m.Flags = [.. decision.Flags];
-            m.Links = [.. analysis.Links];
-            m.SenderSignals = [.. analysis.SenderSignals];
-            m.Summary = decision.Summary;
-            m.Concern = decision.Concern;
-            m.WatchFor = decision.WatchFor;
-            m.RulesScore = decision.RulesScore;
-            m.Tiers = [analysis.RulesTier, aiTier, analysis.LinkTier, decision.PolicyTier];
-            m.State = decision.State;
-            m.AwaitingScan = false;
-            m.ReceivedAt = DateTimeOffset.Now;
-        });
+        // Only still-held, still-waiting mail nobody is deciding changes. A helper who blocked it, is deciding it, or will call first wins.
+        return store.TryChange(msg.Id, MayRescan, m => Apply(m, analysis, decision, [analysis.RulesTier, AiTier(ai), analysis.LinkTier, decision.PolicyTier]));
     }
 
     public void Reset() => store.Reset();

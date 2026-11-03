@@ -98,17 +98,29 @@ public static partial class InputGuard
     public static bool IsSingleLine(string? s, int max) =>
         s is not null && s.Length <= max && !s.Any(char.IsControl);
 
+    // Every order has to name what it is aimed at (instructions, rules, the assistant, the model), because the bare words are
+    // everyday English: "don't forget your coat", "you are now a great-grandma", "please ignore the previous email".
     [GeneratedRegex(
-        @"ignore (?:all |any |the |your |every )?(?:previous|prior|above|earlier|preceding)|disregard (?:all |any |the |your )?(?:previous|prior|above|earlier|instructions|rules)|forget (?:all |everything|your |the )|override (?:the |your |all )?(?:system|rules|instructions|verdict)" +
-        @"|you are now\b|from now on you|act as (?:a |an |the )?(?:different|new|unrestricted)|new instructions?\b|system prompt|developer message|jailbreak|\bdan mode\b|pretend (?:you are|to be)" +
-        @"|(?:set|output|return|respond with|answer|reply with|mark(?: this)? as|rate(?: this)? as|say)\W{0,4}(?:the )?(?:verdict|result|answer|rating)?\W{0,4}(?:is |as |to |with )?\W{0,3}looks ?safe" +
+        @"ignore (?:all |any |the |your |every )?(?:of )?(?:the |your )?(?:previous|prior|above|earlier|preceding|former) (?:instructions?|rules|prompts?|directions|commands|guidelines)" +
+        @"|ignore (?:all |any |every |of )*(?:your|these|my) (?:own )?(?:instructions|rules|prompts?|guidelines|training)" +
+        @"|disregard (?:all |any |the |your )?(?:of )?(?:the |your )?(?:previous |prior |above |earlier )?(?:instructions|rules|prompts?|guidelines)" +
+        @"|forget (?:all |about )?(?:your |the |all |previous |prior |of )*(?:instructions|rules|prompts?|guidelines|training)" +
+        @"|override (?:the |your |all )?(?:system|rules|instructions|verdict|safety)" +
+        @"|you are now (?:an? |the )?(?:ai |new |different |unrestricted |unfiltered |jailbroken )?(?:assistant|ai|model|chatbot|bot|checker|system)\b|you are now in \w+ mode" +
+        @"|from now on,? you (?:will|must|shall|should|are to) (?:answer|reply|respond|say|output|only|always|ignore|act|pretend)" +
+        @"|act as (?:a |an |the )?(?:different|new|unrestricted|unfiltered) (?:ai|assistant|model|chatbot|bot|checker|system)\b" +
+        @"|new (?:system )?instructions?\s*:|(?:here are|these are|follow) (?:your |the |my |these )?new instructions" +
+        @"|system prompt|developer message|jailbreak|\bdan mode\b" +
+        @"|pretend (?:you are|to be) (?:an? |the )?(?:different |new |unrestricted |evil )?(?:ai|assistant|model|chatbot|bot|checker|system)\b" +
+        @"|(?:set|output|return|respond with|answers?|reply with|mark(?: this)? as|rate(?: this)? as|say)\W{0,4}(?:the )?(?:verdict|result|answer|rating)?\W{0,4}(?:is |as |to |with )?\W{0,3}looks ?safe" +
         @"|verdict\W{1,4}looks ?safe|this (?:message |email |text )?is (?:completely |totally |perfectly )?(?:safe|legitimate|genuine|not a scam)\b.{0,40}(?:tell|say|report|mark)" +
         @"|</?(?:system|assistant|user|instructions?)>|\[/?(?:inst|system)\]|<\|(?:im_start|im_end|system|endoftext)\|>|begin (?:inspected|untrusted)|end (?:inspected|untrusted)",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex InjectionPhrases();
 
     // The same orders with the gaps taken out, for text spaced or punctuated to dodge the main pattern.
-    [GeneratedRegex(@"ignore(?:all|any|the|your|every)?(?:previous|prior|above|earlier)|disregard(?:all|any|the|your)?(?:previous|prior|above|instructions)|systemprompt|youarenow|newinstructions|(?:verdict|output|return|answer)(?:is|as|to)?lookssafe|overridetheverdict", RegexOptions.CultureInvariant)]
+    // As above, each one names its target, so "you are nowhere near" and "new instructions for your tablets" pass.
+    [GeneratedRegex(@"ignore(?:all|any|the|your|every)?(?:previous|prior|above|earlier)(?:instructions?|rules|prompts?)|disregard(?:all|any|the|your)?(?:previous|prior|above)?(?:instructions|rules|prompts?)|systemprompt|(?:verdict|output|return|answer)(?:is|as|to)?lookssafe|overridetheverdict", RegexOptions.CultureInvariant)]
     private static partial Regex Squashed();
 
     [GeneratedRegex(@"[^a-z]")]

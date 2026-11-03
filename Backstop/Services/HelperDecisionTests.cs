@@ -34,6 +34,8 @@ public static class HelperDecisionTests
 
         public async Task<MailMessage> Held() => (await Mail.ReceiveAsync("remote-support", false))!;
         public void Pass(double seconds) { Clock = Clock.AddSeconds(seconds); Guardian.CommitDue(); }
+        // The store hands out copies, so read the message again to see what a decision did.
+        public MailMessage Fresh(MailMessage m) => Store.Find(m.Id)!;
     }
 
     public static async Task RunAsync()
@@ -43,14 +45,14 @@ public static class HelperDecisionTests
         // Safe, let it through: nothing changes until the window ends, then it reaches the inbox with the helper's mark.
         var r = new Rig();
         var m = await r.Held();
-        Assert(m.State == MessageState.Held && r.Mail.HeldCount >= 1, "It starts held");
+        Assert(r.Fresh(m).State == MessageState.Held && r.Mail.HeldCount >= 1, "It starts held");
         Assert(r.Guardian.Propose(m.Id, true).Ok, "Safe is accepted");
         Assert(r.Guardian.GetPending(m.Id) is { Safe: true, SecondsLeft: 10 }, "The toast starts at 10 seconds");
         r.Pass(9);
-        Assert(m.State == MessageState.Held && r.Mail.GetInbox().All(x => x.Id != m.Id) && r.Mail.GetClearedMessage(m.Id) is null, "Inside the window the user still sees nothing");
+        Assert(r.Fresh(m).State == MessageState.Held && r.Mail.GetInbox().All(x => x.Id != m.Id) && r.Mail.GetClearedMessage(m.Id) is null, "Inside the window the user still sees nothing");
         Assert(r.Guardian.GetPending(m.Id) is { SecondsLeft: 1 }, "One second left");
         r.Pass(1);
-        Assert(m.State == MessageState.Cleared && m.HelperDecision == "Approved" && r.Mail.GetInbox().Any(x => x.Id == m.Id), "After the window: released to the inbox");
+        Assert(r.Fresh(m).State == MessageState.Cleared && r.Fresh(m).HelperDecision == "Approved" && r.Mail.GetInbox().Any(x => x.Id == m.Id), "After the window: released to the inbox");
         Assert(r.Guardian.GetPending(m.Id) is null && r.Guardian.TakeFailure(m.Id) is null, "Nothing is left waiting");
         Assert(r.Guardian.GetMailActivity().Any(a => a.Text.Contains("approved")), "It is written to the activity log");
 
@@ -60,12 +62,12 @@ public static class HelperDecisionTests
         var heldBefore = r.Mail.HeldCount;
         Assert(r.Guardian.Propose(m.Id, false).Ok && r.Mail.RecentHelperBlocks == 0, "Not safe is accepted, and nothing is said to the user yet");
         r.Pass(10);
-        Assert(m.State == MessageState.Blocked && m.HelperDecision == "Blocked", "After the window: blocked");
+        Assert(r.Fresh(m).State == MessageState.Blocked && r.Fresh(m).HelperDecision == "Blocked", "After the window: blocked");
         Assert(r.Mail.GetInbox().All(x => x.Id != m.Id) && r.Mail.GetClearedMessage(m.Id) is null && r.Mail.HeldCount == heldBefore - 1, "Blocked mail is gone from the user's view and the held count");
         Assert(r.Mail.RecentHelperBlocks == 1, "The user is told a helper blocked one, as a number only");
         Assert(!r.Guardian.Propose(m.Id, true).Ok, "Blocked is final: it cannot be decided again");
         r.Guardian.Approve(m.Id);
-        Assert(m.State == MessageState.Blocked, "Even the old Approve cannot bring it back");
+        Assert(r.Fresh(m).State == MessageState.Blocked, "Even the old Approve cannot bring it back");
 
         // Undo works inside the window and not after it.
         r = new Rig();
@@ -74,7 +76,7 @@ public static class HelperDecisionTests
         r.Pass(5);
         Assert(r.Guardian.Undo(m.Id) && r.Guardian.GetPending(m.Id) is null, "Undo at 5 seconds works");
         r.Pass(30);
-        Assert(m.State == MessageState.Held && m.HelperDecision is null, "An undone decision is never saved");
+        Assert(r.Fresh(m).State == MessageState.Held && r.Fresh(m).HelperDecision is null, "An undone decision is never saved");
         Assert(!r.Guardian.Undo(m.Id), "Nothing left to undo");
         r.Guardian.Propose(m.Id, false);
         r.Pass(9.9);
@@ -83,12 +85,12 @@ public static class HelperDecisionTests
         r.Clock = r.Clock.AddSeconds(10); // the window has passed, and the timer has not saved it yet
         Assert(!r.Guardian.Undo(m.Id), "Undo at 10 seconds is too late");
         r.Guardian.CommitDue();
-        Assert(m.State == MessageState.Blocked, "A decision that was not undone is saved");
+        Assert(r.Fresh(m).State == MessageState.Blocked, "A decision that was not undone is saved");
         r = new Rig();
         m = await r.Held();
         r.Guardian.Propose(m.Id, true);
         r.Pass(11);
-        Assert(m.State == MessageState.Cleared && !r.Guardian.Undo(m.Id), "Undo after a decision was saved does nothing");
+        Assert(r.Fresh(m).State == MessageState.Cleared && !r.Guardian.Undo(m.Id), "Undo after a decision was saved does nothing");
 
         // The latest tap wins, with a fresh window.
         r = new Rig();
@@ -97,9 +99,9 @@ public static class HelperDecisionTests
         r.Pass(6);
         r.Guardian.Propose(m.Id, false);
         r.Pass(6);
-        Assert(m.State == MessageState.Held && r.Guardian.GetPending(m.Id) is { Safe: false }, "Changing your mind restarts the window");
+        Assert(r.Fresh(m).State == MessageState.Held && r.Guardian.GetPending(m.Id) is { Safe: false }, "Changing your mind restarts the window");
         r.Pass(4);
-        Assert(m.State == MessageState.Blocked, "The second choice is the one saved");
+        Assert(r.Fresh(m).State == MessageState.Blocked, "The second choice is the one saved");
 
         // Fail closed: a decision that cannot be saved leaves the message held, and says so once.
         r = new Rig();
@@ -107,16 +109,16 @@ public static class HelperDecisionTests
         r.Guardian.SaveCheck = () => throw new InvalidOperationException("storage is down");
         r.Guardian.Propose(m.Id, true);
         r.Pass(10);
-        Assert(m.State == MessageState.Held && m.HelperDecision is null && r.Mail.GetInbox().All(x => x.Id != m.Id), "Could not save: still held, never released");
+        Assert(r.Fresh(m).State == MessageState.Held && r.Fresh(m).HelperDecision is null && r.Mail.GetInbox().All(x => x.Id != m.Id), "Could not save: still held, never released");
         Assert(r.Guardian.TakeFailure(m.Id) is { Length: > 0 } && r.Guardian.TakeFailure(m.Id) is null && r.Guardian.GetPending(m.Id) is null, "The helper is told once");
         r.Guardian.SaveCheck = () => throw new InvalidOperationException("storage is down");
         r.Guardian.Propose(m.Id, false);
         r.Pass(10);
-        Assert(m.State == MessageState.Held && r.Guardian.TakeFailure(m.Id) is not null, "A block that cannot be saved stays held too");
+        Assert(r.Fresh(m).State == MessageState.Held && r.Guardian.TakeFailure(m.Id) is not null, "A block that cannot be saved stays held too");
         r.Guardian.SaveCheck = null;
         r.Guardian.Propose(m.Id, true);
         r.Pass(10);
-        Assert(m.State == MessageState.Cleared, "When saving works again, a new decision goes through");
+        Assert(r.Fresh(m).State == MessageState.Cleared, "When saving works again, a new decision goes through");
 
         // Mail the checker has not finished with cannot be let through, and anything not held cannot be decided.
         var down = new Rig(new FixedMeta(new MetaScamAnalysis(Verdict.LooksSafe, "", [], false, "down")));
@@ -152,8 +154,7 @@ public static class HelperDecisionTests
         Assert(!tier.Guardian.Allows(HelperCapability.SendAsUser) && !tier.Guardian.Allows(HelperCapability.SeeChats), "Standard has neither SendAsUser nor SeeChats");
         tier.Guardian.SetAccess(new HelperPermissions((HelperTier)3));
         Assert(tier.Guardian.Access.Tier == HelperTier.Standard && !tier.Guardian.Allows(HelperCapability.SendAsUser) && !tier.Guardian.Allows(HelperCapability.SeeChats), "Asking for more is clamped back to Standard");
-        var send = tier.Guardian.SendAsUser("friend@example.org", "Hello", "Hi there");
-        Assert(send.Message is null && send.Refused is not null && tier.Store.Sent().All(s => s.ToAddress != "friend@example.org"), "SendAsUser is still refused and sends nothing");
+        Assert(typeof(IGuardianService).GetMethod("SendAsUser") is null, "There is no way for a helper to send mail as the user");
         var api = new MockBackstopApi(tier.Guardian, new MockApiOptions(), null);
         var refused = false;
         try { await api.GetChatLogAsync("anyone"); } catch (BackstopApiException) { refused = true; }

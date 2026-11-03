@@ -109,12 +109,6 @@ public interface IGuardianService
     IReadOnlyList<CalendarEvent> GetUserEvents();
     IReadOnlyList<HelperNotice> GetSeenNotices();
 
-    /// <summary>
-    /// Administrator only. MOCK: pretends to send. The message is marked as sent by the helper in the user's Sent list
-    /// and in the activity log. Refuses no-reply and invalid addresses.
-    /// </summary>
-    SendResult SendAsUser(string to, string subject, string body);
-
     MailMessage? Get(string id);
 
     void Approve(string id);

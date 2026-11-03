@@ -129,6 +129,10 @@
                 {
                     <a class="btn btn-text" href="@tel" @onclick="@(() => Guardian.CallFirst(Message.Id))"><Icon Name="phone" /> Ring them</a>
                 }
+                else if (!Message.CallRequested)
+                {
+                    <button type="button" class="btn btn-text" @onclick="@(() => Guardian.CallFirst(Message.Id))"><Icon Name="phone" /> Call them first</button>
+                }
             </div>
             @if (_error is not null)
             {

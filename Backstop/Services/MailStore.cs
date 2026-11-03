@@ -46,20 +46,54 @@ public sealed class MailStore
         return n;
     }
 
+    // The demo is one shared household on a public site, so nothing may grow without end. Past these sizes the oldest go first.
+    internal const int MaxMessages = 600, MaxSent = 300, MaxNotices = 200, MaxHeldOutgoing = 200, MaxEvents = 300;
+
+    /// <summary>Copies, newest first. Changing one does not change the store: use <see cref="TryChange"/> or <see cref="Update"/>.</summary>
     public List<MailMessage> Query(Func<MailMessage, bool> where)
     {
-        lock (_gate) return _all.Where(where).OrderByDescending(m => m.ReceivedAt).ToList();
+        lock (_gate) return _all.Where(where).OrderByDescending(m => m.ReceivedAt).Select(m => m.Snapshot()).ToList();
     }
 
+    /// <summary>How many match. No copy and no sort, for counts drawn on every screen.</summary>
+    public int Count(Func<MailMessage, bool> where)
+    {
+        lock (_gate) return _all.Count(where);
+    }
+
+    /// <summary>A copy of one message, or null.</summary>
     public MailMessage? Find(string id)
     {
-        lock (_gate) return _all.FirstOrDefault(m => m.Id == id);
+        lock (_gate) return _all.FirstOrDefault(m => m.Id == id)?.Snapshot();
     }
 
     public void Add(MailMessage message)
     {
-        lock (_gate) _all.Add(message);
+        lock (_gate)
+        {
+            _all.Add(message);
+            if (_all.Count > MaxMessages) TrimMessages(keep: message);
+        }
         Changed?.Invoke();
+    }
+
+    // Oldest first: blocked mail, then cleared, then held. A message still being checked is never dropped. Caller holds the lock.
+    private void TrimMessages(MailMessage keep)
+    {
+        var drop = _all
+            .Where(m => m != keep && m.State is MessageState.Blocked or MessageState.Cleared or MessageState.Held)
+            .OrderBy(m => m.State switch { MessageState.Blocked => 0, MessageState.Cleared => 1, _ => 2 })
+            .ThenBy(m => m.ReceivedAt)
+            .Take(_all.Count - MaxMessages)
+            .ToHashSet();
+        _all.RemoveAll(drop.Contains);
+    }
+
+    private static void TrimOldest<T>(List<T> list, int max, Func<T, DateTimeOffset> at)
+    {
+        if (list.Count <= max) return;
+        var drop = list.OrderBy(at).Take(list.Count - max).ToHashSet();
+        list.RemoveAll(drop.Contains);
     }
 
     /// <summary>
@@ -173,6 +207,7 @@ public sealed class MailStore
         {
             _sent.Add(message);
             if (notice is not null) _notices.Add(notice);
+            TrimLists();
         }
         Changed?.Invoke();
     }
@@ -188,7 +223,11 @@ public sealed class MailStore
             Body = body,
             Reasons = reasons,
         };
-        lock (_gate) _heldOutgoing.Add(held);
+        lock (_gate)
+        {
+            _heldOutgoing.Add(held);
+            TrimLists();
+        }
         Changed?.Invoke();
         return held;
     }
@@ -228,20 +267,46 @@ public sealed class MailStore
                 if (isNew) _notices.Add(new HelperNotice { Id = Guid.NewGuid().ToString("N")[..8], Address = h.ToAddress, Subject = h.Subject });
                 h.Decision = "Sent";
             }
+            TrimLists();
         }
         Changed?.Invoke();
         return true;
     }
 
+    // Sent mail keeps the newest. Notices and held outgoing mail drop finished ones before anything still waiting. Caller holds the lock.
+    private void TrimLists()
+    {
+        TrimOldest(_sent, MaxSent, s => s.SentAt);
+        if (_notices.Count > MaxNotices)
+        {
+            var drop = _notices.OrderBy(n => n.Seen ? 0 : 1).ThenBy(n => n.At).Take(_notices.Count - MaxNotices).ToHashSet();
+            _notices.RemoveAll(drop.Contains);
+        }
+        if (_heldOutgoing.Count > MaxHeldOutgoing)
+        {
+            var drop = _heldOutgoing.OrderBy(h => h.Decision is null ? 1 : 0).ThenBy(h => h.At).Take(_heldOutgoing.Count - MaxHeldOutgoing).ToHashSet();
+            _heldOutgoing.RemoveAll(drop.Contains);
+        }
+    }
+
     public void AddEvent(CalendarEvent e)
     {
-        lock (_gate) _events.Add(e);
+        lock (_gate)
+        {
+            _events.Add(e);
+            if (_events.Count > MaxEvents) _events.RemoveAt(0);
+        }
         Changed?.Invoke();
     }
 
     public void DismissNotice(string id)
     {
-        lock (_gate) _notices.FirstOrDefault(n => n.Id == id)?.Let(n => n.Seen = true);
+        lock (_gate)
+        {
+            var n = _notices.FirstOrDefault(x => x.Id == id);
+            if (n is null || n.Seen) return;
+            n.Seen = true;
+        }
         Changed?.Invoke();
     }
 
@@ -291,9 +356,4 @@ public sealed class MailStore
         HoldUnfinished();
         Changed?.Invoke();
     }
-}
-
-internal static class StoreExtensions
-{
-    public static void Let<T>(this T value, Action<T> action) => action(value);
 }

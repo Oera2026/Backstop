@@ -47,28 +47,45 @@ public sealed class AccountStore
     private static byte[] Hash(string password, byte[] salt) =>
         Rfc2898DeriveBytes.Pbkdf2(Encoding.UTF8.GetBytes(password), salt, Iterations, HashAlgorithmName.SHA256, 32);
 
-    /// <summary>Returns the account when the email and password match; otherwise null. Slows down repeated misses.</summary>
-    public Account? Verify(string? email, string? password)
+    private const int MaxTracked = 5000;
+    private static readonly TimeSpan Window = TimeSpan.FromMinutes(5);
+
+    /// <summary>
+    /// Returns the account when the email and password match; otherwise null. Slows down repeated misses.
+    /// The lock is per <paramref name="visitor"/> and email, so a stranger's wrong guesses cannot lock the real person out.
+    /// </summary>
+    public Account? Verify(string? email, string? password, string? visitor = null)
     {
         email = (email ?? "").Trim();
         if (email.Length is 0 or > 200 || string.IsNullOrEmpty(password) || password.Length > 200) return null;
-        if (IsLocked(email)) return null;
+        var key = $"{visitor ?? "unknown"}|{email}";
+        if (IsLocked(key)) return null;
 
         // Same work whether or not the account exists, so timing does not reveal which emails are real.
         _accounts.TryGetValue(email, out var account);
         var hash = Hash(password, account?.Salt ?? new byte[16]);
         var ok = account is not null && CryptographicOperations.FixedTimeEquals(hash, account.Hash);
-        if (ok) { _failures.TryRemove(email, out _); return account; }
+        if (ok) { _failures.TryRemove(key, out _); return account; }
 
-        _failures.AddOrUpdate(email, (1, DateTime.UtcNow), (_, f) => (f.Count + 1, f.Since));
+        if (_failures.Count >= MaxTracked) Sweep();
+        _failures.AddOrUpdate(key, (1, DateTime.UtcNow), (_, f) => (f.Count + 1, f.Since));
         return null;
     }
 
-    private bool IsLocked(string email)
+    private bool IsLocked(string key)
     {
-        if (!_failures.TryGetValue(email, out var f)) return false;
-        if (DateTime.UtcNow - f.Since > TimeSpan.FromMinutes(5)) { _failures.TryRemove(email, out _); return false; }
+        if (!_failures.TryGetValue(key, out var f)) return false;
+        if (DateTime.UtcNow - f.Since > Window) { _failures.TryRemove(key, out _); return false; }
         return f.Count >= 5;
+    }
+
+    // Forgets misses older than the window, so typed-in emails cannot fill memory. Still full: start again.
+    private void Sweep()
+    {
+        var now = DateTime.UtcNow;
+        foreach (var (k, f) in _failures)
+            if (now - f.Since > Window) _failures.TryRemove(k, out _);
+        if (_failures.Count >= MaxTracked) _failures.Clear();
     }
 
     public static ClaimsPrincipal Principal(string name, string role, string authType = "backstop")

@@ -180,11 +180,13 @@ public static class SenderCheckTests
 
         // Rescan: when the AI finally answers "safe", a bad sender is still held.
         var ai = new SwitchMeta { Answer = new MetaScamAnalysis(Verdict.LooksSafe, "", [], false, "down") };
-        var rescanMail = new MockMailService(new MailStore(), ai);
+        var rescanStore = new MailStore();
+        var rescanMail = new MockMailService(rescanStore, ai);
         var waiting = (await rescanMail.ReceiveAsync("mum-new-address", false))!;
         ai.Answer = Safe;
         await rescanMail.RescanAsync(waiting.Id);
-        Assert(waiting.State == MessageState.Held && !waiting.AwaitingScan && Find(waiting.SenderSignals, "family-name-free-address") is not null, "Rescan: AI says safe, the sender still holds it");
+        var rescanned = rescanStore.Find(waiting.Id)!;
+        Assert(rescanned.State == MessageState.Held && !rescanned.AwaitingScan && Find(rescanned.SenderSignals, "family-name-free-address") is not null, "Rescan: AI says safe, the sender still holds it");
 
         // 9. The Try it page shows the signals and holds the same way.
         var tryMail = new MockMailService(new MailStore(), new FixedMeta(Safe)) { TryGuard = new MetaCallGuard(100000, null, 100000) };

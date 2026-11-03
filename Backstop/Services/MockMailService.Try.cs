@@ -138,13 +138,14 @@ public sealed partial class MockMailService
 
     private async Task<TryResult> TryIncomingCoreAsync(MailAnalyzer.Analysis analysis, string subject, string body, CancellationToken ct)
     {
-        // A serious warning sign blocks the message on its own, so nothing is opened and nothing is sent to Meta.
-        var (reports, notChecked) = MailAnalyzer.IsSerious(analysis) ? ([], 0) : await InspectLinksAsync($"{subject}\n{body}", ct);
+        // A serious warning sign sends the message to a helper on its own, so nothing is opened and nothing is sent to Meta.
+        var serious = MailAnalyzer.IsSerious(analysis);
+        var (reports, notChecked) = serious ? ([], 0) : await InspectLinksAsync($"{subject}\n{body}", ct);
         // The links were opened, so what was found replaces the guess made from the address alone. Without that, a harmless shortener
         // would still be called "hidden" and hold the message by itself, however clean the trip turned out to be.
         analysis = MailAnalyzer.WithInspectedLinks(analysis, reports);
-        // Blocked by the local checks alone: the AI could only agree, so it is not asked and the answer is instant.
-        var ai = MailAnalyzer.BlocksOutright(analysis) ? null
+        // Blocked or held by the local checks alone: no AI answer could change that, so it is not asked and the answer is instant.
+        var ai = MailAnalyzer.SkipsAi(analysis) ? null
             : await AskMetaAsync(subject, body, reports.Count > 0 ? Findings(reports, notChecked) : [], ct, MailAnalyzer.SenderFindings(analysis));
         // Same decision as real mail. With no AI answer it is Held, as a real message would be.
         var decision = MailAnalyzer.Decide(analysis, ai);
@@ -176,11 +177,16 @@ public sealed partial class MockMailService
             return Tipped(new(TryVerdict.Blocked, true, signals, decision.Summary,
                 "It would be in their Blocked list. You would never see it.", Links: reports));
 
+        // Held for a serious sign: the checks finished, and the answer is certain, so it counts as verified.
+        if (ai is null && serious)
+            return Tipped(new(TryVerdict.Held, true, signals, decision.Summary,
+                "They would see it with these warnings, and choose Approve, Block or Call them first. You would not see it yet.", Links: reports));
+
         if (ai is null)
             return Tipped(new(TryVerdict.Held, false, signals, "Couldn't verify, so this would be held.",
                 "Your helper would see it with any warnings found so far, and choose Approve, Block or Call them first.", Links: reports));
 
-        var aiWorried = ai.Verdict != Verdict.LooksSafe || ai.NeedsHuman || ai.AtRisk;
+        var aiWorried = ai.Worried;
         var state = decision.State == MessageState.Cleared && linkBad ? MessageState.Held : decision.State;
         var explanation = state == MessageState.Held && decision.State == MessageState.Cleared && !aiWorried
             ? (reports.Any(r => r.Verdict == LinkVerdict.Unsafe) || notChecked > 0
@@ -208,7 +214,7 @@ public sealed partial class MockMailService
         var check = CheckOutgoing(to, subject, body);
         var ai = await AskMetaAsync(subject, body, [], ct);
         var signals = check.Reasons.Select(r => new TrySignal(r.TrimEnd('.'), "")).ToList();
-        var aiWorried = ai is not null && (ai.Verdict != Verdict.LooksSafe || ai.NeedsHuman || ai.AtRisk);
+        var aiWorried = ai is { Worried: true };
         if (aiWorried)
             foreach (var f in ai!.Flags)
                 if (signals.All(s => s.Title != f.Title)) signals.Add(new(f.Title, f.Explanation));

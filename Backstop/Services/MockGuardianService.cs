@@ -39,32 +39,6 @@ public sealed class MockGuardianService(MailStore store) : IGuardianService
     public IReadOnlyList<CalendarEvent> GetUserEvents() => Allows(HelperCapability.SeeFullActivity) ? store.Events() : [];
     public IReadOnlyList<HelperNotice> GetSeenNotices() => Allows(HelperCapability.SeeFullActivity) ? store.SeenNotices() : [];
 
-    public SendResult SendAsUser(string to, string subject, string body)
-    {
-        if (!Allows(HelperCapability.SendAsUser)) return new(null, false, $"{Names.User} has not allowed you to send mail as them.");
-        to = (to ?? "").Trim();
-        if (!InputGuard.IsPlainAddress(to)) return new(null, false, "Please check the address.");
-        if (!InputGuard.IsSingleLine(subject ?? "", 200)) return new(null, false, "The subject is not right. Please shorten it.");
-        if (string.IsNullOrWhiteSpace(body) || body.Length > 20000) return new(null, false, "Please write the message, and keep it under 20,000 letters.");
-        if (NoReply.IsNoReply(to)) return new(null, false, "Nobody reads replies to that address.");
-
-        var isNew = !store.IsKnownRecipient(to);
-        var contact = store.FindContact(to);
-        var sent = new SentMessage
-        {
-            Id = Guid.NewGuid().ToString("N")[..8],
-            ToName = contact?.Name ?? "",
-            ToAddress = to,
-            Subject = string.IsNullOrWhiteSpace(subject) ? "(no subject)" : subject.Trim(),
-            Body = body,
-            SentBy = HouseholdFixture.Household.TrustedPersonName,
-        };
-        // MOCK: the message is only stored in memory. Nothing is sent anywhere.
-        store.AddSent(sent, null);
-        store.AddActivity("send", $"You sent an email to {to} as {Names.User}: \"{sent.Subject}\".");
-        return new(sent, isNew, null);
-    }
-
     public MailMessage? Get(string id)
     {
         var m = store.Find(id);
@@ -123,12 +97,19 @@ public sealed class MockGuardianService(MailStore store) : IGuardianService
         var m = store.Find(id);
         if (m is null || m.State != MessageState.Held) return new(false, "This message is not waiting for you any more.");
         if (safe && m.AwaitingScan) return new(false, "The checker has not finished with this one. Please check it again first.");
+        // Marked on the message itself, so a rescan cannot release it while the helper's decision waits out its window.
+        if (!store.TryChange(id, x => x.State == MessageState.Held && !(safe && x.AwaitingScan), x => x.DecisionPending = true))
+            return new(false, "This message is not waiting for you any more.");
         lock (_pendingGate)
         {
             _pending[id] = (safe, Now());
             _failures.Remove(id);
+            if (AutoCommit)
+            {
+                _timer ??= new Timer(_ => CommitDue());
+                _timer.Change(500, 500);
+            }
         }
-        if (AutoCommit) _timer ??= new Timer(_ => CommitDue(), null, 500, 500);
         return new(true);
     }
 
@@ -138,8 +119,9 @@ public sealed class MockGuardianService(MailStore store) : IGuardianService
         {
             if (!_pending.TryGetValue(id, out var p) || Now() - p.At >= TimeSpan.FromSeconds(DecisionSeconds)) return false;
             _pending.Remove(id);
-            return true;
         }
+        store.TryChange(id, _ => true, x => x.DecisionPending = false);
+        return true;
     }
 
     public PendingDecision? GetPending(string id)
@@ -165,21 +147,32 @@ public sealed class MockGuardianService(MailStore store) : IGuardianService
         {
             due = _pending.Where(p => Now() - p.Value.At >= TimeSpan.FromSeconds(DecisionSeconds)).Select(p => (p.Key, p.Value.Safe)).ToList();
             foreach (var d in due) _pending.Remove(d.Id);
+            if (_pending.Count == 0) _timer?.Change(Timeout.Infinite, Timeout.Infinite); // nothing waiting: the timer sleeps until the next decision
         }
         foreach (var (id, safe) in due)
         {
+            var target = safe ? MessageState.Cleared : MessageState.Blocked;
             try
             {
                 var saved = safe ? Decide(id, MessageState.Cleared, "Approved", "check", "approved") : Decide(id, MessageState.Blocked, "Blocked", "cross", "blocked");
-                if (!saved && store.Find(id)?.State == MessageState.Held) Fail(id);
+                // Not saved and not already where the helper wanted it: say so. A decision is never dropped without a word.
+                if (!saved && store.Find(id)?.State != target) Fail(id);
             }
             catch (Exception) { Fail(id); } // fail closed: the message was not changed and stays held
+            finally
+            {
+                try { store.TryChange(id, m => m.DecisionPending, m => m.DecisionPending = false); }
+                catch (Exception) { /* the flag only pauses rescans; a reset or restart clears it */ }
+            }
         }
     }
 
     private void Fail(string id)
     {
-        lock (_pendingGate) _failures[id] = "We could not save that. The message is still held, so please try again.";
+        var why = store.Find(id)?.State is null or MessageState.Held
+            ? "We could not save that. The message is still held, so please try again."
+            : "This message was decided in another window before your choice was saved.";
+        lock (_pendingGate) _failures[id] = why;
     }
 
     public string? GetRingHref()
@@ -207,6 +200,7 @@ public sealed class MockGuardianService(MailStore store) : IGuardianService
                 m.State = to;
                 m.HelperDecision = decision;
                 m.CallRequested = false;
+                m.DecisionPending = false;
                 m.ReceivedAt = DateTimeOffset.Now; // lands at the top of the inbox when approved
                 subject = m.Subject;
             });

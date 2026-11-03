@@ -13,7 +13,11 @@ public sealed record MetaScamAnalysis(
     FailureInfo? Failure = null,
     // The checker tip "Next time, watch for…", already cleaned by WatchFor.Clean. Null when missing or not safe to show: callers use the fixed library.
     string? WatchFor = null
-);
+)
+{
+    /// <summary>Anything short of "looks safe, no human needed, nobody at risk". Only meaningful when <see cref="Success"/> is true.</summary>
+    public bool Worried => Verdict != Verdict.LooksSafe || NeedsHuman || AtRisk;
+}
 
 public interface IMetaScamChecker
 {

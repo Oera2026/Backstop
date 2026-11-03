@@ -210,8 +210,10 @@ public sealed class MetaAiScamChecker : ILlamaScamChecker, IMetaScamChecker, IMe
         if (status >= 500) return "Meta had a problem on its side. Try again later.";
         return "unexpected status. See the reply above.";
     }
-    public Task<LlamaScamAnalysis> CheckScamAsync(string text, CancellationToken ct) =>
-        CheckScamAsync(text, null, null, ct).ContinueWith(t => (LlamaScamAnalysis)t.Result, ct);
+    // Legacy shape. Awaited, not ContinueWith: a cancel or a fault must still come back as the fail-closed answer, never as a
+    // cancelled task or an AggregateException. CheckCoreAsync already turns every failure into that answer.
+    public async Task<LlamaScamAnalysis> CheckScamAsync(string text, CancellationToken ct) =>
+        await CheckScamAsync(text, null, null, ct);
 
     public Task<MetaScamAnalysis> CheckScamAsync(
         string? text,

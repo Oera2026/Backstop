@@ -175,10 +175,21 @@ Roughly 4,000 lines of C# in `Services/` and `Models/`, about 100 Razor componen
 - Eval: the email is a hard negative in `LinkCheckTests` ("Eval hard negative", expected Safe and "Looks fine"). It uses real shop and shortener names, in test code only, as the list under test; it is not a `/try` sample button because samples must use example domains.
 - Tests: `Services/Api/LinkCheckTests.cs` (inside block 32 of `--test-llama`) and an updated line in `Services/WatchForTests.cs`.
 
-## 13. Serious violations are blocked outright (added 2026-11-03)
 
-- `MailAnalyzer.SeriousSignals` (currently `injection`: an email giving orders to the checker) blocks a message with no helper and no AI. To make another sign serious, add its signal id to that list. `MailAnalyzer.BlocksOutright` is a serious sign, or a disguised link with a strong warning (the old rule). Never when someone may be at risk: that still goes to a person.
-- The AI is not asked in that case. It could only agree, and skipping it makes the answer instant and keeps the attack text away from Meta. On `/try` the links are not opened either for a serious sign. Real mail records the Meta AI step as Skipped.
-- Blocked even when the checker is missing or failing, because the decision is local. Blocked stays final and invisible to the user.
-- Behaviour change: demo scenario 6 ("tries to trick the checker") is now Blocked, not Held; tests updated. Any /try email with an order to the checker is Blocked.
-- Tests: `LinkCheckTests` ("Serious violations are blocked outright").
+## 13. Serious signs go straight to a helper (added 2026-11-03, changed the same day after review)
+
+- `MailAnalyzer.SeriousSignals` (currently `injection`: an email giving orders to the checker) sends a message straight to a helper: **Held**, concern Strong, with no AI call and (on `/try`) no link opened. `MailAnalyzer.SkipsAi` is true for a serious sign or for `BlocksOutright` (a disguised link with a strong warning, the only automatic block). Never blocked for a serious sign alone: the phrases turned up in ordinary family mail ("don't forget your coat", "you are now a great-grandma"), and Blocked is final and unseen, so a person decides.
+- The injection patterns (`InputGuard.InjectionPhrases` / `Squashed`) now have to name their target (instructions, rules, the assistant, the model). Ordinary sentences that used to match are listed as must-not-match in the tests.
+- Demo scenario 6 ("tries to trick the checker") is Held again. The helper can approve it, because it is not waiting for a scan.
+
+## 14. Fixes from the 3 Nov code review
+
+- **Decisions beat rescans.** `MailMessage.DecisionPending` is set while a one-tap decision waits out its undo window. The rescan (`MayRescan`) skips a message that has a pending decision or `CallRequested`. A decision that cannot be saved because the message changed elsewhere is reported to the helper, never dropped.
+- **Call them first** is on the evidence card when there is no phone number to ring.
+- **Rescans back off** (45s doubling to 30 min per message) on the timer; the helper's "Check again" always tries.
+- **Retries count against the Meta caps** (`MetaRetryBudget`, a handler inside the resilience pipeline). Over the cap a retry is not sent.
+- **Shared state is bounded.** `MailStore` caps messages (600), sent (300), notices (200), held outgoing (200) and events (300), oldest first, never a message mid-check. Show me photos have a 64 MB total budget and are not kept when no guide matches. `MailStore.Find/Query` return copies; changes go through `TryChange`/`Update`.
+- **Demo controls.** "Make these modes fail" is per visitor (by address). "Empty Remember" needs the reset code. The demo panel no longer shows the guide bar (it used to send the visitor away from `/demo` to the first slide).
+- **Sign-in.** Locks are per visitor and email, the failure table is bounded, and `/account/login` is rate limited to 10 tries a minute per visitor.
+- **Hygiene.** CSP `connect-src 'self' wss:` (no `ws:`), no inline import map, `SendAsUser` and the helper Write page removed (out of scope), compiler warnings fixed.
+- Tests: `Services/ReviewFixTests.cs` (block 37 of `--test-llama`), and the injection tests in `LinkCheckTests` and `LlamaScamCheckerTests`.

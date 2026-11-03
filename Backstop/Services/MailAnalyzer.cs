@@ -112,29 +112,34 @@ public static partial class MailAnalyzer
         a.SenderSignals.Select(s => $"Sender check ({s.Severity.ToString().ToLowerInvariant()}): {s.Reason}").ToList();
 
     /// <summary>
-    /// Policy tier. Cleared only when every local check is clean AND Meta AI answered and agreed.
-    /// Blocked only for a disguised link together with a strong warning, and never when someone may be at risk.
-    /// Everything else, including a missing or failed AI answer, is Held.
-    /// </summary>
-    /// <summary>
-    /// Warning signs so serious that the message is blocked outright, with no helper and no AI needed. To add one, add its signal id here.
-    /// "injection" is an email giving orders to the checker: nobody who writes that is sending a real message.
+    /// Warning signs so serious that no AI answer could ever release the message. It goes straight to a helper (Held), with no AI call
+    /// and no link opened. To add one, add its signal id here.
+    /// "injection" is an email giving orders to the checker. It is held, not blocked: the phrases can turn up in real mail, and
+    /// Blocked is final and unseen, so a person must make that call.
     /// </summary>
     public static readonly IReadOnlyList<string> SeriousSignals = ["injection"];
 
     public static bool IsSerious(Analysis a) => a.SignalIds.Any(id => SeriousSignals.Contains(id));
 
     /// <summary>
-    /// Blocked by the local checks alone: a serious sign, or a disguised link with a strong warning. Never when someone may be at risk,
-    /// because that always goes to a person. The AI can only make a result stricter, and this is already the strictest, so it is not asked.
+    /// Blocked by the local checks alone: a disguised link with a strong warning. Never when someone may be at risk, because that
+    /// always goes to a person. The AI can only make a result stricter, and this is already the strictest, so it is not asked.
     /// </summary>
     public static bool BlocksOutright(Analysis a) =>
-        !a.AtRisk && (IsSerious(a) || (a.DeceptiveLink && MockRiskRules.VerdictFor(a.RulesScore) == Verdict.DontReply));
+        !a.AtRisk && a.DeceptiveLink && MockRiskRules.VerdictFor(a.RulesScore) == Verdict.DontReply;
 
+    /// <summary>True when the AI's answer cannot change the outcome (blocked outright, or held for a serious sign), so it is not asked.</summary>
+    public static bool SkipsAi(Analysis a) => BlocksOutright(a) || IsSerious(a);
+
+    /// <summary>
+    /// Policy tier. Cleared only when every local check is clean AND Meta AI answered and agreed.
+    /// Blocked only for a disguised link together with a strong warning, and never when someone may be at risk.
+    /// Everything else, including a serious sign and a missing or failed AI answer, is Held.
+    /// </summary>
     public static Decision Decide(Analysis a, MetaScamAnalysis? ai)
     {
         var aiAnswered = ai is { Success: true };
-        var aiWorried = aiAnswered && (ai!.Verdict != Verdict.LooksSafe || ai.NeedsHuman || ai.AtRisk);
+        var aiWorried = aiAnswered && ai!.Worried;
         var atRisk = a.AtRisk || (ai?.AtRisk ?? false);
         var localClean = a.RulesScore == 0 && a.LinkProblems == 0 && !a.SenderProblem;
         var strong = MockRiskRules.VerdictFor(a.RulesScore) == Verdict.DontReply;
@@ -142,8 +147,10 @@ public static partial class MailAnalyzer
         MessageState state;
         string note;
         var serious = IsSerious(a);
-        if ((serious || (a.DeceptiveLink && strong)) && !atRisk)
-        { state = MessageState.Blocked; note = serious ? "It tries to tell the checker what to say. Blocked automatically." : "Hidden link plus a strong warning sign. Blocked automatically."; }
+        if (a.DeceptiveLink && strong && !atRisk)
+        { state = MessageState.Blocked; note = "Hidden link plus a strong warning sign. Blocked automatically."; }
+        else if (serious)
+        { state = MessageState.Held; note = atRisk ? "Someone may need help, so a helper looks first." : "It tries to tell the checker what to say, so a helper looks first."; }
         else if (localClean && aiAnswered && !aiWorried)
         { state = MessageState.Cleared; note = "Every check passed. Cleared."; }
         else if (!aiAnswered && localClean)
@@ -159,7 +166,7 @@ public static partial class MailAnalyzer
 
         string summary;
         if (state == MessageState.Cleared) summary = "Nothing unusual found.";
-        else if (state == MessageState.Blocked && serious) summary = "This message tries to tell our checker what to say, so it was blocked.";
+        else if (serious && !atRisk) summary = "This message tries to tell our checker what to say, so a helper should look at it.";
         else if (a.RulesScore > 0)
             summary = MockRiskRules.ReasonFor(MockRiskRules.VerdictFor(a.RulesScore), a.TopBecause);
         else if (aiWorried) summary = ai!.Reason;

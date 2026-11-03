@@ -16,7 +16,7 @@ Every incoming message goes through four checks, in order: **Rules**, **Meta AI*
 Alongside the Rules, a **Sender check** (`ISenderCheck`, pure code, no AI call) looks at who the message says it is from: the name shown against the address (a brand, a family word like "Mum", or a saved contact on a different address), look-alike and punycode domains, and a Reply-To on another domain. Its findings go to Meta AI as evidence and show in a "Sender checks" section for the helper and on `/try`. A serious finding always holds the message, whatever Meta AI says. Headers that cannot be read are treated as unverified and held.
 
 - **Cleared** only when the local checks are clean and Meta AI answered and agreed.
-- **Held** for the helper when anything looks wrong, or when a check fails.
+- **Held** for the helper when anything looks wrong, or when a check fails. An email that gives orders to the checker ("ignore your instructions…") goes straight to the helper with no AI call: it is never blocked unseen, because a person should decide.
 - **Blocked** (final, invisible to the user) only for a disguised link together with a strong warning sign, and never when someone may be at risk.
 - **Fail closed.** A Meta error, a timeout, an unexpected answer, a missing API key or any exception ends in Held. Nothing is ever cleared on a failure.
 - **Local checks are a floor.** The phrase rules and input guard set a minimum. Meta's answer can only make a result stricter, never looser.
@@ -63,10 +63,10 @@ Set these as environment variables (locally in the untracked `.env`, in producti
 | `META_AI_KEY` | Meta Dev API key. |
 | `META_AI_ENDPOINT_URL`, `META_AI_MODEL`, `META_AI_TIMEOUT_SECONDS` | Meta endpoint (must be on `https://api.meta.ai`), model and timeout in seconds. The timeout applies to checks and chat; social stories always wait at least 100 seconds, because a story with painted scenes takes about 40. |
 | `MetaAI__MaxCallsPerMinute` | Cap on calls to Meta per minute. Default 40. |
-| `META_AI_MAX_CALLS_PER_DAY` | Cap on calls to Meta per UTC day for the whole app. Default 1500. A restart resets the count. |
+| `META_AI_MAX_CALLS_PER_DAY` | Cap on calls to Meta per UTC day for the whole app, retries included. Default 1500. A restart resets the count. |
 | `META_AI_MAX_CALLS_PER_IP_PER_MINUTE` | Cap on calls to Meta per visitor per minute. Default 15. |
 | `CLIENT_IP_HEADER` | Optional. A header the host sets to the visitor address (for example `CF-Connecting-IP`). Empty uses `X-Forwarded-For`. |
-| `DEMO_RESET_SECRET` | The code needed for "Reset demo" on `/demo`. With no value, reset is switched off. |
+| `DEMO_RESET_SECRET` | The code needed for "Reset demo" and "Empty Remember" on `/demo`. With no value, both are switched off. |
 | `ACCOUNT_USER_PASSWORD`, `ACCOUNT_HELPER_PASSWORD` | Passwords for the made-up accounts `sam@example.com` (user side) and `alex@example.com` (helper side). With no value, that account cannot sign in. |
 | `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` | Supabase project URL and service key (server only). Not used yet. |
 | `SAFE_BROWSING_API_KEY`, `URLHAUS_AUTH_KEY` | Optional. Blocklist lookups for links on `/try` only. Empty skips them silently. |
@@ -123,7 +123,7 @@ You get a verdict (**Blocked**, **Held for helper** or **Safe**), the warning si
 2. Pick one of the eleven example emails (or write your own) and press **Simulate incoming email**.
 3. Safe mail appears in the user pane. Held mail appears in the helper pane, and the user pane only shows that a message is being checked.
 4. Approve in the helper pane and the message moves into the user inbox live.
-5. Tick "Make the checker crash" to see fail-closed behaviour.
+5. Tick "Make the checker crash" to see fail-closed behaviour. "Make these modes fail" affects only your own visit.
 
 ## Link check (the Try it page only)
 

@@ -7,7 +7,11 @@
 <h1>Sign in</h1>
 <p class="lead">Type the email and password you were given.</p>
 
-@if (Error)
+@if (ErrorFlag == "wait")
+{
+    <p class="form-error" role="alert">That is a lot of tries. Please wait a minute and try again.</p>
+}
+else if (Error)
 {
     <p class="form-error" role="alert">That email or password is not right. Please try again.</p>
 }

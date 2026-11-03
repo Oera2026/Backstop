@@ -12,7 +12,7 @@
     </nav>
 </header>
 <RoleGate Allow="@Roles.Demo" Guest="/account/demo?next=demo">
-<DemoBar />
+@* No guide bar here: the guide walks the user and helper pages, so on this page it could only send the visitor away from it. *@
 <main id="main" class="page page--demo" tabindex="-1">
     @Body
 </main>
