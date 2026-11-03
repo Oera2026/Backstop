@@ -154,9 +154,27 @@ body { transition: background-color .3s ease, color .3s ease; }
 :root[data-motion="calm"] .skel__pic::after, :root[data-motion="calm"] .skel__bar::after { animation: none; }
 
 /* Shown while the app starts, so the first look is a page shape and not a blank screen. Hidden once a page is drawn. */
-.boot { width: 100%; box-sizing: border-box; padding: 1.25rem max(.75rem, env(safe-area-inset-left)); max-width: 52rem; margin: 0 auto; }
+.boot { flex: 1; display: flex; flex-direction: column; }
+.boot .site-header { min-height: 56px; }
 .boot .rows { margin: 0; }
+.boot .skel__bar { display: block; }
 .boot .skel__bar--title { margin-bottom: 1rem; }
+.boot__nav, .boot__tabs { display: none; }
+.boot__tabs { position: fixed; left: 0; right: 0; bottom: 0; height: calc(4rem + env(safe-area-inset-bottom)); background: var(--bg); border-top: var(--line) solid var(--border); }
+.boot .skel__bar.boot__button { display: block; height: 56px; margin-bottom: 1rem; }
+.boot .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: .5rem; margin: 0 0 1rem; }
+.boot .skel__bar.boot__tile { height: 64px; }
+@media (max-width: 959px) { .boot__tabs { display: block; } }
+@media (min-width: 960px) {
+  .boot__nav { display: grid; align-content: start; gap: .4rem; flex: 0 0 15rem; padding: 1.5rem .75rem; box-sizing: border-box; }
+  .boot .skel__bar.boot__navitem { height: 56px; }
+}
+/* Same two columns as the real home page (app.css, from 1200px) */
+@media (min-width: 1200px) {
+  .boot__home { --col: 66rem; }
+  .boot .tiles { grid-template-columns: 1fr; gap: .6rem; }
+  .boot .skel__bar.boot__tile { height: 72px; }
+}
 body:has(#main) .boot { display: none; }
 
 /* On a phone the guide card sits at the bottom, so the page needs room to scroll the lit-up thing above it */

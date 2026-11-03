@@ -27,20 +27,55 @@
 
 <body>
     <div class="boot" aria-hidden="true">
-        <span class="skel__bar skel__bar--title"></span>
-        @* Lists get rows, everything else gets a reading shape, so the first look matches the page that arrives. *@
-        @if (IsListPath)
-        {
-            <ul class="rows">
-                @for (var i = 0; i < 3; i++)
+        @* The same frame the real page gets (header, side bar or tab bar, page column), so nothing moves when the page arrives. *@
+        <div class="site-header"><span class="brand"><Logo /> <span class="brand__word">Backstop</span></span></div>
+        <div class="shell">
+            @if (HasNav)
+            {
+                <div class="boot__nav">
+                    @for (var i = 0; i < 5; i++) { <span class="skel__bar boot__navitem"></span> }
+                </div>
+            }
+            <div class="page @(IsHelper ? "page--wide" : "") @(IsHome ? "boot__home" : "")">
+                <span class="skel__bar skel__bar--title"></span>
+                @* Each kind of page gets its own shape, so the first look matches the page that arrives. *@
+                @if (IsHome)
                 {
-                    <li class="row"><span class="skel__pic"></span><span class="row__main skel__lines"><span class="skel__bar skel__bar--short"></span><span class="skel__bar"></span></span></li>
+                    <div class="home">
+                        <div class="home__side">
+                            <span class="skel__bar boot__button"></span>
+                            <div class="tiles">
+                                @for (var i = 0; i < 4; i++) { <span class="skel__bar boot__tile"></span> }
+                            </div>
+                        </div>
+                        <div class="home__list">
+                            <ul class="rows">
+                                @for (var i = 0; i < 3; i++)
+                                {
+                                    <li class="row"><span class="skel__pic"></span><span class="row__main skel__lines"><span class="skel__bar skel__bar--short"></span><span class="skel__bar"></span></span></li>
+                                }
+                            </ul>
+                        </div>
+                    </div>
                 }
-            </ul>
-        }
-        else
+                else if (IsListPath)
+                {
+                    <ul class="rows">
+                        @for (var i = 0; i < 3; i++)
+                        {
+                            <li class="row"><span class="skel__pic"></span><span class="row__main skel__lines"><span class="skel__bar skel__bar--short"></span><span class="skel__bar"></span></span></li>
+                        }
+                    </ul>
+                }
+                else
+                {
+                    <div class="skel__panel"><span class="skel__bar"></span><span class="skel__bar"></span><span class="skel__bar"></span><span class="skel__bar skel__bar--short"></span></div>
+                }
+            </div>
+        </div>
+        @if (HasNav)
         {
-            <div class="skel__panel"><span class="skel__bar"></span><span class="skel__bar"></span><span class="skel__bar"></span><span class="skel__bar skel__bar--short"></span></div>
+            <div class="boot__tabs"></div>
         }
     </div>
     <Routes @rendermode="PageRenderMode" TimeZone="@HttpContext?.Request.Cookies["backstop.tz"]" />
@@ -61,7 +96,13 @@
     private static readonly IComponentRenderMode InteractiveNoPrerender = new InteractiveServerRenderMode(prerender: false);
 
     private static readonly string[] ListPaths = ["", "messages", "stories", "remember", "contacts", "sent", "helper", "helper/messages", "helper/history"];
-    private bool IsListPath => ListPaths.Contains((HttpContext?.Request.Path.Value ?? "").Trim('/').ToLowerInvariant());
+    // Pages with no side bar or tab bar: sign-in, the demo panel and the welcome walkthroughs.
+    private static readonly string[] NoNavPaths = ["login", "demo-start", "demo", "welcome", "helper/welcome"];
+    private string Path => (HttpContext?.Request.Path.Value ?? "").Trim('/').ToLowerInvariant();
+    private bool IsListPath => ListPaths.Contains(Path);
+    private bool IsHome => Path == "home";
+    private bool IsHelper => Path == "helper" || Path.StartsWith("helper/");
+    private bool HasNav => !NoNavPaths.Contains(Path);
 
     // The sign-in page is plain server-rendered HTML (its form posts to /account/login); everything else is interactive.
     private IComponentRenderMode? PageRenderMode =>
