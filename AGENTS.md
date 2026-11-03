@@ -9,11 +9,9 @@ Core idea
 Backstop holds every incoming message until it is checked. The user never sees held mail. Anything unclear goes to a trusted helper, who approves, blocks, or asks the user to "call them first".
 
 Release status (hackathon)
-Production ends 3 Nov 2026. Submission is 4 Nov 2026. Feature freeze: midday 3 Nov.
+Production ends 3 Nov 2026. Submission is 4 Nov 2026.
 Priorities in order: (1) live URL works, (2) Supabase persistence, (3) Standard helper tier enforced, (4) polish and demo video.
-Do not build (out of scope for this release): Administrator tier, SendAsUser, INotificationChannel (email/SMS/push to helpers), Welcome step "Who helps you", full Helper access settings screen, real mail provider integration, per-visitor households (stretch only, and only if everything above is done).
-After the freeze, only fix bugs. No new features, no refactors.
-Hard rules
+Do not build (out of scope for this release): Administrator tier, SendAsUser, INotificationChannel (email/SMS/push to helpers), Welcome step "Who helps you", full Helper access settings screen, real mail provider integration, per-visitor households (stretch only, and only if everything above is done).Hard rules
 Synthetic data only. All people, messages and domains are made up. Use only example.com, example.net, example.org and .test. Never use real names, addresses or real brands' domains. Only made-up messages are inspected or stored.
 No secrets in the repo. No API keys, tokens or passwords committed. .env.example holds empty placeholders only. Real values live in the untracked .env locally and in the host's environment variables in production. Names:
 META_AI_KEY, META_AI_ENDPOINT_URL, META_AI_MODEL, META_AI_TIMEOUT_SECONDS
