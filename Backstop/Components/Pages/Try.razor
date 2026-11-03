@@ -1,0 +1,128 @@
+@page "/try"
+@layout TryLayout
+@inject IMailService Mail
+
+<PageTitle>Try it – Backstop</PageTitle>
+
+<h1>Try it</h1>
+<p class="lead">Paste an email, or pick an example. See what Backstop would do with it.</p>
+
+<div class="try-samples" role="group" aria-label="Examples">
+    @foreach (var s in Mail.TrySamples)
+    {
+        <button type="button" class="btn btn-quiet try-sample" disabled="@_busy" @onclick="() => UseSample(s)">@s.Label</button>
+    }
+</div>
+
+<form class="try-form" @onsubmit="Check">
+    <fieldset class="try-mode">
+        <legend>This email is</legend>
+        <label class="try-mode__opt"><input type="radio" name="mode" checked="@(!_outgoing)" @onchange="() => _outgoing = false" /> <span>Coming in</span></label>
+        <label class="try-mode__opt"><input type="radio" name="mode" checked="@_outgoing" @onchange="() => _outgoing = true" /> <span>Going out</span></label>
+    </fieldset>
+    <div class="field">
+        <label for="try-from">@(_outgoing ? "To" : "From")</label>
+        <input id="try-from" type="text" @bind="_from" maxlength="300" autocomplete="off" />
+    </div>
+    <div class="field">
+        <label for="try-subject">Subject</label>
+        <input id="try-subject" type="text" @bind="_subject" maxlength="200" autocomplete="off" />
+    </div>
+    <div class="field">
+        <label for="try-body">Message</label>
+        <textarea id="try-body" @bind="_body" maxlength="4500"></textarea>
+    </div>
+    @if (_problem is not null)
+    {
+        <p class="form-error" role="alert">@_problem</p>
+    }
+    <div class="actions">
+        <button type="submit" class="btn btn-primary" disabled="@_busy"><Icon Name="inspect" /> Check it</button>
+    </div>
+</form>
+
+@if (_busy)
+{
+    <LoadingState Text="Checking it…" />
+}
+else if (_result is { } r)
+{
+    <section class="card try-result" aria-labelledby="try-verdict" tabindex="-1" @ref="_resultBox">
+        <p>
+            <span class="badge badge--@Kind(r)"><Icon Name="@IconFor(r)" /><span>@Word(r)</span></span>
+        </p>
+        <h2 id="try-verdict">@Headline(r)</h2>
+        <p>@r.Explanation</p>
+
+        @if (r.Signals.Count > 0)
+        {
+            <h3>What was flagged</h3>
+            <ul class="plain-list try-signals">
+                @foreach (var s in r.Signals)
+                {
+                    <li><strong>@s.Title</strong>@if (s.Detail.Length > 0){<span> @s.Detail</span>}</li>
+                }
+            </ul>
+        }
+
+        <h3>What your trusted helper sees</h3>
+        <p>@r.HelperSees</p>
+
+        <div class="actions">
+            <ReadAloudButton Text="@Speech(r)" />
+        </div>
+    </section>
+}
+
+@code {
+    private bool _outgoing, _busy, _focusResult;
+    private string _from = "", _subject = "", _body = "";
+    private string? _problem;
+    private TryResult? _result;
+    private ElementReference _resultBox;
+
+    private async Task UseSample(TrySample s)
+    {
+        _outgoing = s.Outgoing;
+        _from = s.Mail.FromName + " <" + s.Mail.FromAddress + ">";
+        _subject = s.Mail.Subject;
+        _body = s.Mail.Body;
+        await Check();
+    }
+
+    private async Task Check()
+    {
+        if (_busy) return;
+        _busy = true;
+        _problem = null;
+        _result = null;
+        StateHasChanged();
+        try
+        {
+            var r = await Mail.TryCheckAsync(new InboundMail(_from, _from, _subject, _body), _outgoing);
+            if (r.Problem is not null) _problem = r.Problem;
+            else { _result = r; _focusResult = true; }
+        }
+        catch (Exception)
+        {
+            // Fail closed: an error is never shown as Safe.
+            _result = new TryResult(TryVerdict.Held, false, [], "Couldn't verify, so this would be held.", "Your helper would look at it first.");
+            _focusResult = true;
+        }
+        finally { _busy = false; }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_focusResult || _result is null) return;
+        _focusResult = false;
+        try { await _resultBox.FocusAsync(); } catch (Exception) { }
+    }
+
+    private static string Kind(TryResult r) => r.Verdict switch { TryVerdict.Safe when r.Verified => "safe", TryVerdict.Blocked => "block", _ => "check" };
+    private static string IconFor(TryResult r) => r.Verdict switch { TryVerdict.Safe when r.Verified => "check", TryVerdict.Blocked => "cross", _ => "hourglass" };
+    private static string Word(TryResult r) => !r.Verified ? "Held for helper" : r.Verdict switch { TryVerdict.Safe => "Safe", TryVerdict.Blocked => "Blocked", _ => "Held for helper" };
+    private static string Headline(TryResult r) => !r.Verified ? "Couldn't verify, so this would be held."
+        : r.Verdict switch { TryVerdict.Safe => "Backstop would let this through.", TryVerdict.Blocked => "Backstop would block this.", _ => "Backstop would hold this for a helper." };
+    private static string Speech(TryResult r) => $"{Headline(r)} {(r.Verified ? r.Explanation : "")} {r.HelperSees}";
+}

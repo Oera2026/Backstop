@@ -726,3 +726,16 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 .tourcard__trail { list-style: none; margin: 0 0 .5rem; padding: 0; display: flex; flex-wrap: wrap; gap: .25rem; }
 .tourcard__place { padding: .1rem .55rem; border-radius: 999px; font-size: calc(.8rem * var(--tx, 1)); font-weight: 700; color: var(--text-2); border: 1px solid var(--rule); }
 .tourcard__place--on { background: var(--navy); color: var(--on-navy); border-color: var(--navy); font-weight: 800; }
+
+/* Try it: the public page for judges. White, one blue accent, one column. */
+.page--try { max-width: 44rem; margin-inline: auto; }
+.try-samples { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: .6rem; margin: 0 0 1.5rem; }
+.try-sample { justify-content: center; text-align: center; }
+.try-mode { border: 0; padding: 0; margin: 0 0 1.25rem; display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; }
+.try-mode legend { font-weight: 800; padding: 0; margin-bottom: .3rem; }
+.try-mode__opt { display: inline-flex; align-items: center; gap: .6rem; min-height: 56px; font-weight: 600; }
+.try-mode__opt input { width: 1.6rem; height: 1.6rem; accent-color: var(--navy); }
+.try-result h3 { font-size: calc(1.05rem * var(--tx)); margin: 1.25rem 0 .3rem; }
+.try-signals { display: block; overflow-wrap: anywhere; }
+@media (max-width: 480px) { .try-samples { grid-template-columns: 1fr 1fr; } }
+.login-try { margin: .75rem 0 0; } .login-try .btn { width: 100%; justify-content: center; }

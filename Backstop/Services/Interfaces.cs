@@ -46,6 +46,15 @@ public interface IMailService
     // --- Demo support ---
     IReadOnlyList<Scenario> Scenarios { get; }
 
+    /// <summary>Made-up examples for the public Try it page.</summary>
+    IReadOnlyList<TrySample> TrySamples { get; }
+
+    /// <summary>
+    /// The public Try it page: runs the same checks as real mail on one pasted email (incoming) or draft (outgoing) and says
+    /// what Backstop would do. Keeps nothing and opens no link. No Meta answer is always Held, never Safe.
+    /// </summary>
+    Task<TryResult> TryCheckAsync(InboundMail mail, bool outgoing, CancellationToken ct = default);
+
     /// <summary>
     /// Runs the checking pipeline for a demo scenario. <paramref name="onTier"/> is called when a tier starts
     /// (status Running) and when it finishes. Any error ends in Failed -> Held.

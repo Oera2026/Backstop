@@ -1,6 +1,6 @@
 # PROJECT STATE & ARCHITECTURE REPORT
 
-Generated 2026-11-01 from commit `2dc315c` (branch `main`, clean tree, 21 commits).
+Generated 2026-11-01 from commit `2dc315c`. Updated 2026-11-03: the public Try it page (`/try`) is added (section 4). Other sections still describe 1 Nov and are partly out of date (sign-in cookies, the Render deployment and the Dockerfile now exist; Supabase persistence is still not wired).
 
 ## 1. Executive Summary & Core Stack
 
@@ -46,12 +46,12 @@ Meta Hackathon/
     │       └── LlamaScamCheckerTests.cs   Custom test runner (not xUnit)
     ├── Components/
     │   ├── App.razor, Routes.razor, _Imports.razor
-    │   ├── Layout/ (UserLayout, HelperLayout, DemoLayout, WelcomeLayout, AppNav, ReconnectModal)
+    │   ├── Layout/ (UserLayout, HelperLayout, DemoLayout, WelcomeLayout, TryLayout, AppNav, ReconnectModal)
     │   ├── Pages/User/   Home, Inbox, MessageView, Compose, Sent(View), Contacts, ContactEdit, Calendar(New),
     │   │                 Search, Check(+ResultView), Explain(+View), ShowMe, GuideView, Remember, MemoryView,
     │   │                 Stories, StoryNew, StoryView, MakeSense, AskMe, Messages, Conversation, Help, Welcome
     │   ├── Pages/Helper/ Queue, Evidence, CheckReview, StoryReview, HelperMessages, HelperSettings
-    │   ├── Pages/Demo/DemoPanel.razor   Pages/Settings.razor, Error, NotFound
+    │   ├── Pages/Demo/DemoPanel.razor   Pages/Try.razor (public /try)   Pages/Settings.razor, Error, NotFound
     │   ├── Helper/ ActivityLog, CheckQueue, EvidenceCard, SharedMemories, StoryQueue
     │   ├── Demo/PipelineTimeline.razor
     │   └── Shared/       StatusBadge, VerdictCard, Icon, ReadAloudButton, ChatLog/Composer, CameraCapture,
@@ -64,7 +64,7 @@ Roughly 4,000 lines of C# in `Services/` and `Models/`, about 100 Razor componen
 
 ## 3. Architecture & Data Flow
 
-- **System Architecture:** Browser <-> SignalR circuit (Blazor Server) <-> Razor pages. Pages talk only to `IMailService`, `IGuardianService`, `IBackstopApi` (AGENTS rule 7). Mock singletons implement them over in-memory stores. `MetaAiScamChecker` and `MetaAssistant` (typed `HttpClient`, no redirects, no cookies) call Meta. Singleton `Changed` events plus `LiveComponentBase` push live updates between the user, helper, and demo views, which are the same server process (the demo's split screen uses iframes of `/` and `/helper`). Routes: `/` user, `/helper` helper, `/demo` demo panel.
+- **System Architecture:** Browser <-> SignalR circuit (Blazor Server) <-> Razor pages. Pages talk only to `IMailService`, `IGuardianService`, `IBackstopApi` (AGENTS rule 7). Mock singletons implement them over in-memory stores. `MetaAiScamChecker` and `MetaAssistant` (typed `HttpClient`, no redirects, no cookies) call Meta. Singleton `Changed` events plus `LiveComponentBase` push live updates between the user, helper, and demo views, which are the same server process (the demo's split screen uses iframes of `/` and `/helper`). Routes: `/` user, `/helper` helper, `/demo` demo panel, `/try` public check-an-email page.
 - **Mail pipeline:** `Received -> Scanning -> (Cleared | Held | Blocked)`. Any error or unknown state becomes `Failed -> Held` (fail closed). The pipeline runs 4 tiers (Rules, Meta AI, Link check, Policy); no timings are shown or invented. Only `Cleared` is returned by `GetInbox` and `GetClearedMessage`. `Blocked` is final and invisible to the user.
 - **Floor rule:** Local checks (`MockRiskRules`, `InputGuard`) set a minimum. Meta's verdict can only be stricter (`LooksSafe -> BeCareful -> DontReply`), never looser. Failure or timeout means held.
 - **Data Models:** `MailMessage` (state, flags, links as defanged text, tiers, helper decision), `Scenario` (7 synthetic emails), `Contact`, `CalendarEvent`, `SentMessage`, `HeldOutgoing`, `HelperNotice`. In `Modes.cs`: `CheckResult`, `Guide`, `Explanation`, `MemoryCard`, `ReviewItem`, `Household`. Also `Story`, `ChatThread`/`ChatMessage`/`HeldChat`, `AskTurn`, and `HelperPermissions` (flags enum: RiskAlerts and ReviewHeldMail form an always-on floor, then SeeCheckRequests, SeeSharedMemories, SeeActivitySummary, SeeClearedMail, SeeFullActivity, SendAsUser, SeeChats). Tiers: Minimal and Standard only; Standard is the default and the ceiling (clamped in the guardian service).
@@ -80,6 +80,7 @@ Roughly 4,000 lines of C# in `Services/` and `Models/`, about 100 Razor componen
 - Real Meta AI scam checker with tests. Ask Me AI with escalation.
 - Helper permission model (`Permissions.cs`) and `HelperAccess` get/set on the API. It gates chat-log reading (`GetChatLogAsync` throws unless allowed).
 - Demo panel with 7 scenarios, a "make the checker crash" toggle, and split screen.
+- **Public Try it page (`/try`, no sign-in):** for hackathon judges. A pasted or sample email (6 one-click examples) gets a verdict (Blocked, Held for helper, Safe), flagged signals, a plain AI explanation and a "what your helper sees" line. It calls `IMailService.TryCheckAsync` (`MockMailService.Try.cs`), which runs the same `MailAnalyzer`, Meta checker and `CheckOutgoing` as real mail but stores nothing, never opens links (defanged text only), caps input at 5,000 letters and 6 checks a minute per visitor, and holds (never Safe) when Meta AI gives no answer. Samples are in `Services/TryData.cs`; layout `TryLayout.razor`; page `Pages/Try.razor`; linked from `/login` and the README. Tests: block 31 in `--test-llama`.
 - Theme "Calm Clinical": CSS variables in `theme.css` only, 20px base, Atkinson Next font, 56px buttons, 3px focus ring, reduced-motion support, and read-aloud via `speechSynthesis`. `StatusBadge` combines icon, word, and colour. Welcome flow with text size and colour steps.
 - Design decisions: no self-explaining UI text, no lock or shield decoration, and no UI framework.
 

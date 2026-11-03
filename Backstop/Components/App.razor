@@ -97,7 +97,7 @@
 
     private static readonly string[] ListPaths = ["", "messages", "stories", "remember", "contacts", "sent", "helper", "helper/messages", "helper/history"];
     // Pages with no side bar or tab bar: sign-in, the demo panel and the welcome walkthroughs.
-    private static readonly string[] NoNavPaths = ["login", "demo-start", "demo", "welcome", "helper/welcome"];
+    private static readonly string[] NoNavPaths = ["login", "demo-start", "demo", "welcome", "helper/welcome", "try"];
     private string Path => (HttpContext?.Request.Path.Value ?? "").Trim('/').ToLowerInvariant();
     private bool IsListPath => ListPaths.Contains(Path);
     private bool IsHome => Path == "home";

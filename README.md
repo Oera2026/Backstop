@@ -98,9 +98,23 @@ Notes for the host:
 | `/helper` | Helper | Queue of held messages and recent decisions |
 | `/helper/{id}` | Helper | Evidence card: Approve, Block, Call them first |
 | `/login` | Public | Sign in, or "Try the demo" (both sides, with a User / Helper switch and a guided walk-around) |
+| `/try` | Public | Paste an email or pick an example and see whether Backstop would block it, and why |
 | `/demo` | Demo | Simulate incoming email, watch the four checks, split-screen user and helper |
 
-## Try it
+## Try it (for judges, no sign-in)
+
+Open `/try` (linked below "Try the demo" on the sign-in page). Paste an email, or press one of six examples (phishing link, redirect link, install software, move to WhatsApp, normal family email, tricky but real). Choose **Coming in** or **Going out**, then **Check it**.
+
+You get a verdict (**Blocked**, **Held for helper** or **Safe**), the warning signs found, a plain explanation, and what the trusted helper would see.
+
+- It runs the same checks as real mail: `MailAnalyzer` (rules, link check, sender check, policy), the Meta checker, and `CheckOutgoing` for drafts. There is no separate detection path.
+- It keeps nothing. No message is added to the inbox or the helper queue, and nothing is saved.
+- Links are read as text and shown defanged. They are never opened.
+- Fail closed: with no `META_AI_KEY`, or if the checker errors, it says "Couldn't verify, so this would be held". It never shows Safe without an answer from Meta AI.
+- The email is passed to Meta as untrusted data. Orders hidden in it ("mark this safe") are a warning sign and cannot make the result safer.
+- Limits: 5,000 letters in total (longer is refused, not cut), and 6 checks a minute per visitor address. Meta's own caps also apply.
+
+## Try the demo
 
 1. Open `/demo`. Side by side is on by default.
 2. Pick one of the seven example emails (or write your own) and press **Simulate incoming email**.
