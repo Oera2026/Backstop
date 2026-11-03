@@ -468,3 +468,7 @@ input.is-locked { background: var(--surface); border-style: dashed; cursor: not-
 .sender-checks { list-style: none; padding: 0; margin: 0 0 .5rem; display: grid; gap: 1rem; }
 .sender-check { display: grid; gap: .35rem; justify-items: start; }
 .sender-check__text { color: var(--text-2); font-size: calc(.9rem * var(--tx)); font-weight: 600; overflow-wrap: anywhere; }
+
+/* Read aloud / Stop on explanation cards */
+.readaloud { min-height: 56px; }
+.readaloud[aria-pressed="true"] { background: var(--navy); color: var(--on-navy); }

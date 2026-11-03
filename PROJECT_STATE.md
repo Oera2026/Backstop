@@ -133,3 +133,10 @@ Roughly 4,000 lines of C# in `Services/` and `Models/`, about 100 Razor componen
 - Demo: scenarios 8 to 11 (`mum-new-address`, `lookalike-bank`, `reply-to-mismatch`, `contact-new-address`) and four matching `/try` examples. They use made-up stand-ins only (`freemail.example.net`, the fictional brand Northbank at `northbank.test`), because the hard rules allow no real domains in messages. The detection lists do name real brands and free providers; they are compared as text and never sent anywhere.
 - Same-company rule: a saved contact's name from another address at the same non-free domain (reception@ vs reminders@) fires nothing. On a free provider it does.
 - Tests: `Services/SenderCheckTests.cs` (block 33 of `--test-llama`). Note: example.* domains count as one registrable name each, so Reply-To tests across different `example.*` endings or `.test` names are used.
+
+## 9. Read aloud on explanation cards (added 2026-11-03)
+
+- `Components/Shared/ReadAloud.razor`: "Read aloud" / "Stop" button (`aria-pressed`, `aria-label`, `btn-quiet`, 56px). Uses the browser's `speechSynthesis` only, through `backstop.canSpeak` and `backstop.speakWithEnd` in `wwwroot/js/backstop.js` (prefers an en-GB voice, rate from the voice-speed setting, default 0.9). Hidden when the text is empty or the browser cannot speak. Stops when a new result replaces the text, and when the component is disposed (navigation).
+- Used on: the `/try` result card (explanation + "what your helper sees" line), `VerdictCard` (the AI explanation on Check results and the helper's check review), the helper evidence card (summary + next step, not the flags, signals or rules score) and the helper queue's "Next up" alert.
+- The older `ReadAloudButton` ("Read this to me", for message text) is unchanged.
+- Tests: `Services/ReadAloudTests.cs` (block 34 of `--test-llama`). No bUnit in the project, so it uses Blazor's `Renderer` with a fake `IJSRuntime`: renders, hides (empty or unsupported), toggles, resets when speech ends, stops on new text and on dispose.

@@ -1108,6 +1108,9 @@ public class LlamaScamCheckerTests
         // 33. Sender check: impersonation signals, held when High, fed to the AI as evidence, shown on /try and to the helper.
         await SenderCheckTests.RunAsync();
 
+        // 34. Read aloud button: renders, hides, toggles, stops.
+        await ReadAloudTests.RunAsync();
+
         Console.WriteLine("\nALL TESTS PASSED SUCCESSFULLY.");
     }
 

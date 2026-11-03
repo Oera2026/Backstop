@@ -27,7 +27,7 @@
     }
 
     <p class="lead">@Message.Summary</p>
-    <div class="evidence__read"><ReadAloudButton Text="@($"{VerdictHead} {Message.Summary} {string.Join(' ', ShownFlags.Select(f => f.Title + ". " + f.Explanation))} {string.Join(' ', Message.SenderSignals.Select(s => s.Reason))}")" /></div>
+    <div class="evidence__read"><ReadAloud Text="@Speech" /></div>
 
     @if (ShownFlags.Count > 0)
     {
@@ -168,6 +168,9 @@
     [Parameter] public EventCallback OnRescan { get; set; }
 
     private bool _scanning;
+
+    // The explanation and the next step only, not the flags, the signals or the rules score.
+    private string Speech => string.IsNullOrWhiteSpace(Message.Summary) ? "" : $"{VerdictHead} {Message.Summary} {(Message.Concern == Concern.Strong ? "We suggest you block it." : "Please read it with care.")}";
 
     // The one-line sender flag is left out when the "Sender checks" card lists the signals in full.
     private List<Flag> ShownFlags => Message.SenderSignals.Count > 0

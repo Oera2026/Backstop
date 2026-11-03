@@ -11,6 +11,7 @@
             <h2>@Word</h2>
         }
         <p>@Reason</p>
+        <ReadAloud Text="@Speech" />
     </div>
 </div>
 
@@ -28,6 +29,7 @@
     };
 
     private string Word => WordFor(Verdict);
+    private string? Speech => string.IsNullOrWhiteSpace(Reason) ? null : $"{Word}. {Reason}";
     private string Kind => Verdict switch { Verdict.LooksSafe => "safe", Verdict.BeCareful => "careful", _ => "stop" };
     private string IconName => Verdict switch { Verdict.LooksSafe => "check", Verdict.BeCareful => "alert", _ => "hand" };
 }

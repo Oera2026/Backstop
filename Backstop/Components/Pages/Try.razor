@@ -136,7 +136,7 @@ else if (_result is { } r)
         <p>@r.HelperSees</p>
 
         <div class="actions">
-            <ReadAloudButton Text="@Speech(r)" />
+            <ReadAloud Text="@Speech(r)" />
         </div>
     </section>
 }
@@ -206,5 +206,6 @@ else if (_result is { } r)
     private static string Word(TryResult r) => !r.Verified ? "Held for helper" : r.Verdict switch { TryVerdict.Safe => "Safe", TryVerdict.Blocked => "Blocked", _ => "Held for helper" };
     private static string Headline(TryResult r) => !r.Verified ? "Couldn't verify, so this would be held."
         : r.Verdict switch { TryVerdict.Safe => "Backstop would let this through.", TryVerdict.Blocked => "Backstop would block this.", _ => "Backstop would hold this for a helper." };
-    private static string Speech(TryResult r) => $"{Headline(r)} {(r.Verified ? r.Explanation : "")} {string.Join(' ', r.SenderChecks?.Select(s => s.Reason) ?? [])} {r.HelperSees}";
+    // Only the plain explanation and the next step, never the signals.
+    private static string Speech(TryResult r) => $"{r.Explanation} {r.HelperSees}".Trim();
 }

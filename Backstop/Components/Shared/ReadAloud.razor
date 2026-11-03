@@ -1,0 +1,68 @@
+@* Reads an AI explanation out loud with the browser's own speech (no network). Read aloud / Stop. Hidden when there is
+   nothing to read or the browser cannot speak. Pass only the plain explanation and the next step, never the signals list. *@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+@if (!string.IsNullOrWhiteSpace(Text) && _supported)
+{
+    <button type="button" class="btn btn-quiet readaloud" aria-pressed="@(_speaking ? "true" : "false")"
+            aria-label="@(_speaking ? "Stop reading aloud" : "Read aloud")" @onclick="Toggle">
+        <Icon Name="@(_speaking ? "cross" : "speaker")" /> <span>@(_speaking ? "Stop" : "Read aloud")</span>
+    </button>
+}
+
+@code {
+    /// <summary>The plain-English explanation and the "what to do" line.</summary>
+    [Parameter] public string? Text { get; set; }
+
+    private bool _supported, _speaking;
+    private string? _spoken;
+    private DotNetObjectReference<ReadAloud>? _self;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // A new result replaced the old one: stop reading the old one.
+        if (_speaking && Text != _spoken) await StopAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try { _supported = await JS.InvokeAsync<bool>("backstop.canSpeak"); }
+        catch (Exception) { _supported = false; } // no JS, no speech: the button stays hidden
+        if (_supported) StateHasChanged();
+    }
+
+    private async Task Toggle()
+    {
+        if (_speaking) { await StopAsync(); return; }
+        try
+        {
+            _self ??= DotNetObjectReference.Create(this);
+            _speaking = await JS.InvokeAsync<bool>("backstop.speakWithEnd", _self, Text);
+            _spoken = Text;
+        }
+        catch (Exception) { _speaking = false; }
+    }
+
+    /// <summary>Called by backstop.js when the speech finishes or is cut off.</summary>
+    [JSInvokable]
+    public void Ended()
+    {
+        _speaking = false;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task StopAsync()
+    {
+        _speaking = false;
+        try { await JS.InvokeVoidAsync("backstop.stop"); } catch (Exception) { }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        // Leaving the page stops the voice.
+        if (_speaking) await StopAsync();
+        _self?.Dispose();
+    }
+}

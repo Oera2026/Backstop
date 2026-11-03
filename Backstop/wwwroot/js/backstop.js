@@ -11,6 +11,26 @@ window.backstop = {
       el.scrollIntoView({ block: "end", behavior: calm ? "auto" : "smooth" });
     }));
   },
+  canSpeak() {
+    return 'speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined';
+  },
+  // Like speak, but tells the page when the voice ends (done, stopped, or replaced by another). Prefers an en-GB voice.
+  speakWithEnd(ref, text) {
+    if (!window.backstop.canSpeak()) return false;
+    const synth = window.speechSynthesis;
+    const id = (window.backstop._spk = (window.backstop._spk || 0) + 1);
+    synth.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'en-GB';
+    const voice = synth.getVoices().find(v => (v.lang || '').replace('_', '-').toLowerCase() === 'en-gb');
+    if (voice) u.voice = voice;
+    u.rate = window.backstopSettings ? window.backstopSettings.speechRate() : 0.9;
+    const done = () => { if (window.backstop._spk === id) ref.invokeMethodAsync('Ended').catch(() => {}); };
+    u.onend = done;
+    u.onerror = done;
+    synth.speak(u);
+    return true;
+  },
   speak(text) {
     if (!('speechSynthesis' in window)) return false;
     window.speechSynthesis.cancel();
