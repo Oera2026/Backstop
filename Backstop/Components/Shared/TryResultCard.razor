@@ -10,31 +10,32 @@
         <WatchForTip Tip="@Result.WatchFor" />
     }
 
-    @if (Result.Signals.Count > 0)
+    @{ var flagged = Flagged(Result); }
+    @if (flagged.Count > 0)
     {
-        <h3>What was flagged</h3>
+        <h3>What looked wrong</h3>
         <ul class="plain-list try-signals">
-            @foreach (var s in Result.Signals)
+            @foreach (var s in flagged)
             {
-                <li><strong>@s.Title</strong>@if (s.Detail.Length > 0){<span> @s.Detail</span>}</li>
+                <li><strong>@s.Title</strong>@if (s.Detail.Length > 0){<span class="try-signals__detail">@s.Detail</span>}</li>
             }
         </ul>
     }
 
     @if (Result.SenderChecks is { Count: > 0 })
     {
-        <h3>Sender checks</h3>
+        <h3>Who it is from</h3>
         <SenderChecks Signals="Result.SenderChecks" />
     }
 
     @if (Result.Links is { Count: > 0 })
     {
-        <h3>Links found</h3>
+        <h3>@(Result.Links.Count == 1 ? "The link" : "The links")</h3>
         @foreach (var l in Result.Links)
         {
             <div class="try-link">
                 <p><span class="badge badge--@LinkKind(l)"><Icon Name="@LinkIcon(l)" /><span>@LinkWord(l)</span></span></p>
-                <ol class="try-chain">
+                <ol class="try-chain@(l.Chain.Count <= 1 ? " try-chain--single" : "")">
                     @foreach (var hop in l.Chain)
                     {
                         <li>@hop.DefangedUrl <span class="try-chain__note">(@hop.Note)</span></li>
@@ -61,7 +62,7 @@
         }
     }
 
-    <h3>What your trusted helper sees</h3>
+    <h3>What your helper would see</h3>
     <p>@Result.HelperSees</p>
 
     <div class="actions">
@@ -91,9 +92,17 @@
 
     private static string Kind(TryResult r) => r.Verdict switch { TryVerdict.Safe when r.Verified => "safe", TryVerdict.Blocked => "block", _ => "check" };
     private static string IconFor(TryResult r) => r.Verdict switch { TryVerdict.Safe when r.Verified => "check", TryVerdict.Blocked => "cross", _ => "hourglass" };
-    private static string Word(TryResult r) => !r.Verified ? "Held for helper" : r.Verdict switch { TryVerdict.Safe => "Safe", TryVerdict.Blocked => "Blocked", _ => "Held for helper" };
-    private static string Headline(TryResult r) => !r.Verified ? "Couldn't verify, so this would be held."
+    // Same wording as the user's own screens: a message that is not safe or blocked is being checked by the helper.
+    private static string Word(TryResult r) => !r.Verified ? "Your helper checks it" : r.Verdict switch { TryVerdict.Safe => "Safe", TryVerdict.Blocked => "Blocked", _ => "Your helper checks it" };
+    // An unverified answer is a hold, so it says the same as any hold. The reason line underneath says why.
+    private static string Headline(TryResult r) => !r.Verified ? "Backstop would hold this for a helper."
         : r.Verdict switch { TryVerdict.Safe => "Backstop would let this through.", TryVerdict.Blocked => "Backstop would block this.", _ => "Backstop would hold this for a helper." };
+
+    // Each link's own signals are listed with that link, so they are not listed twice here.
+    private static IReadOnlyList<TrySignal> Flagged(TryResult r) =>
+        r.Links is { Count: > 0 } links
+            ? r.Signals.Where(s => !links.Any(l => s.Title == "Link " + l.StartUrl)).ToList()
+            : r.Signals;
     // Only the plain explanation and the next step, never the signals.
     private static string Speech(TryResult r) => $"{r.Explanation} {r.HelperSees}".Trim();
 }

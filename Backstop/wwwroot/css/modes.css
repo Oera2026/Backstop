@@ -762,3 +762,5 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 .try-chain { margin: .25rem 0 .5rem; padding-left: 1.4rem; overflow-wrap: anywhere; }
 .try-chain__note { font-weight: 700; }
 .try-link__final { margin: 0 0 .5rem; overflow-wrap: anywhere; }
+.try-signals__detail { display: block; }
+.try-chain--single { list-style: none; padding-left: 0; }
