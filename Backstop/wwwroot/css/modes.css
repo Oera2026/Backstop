@@ -746,7 +746,8 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
   .try-head { grid-area: head; }
   .try-head h1 { margin-bottom: .25rem; }
   .try-head > :last-child { margin-bottom: .75rem; }
-  .try-samples { grid-area: samples; grid-template-columns: 1fr 1fr; margin: 0; gap: .5rem; }
+  /* Two columns of examples. The page-level selector is needed to beat the general .try-samples rule further down. */
+  .page--try .try-samples { grid-area: samples; grid-template-columns: 1fr 1fr; margin: 0; gap: .5rem; }
   .try-samples .btn { padding-inline: .5rem; }
   .try-mailform { grid-area: mail; }
   .try-linkform { grid-area: link; margin-top: 1.5rem; }
