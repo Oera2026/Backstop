@@ -142,7 +142,9 @@ public static class WatchForTests
         }
         var noKey = new MockMailService(new MailStore(), null) { TryGuard = new MetaCallGuard(100000, null, 100000) };
         var unverified = await noKey.TryCheckAsync(noKey.TrySamples.First(s => s.Id == "family").Mail, false);
-        Assert(unverified.Verdict == TryVerdict.Held && !string.IsNullOrWhiteSpace(unverified.WatchFor), "/try: could not verify is held and has a tip");
+        Assert(unverified.Verdict == TryVerdict.Held && unverified.WatchFor is null, "/try: a checker failure alone is held with no tip");
+        var unverifiedMum = await noKey.TryCheckAsync(noKey.TrySamples.First(s => s.Id == "mum").Mail, false);
+        Assert(unverifiedMum.Verdict == TryVerdict.Held && !string.IsNullOrWhiteSpace(unverifiedMum.WatchFor), "/try: a checker failure with a real local warning still has a tip about that warning");
         var heldDraft = await noKey.TryCheckAsync(new InboundMail("Me", "friend@example.org", "Bank", "My PIN is 1234 and my password is hunter2"), true);
         Assert(heldDraft.Verdict == TryVerdict.Held && !string.IsNullOrWhiteSpace(heldDraft.WatchFor), "/try: a held draft has a tip");
 

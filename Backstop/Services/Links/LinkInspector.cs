@@ -75,48 +75,66 @@ public sealed partial class LinkInspector : ILinkInspector
         },
     });
 
+    /// <summary>
+    /// What a link check found, in three tiers. Info is harmless and never raises the verdict (a shortener, a redirect, a hop count).
+    /// Medium holds the message (a shortener or redirect that ends somewhere we do not know). High is dangerous.
+    /// </summary>
+    private sealed class Found
+    {
+        public readonly List<string> High = [], Medium = [], Info = [];
+        public bool SawShortener;
+    }
+
+    // Links in shop mail can be several hundred letters long with tracking in them. Only an absurd length is worth a word.
+    private const int MaxJudgedLength = 2000;
+
     public async Task<LinkReport> InspectAsync(string url, string? shownText = null, CancellationToken ct = default)
     {
         var raw = (url ?? "").Trim();
         var start = raw.Contains("://") ? raw : "https://" + raw;
         var shownStart = Shown(raw);
-        var signals = new List<string>();
+        var found = new Found();
         var chain = new List<LinkHop>();
-        var strong = false;
-        var warn = false;
-
-        // What the address alone gives away. Same rules as real mail.
-        var (addressSignals, problem, disguised) = LinkFinder.Judge(raw);
-        if (problem) { signals.AddRange(addressSignals); warn = true; strong |= disguised; }
 
         if (!Uri.TryCreate(start, UriKind.Absolute, out var uri) || string.IsNullOrEmpty(uri.Host))
-            return Fail(shownStart, chain, signals, "The address is not a proper web address.");
+            return Fail(shownStart, chain, found, "The address is not a proper web address.");
 
         var startHost = uri.IdnHost.ToLowerInvariant();
-        if (HasMismatch(shownText, startHost, null, out var mismatch)) { signals.Add(mismatch!); strong = true; warn = true; }
 
         if (SkipReservedExamples && IpGuard.IsReservedExample(startHost))
         {
+            JudgeHop(uri, found);
+            if (HasMismatch(shownText, startHost, startHost, out var exampleMismatch)) found.High.Add(exampleMismatch!);
             chain.Add(new LinkHop(Shown(uri.AbsoluteUri), "not opened"));
-            return Done(shownStart, null, chain, signals, strong, warn, verified: false, fetched: false,
+            return Done(shownStart, null, chain, found, verified: false, fetched: false, trusted: null,
                 "Example address: only the address was checked.", unsafeIfUnverified: false);
         }
 
         var current = uri;
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var redirects = 0;
+
+        // Every way out of the loop that is not a finished check. Whatever was found on the way is kept.
+        LinkReport Bail(string why)
+        {
+            if (HasMismatch(shownText, startHost, current.IdnHost.ToLowerInvariant(), out var m)) found.High.Add(m!);
+            return Fail(shownStart, chain, found, why);
+        }
+
         while (true)
         {
+            // Every hop is judged, not only the last: a step that is not secure or is a bare number is a warning wherever it sits.
+            JudgeHop(current, found);
             var refusal = IpGuard.RefuseUrl(current) ?? await RefuseResolvedAsync(current, ct);
             if (refusal is not null)
             {
                 chain.Add(new LinkHop(Shown(current.AbsoluteUri), "blocked"));
-                return Fail(shownStart, chain, signals, refusal, strong, warn);
+                return Bail(refusal);
             }
             if (!seen.Add(current.AbsoluteUri))
             {
                 chain.Add(new LinkHop(Shown(current.AbsoluteUri), "blocked"));
-                return Fail(shownStart, chain, signals, "The link goes round in a circle.", strong, warn);
+                return Bail("The link goes round in a circle.");
             }
 
             using var hop = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -133,69 +151,85 @@ public sealed partial class LinkInspector : ILinkInspector
                 {
                     chain.Add(new LinkHop(Shown(current.AbsoluteUri), "redirects"));
                     if (++redirects > MaxRedirects)
-                        return Fail(shownStart, chain, signals, "The link sends you on too many times.", strong, warn);
+                        return Bail("The link sends you on too many times.");
                     current = location.IsAbsoluteUri ? location : new Uri(current, location);
                     continue;
                 }
 
                 chain.Add(new LinkHop(Shown(current.AbsoluteUri), "final page"));
+                var finalHost = current.IdnHost.ToLowerInvariant();
+                var trusted = TrustedDomains.Match(finalHost);
+
                 var contentType = response.Content.Headers.ContentType?.MediaType?.ToLowerInvariant() ?? "";
                 var disposition = response.Content.Headers.ContentDisposition?.DispositionType?.ToLowerInvariant();
                 var isDownload = ExecutableTypes.Contains(contentType) || disposition == "attachment"
                     || DownloadExtensions.Contains(Path.GetExtension(current.AbsolutePath).ToLowerInvariant());
                 if (isDownload)
-                {
-                    signals.Add("It starts a download of a program or a packed file.");
-                    strong = true; warn = true;
-                }
+                    found.High.Add("It starts a download of a program or a packed file.");
                 else if (contentType is "" or "text/html" or "application/xhtml+xml")
                 {
                     // Read as text and looked through. Never run, never drawn.
                     var text = await ReadCappedAsync(response.Content, hop.Token);
-                    if (PasswordBox().IsMatch(text)) { signals.Add("The page asks for a password."); warn = true; }
+                    // A sign-in box is expected on a well-known site. On any other site it is a warning.
+                    if (PasswordBox().IsMatch(text) && trusted is null) found.High.Add("The page asks for a password.");
                 }
 
-                var finalHost = current.IdnHost.ToLowerInvariant();
-                if (redirects > 0 && !SameSite(startHost, finalHost))
-                {
-                    signals.Add($"It sends you to a different website: {Shown(current.AbsoluteUri)}");
-                    warn = true;
-                }
+                // The words shown for the link against the website it really reaches. The only "different website" warning there is.
+                if (HasMismatch(shownText, startHost, finalHost, out var mismatch)) found.High.Add(mismatch!);
+
                 if (redirects > 0)
-                {
-                    var (finalSignals, finalProblem, finalDisguised) = LinkFinder.Judge(current.AbsoluteUri);
-                    if (finalProblem)
-                    {
-                        foreach (var s in finalSignals) if (!signals.Contains(s)) signals.Add(s);
-                        warn = true; strong |= finalDisguised;
-                    }
-                    if (HasMismatch(shownText, startHost, finalHost, out var m2) && !signals.Contains(m2!)) { signals.Add(m2!); strong = true; warn = true; }
-                }
+                    found.Info.Add($"It passes through {redirects} other address{(redirects == 1 ? "" : "es")} on the way.");
+
+                // A shortener or a redirect that ends somewhere we do not know is worth a helper's eyes. Ending at a known site is not.
+                if (trusted is null && (found.SawShortener || (redirects > 0 && TrustedDomains.Registrable(startHost) != TrustedDomains.Registrable(finalHost))))
+                    found.Medium.Add($"It ends at a website we do not recognise: {Shown(current.AbsoluteUri)}");
 
                 if (_reputation is not null)
                 {
                     try
                     {
                         var listed = await _reputation.CheckAsync([uri.AbsoluteUri, current.AbsoluteUri], ct);
-                        if (listed.Count > 0) { signals.AddRange(listed); strong = true; warn = true; }
+                        if (listed.Count > 0) found.High.AddRange(listed);
                     }
                     catch (Exception ex) when (!ct.IsCancellationRequested) { _logger?.LogWarning("Reputation lookup failed ({Type}). Skipped.", ex.GetType().Name); }
                 }
 
-                return Done(shownStart, Shown(current.AbsoluteUri), chain, signals, strong, warn, verified: true, fetched: true,
-                    warn ? (strong ? "Looks dangerous." : "Be careful with this one.") : "No warning signs found.", unsafeIfUnverified: true);
+                return Done(shownStart, Shown(current.AbsoluteUri), chain, found, verified: true, fetched: true, trusted,
+                    summary: null, unsafeIfUnverified: true);
             }
             catch (OperationCanceledException) when (!ct.IsCancellationRequested)
             {
                 chain.Add(new LinkHop(Shown(current.AbsoluteUri), "no answer"));
-                return Fail(shownStart, chain, signals, "It took too long to answer.", strong, warn);
+                return Bail("It took too long to answer.");
             }
             catch (Exception ex) when (ex is HttpRequestException or IOException or UriFormatException or SocketException or InvalidOperationException)
             {
                 // The detail can hold the address, so only the kind of error is logged.
                 _logger?.LogInformation("Link check could not open a link ({Type}).", ex.GetType().Name);
                 chain.Add(new LinkHop(Shown(current.AbsoluteUri), "no answer"));
-                return Fail(shownStart, chain, signals, "It could not be reached.", strong, warn);
+                return Bail("It could not be reached.");
+            }
+        }
+    }
+
+    // What one address gives away on its own, sorted into the three tiers.
+    private static void JudgeHop(Uri hop, Found found)
+    {
+        if (hop.Scheme != Uri.UriSchemeHttps) found.High.Add($"A step on the way is not secure: {Shown(hop.AbsoluteUri)}");
+        foreach (var note in LinkFinder.Judge(hop.AbsoluteUri, MaxJudgedLength).Signals)
+        {
+            switch (note)
+            {
+                case LinkFinder.NotSecureNote: break; // said above, once, for every hop
+                case LinkFinder.ShortenerNote:
+                    found.SawShortener = true;
+                    found.Info.Add("It is a shortened link, so Backstop followed it to see where it goes.");
+                    break;
+                case LinkFinder.RiskyWordsNote:
+                case LinkFinder.VeryLongNote:
+                    found.Medium.Add(note);
+                    break;
+                default: found.High.Add(note); break;
             }
         }
     }
@@ -231,19 +265,30 @@ public sealed partial class LinkInspector : ILinkInspector
         return Encoding.UTF8.GetString(ms.GetBuffer(), 0, (int)ms.Length);
     }
 
-    private static LinkReport Fail(string start, List<LinkHop> chain, List<string> signals, string why, bool strong = false, bool warn = false)
+    private static LinkReport Fail(string start, List<LinkHop> chain, Found found, string why)
     {
-        signals.Add(why);
-        return Done(start, null, chain, signals, strong, warn, verified: false, fetched: false, "Could not verify, treated as unsafe.", unsafeIfUnverified: true);
+        found.High.Add(why);
+        return Done(start, null, chain, found, verified: false, fetched: false, trusted: null, "Could not verify, treated as unsafe.", unsafeIfUnverified: true);
     }
 
-    private static LinkReport Done(string start, string? final, List<LinkHop> chain, List<string> signals, bool strong, bool warn,
-        bool verified, bool fetched, string summary, bool unsafeIfUnverified)
+    // High is dangerous, Medium is "be careful" (held), Info never counts. A well-known final site with no High signal is fine,
+    // and then even a Medium note (a sign-in word in the address) is only information.
+    private static LinkReport Done(string start, string? final, List<LinkHop> chain, Found found, bool verified, bool fetched,
+        string? trusted, string? summary, bool unsafeIfUnverified)
     {
-        var verdict = strong || (!verified && unsafeIfUnverified) ? LinkVerdict.Unsafe : warn ? LinkVerdict.Suspicious : LinkVerdict.NoWarnings;
-        return new LinkReport(start, final, chain, signals.Distinct().ToList(), verdict, verified, fetched, summary);
-    }
+        var high = found.High.Distinct().ToList();
+        var medium = found.Medium.Distinct().ToList();
+        var info = found.Info.Distinct().ToList();
+        var knownSite = verified && trusted is not null && high.Count == 0;
+        if (knownSite) { info.AddRange(medium); medium.Clear(); }
 
+        var verdict = high.Count > 0 || (!verified && unsafeIfUnverified) ? LinkVerdict.Unsafe : medium.Count > 0 ? LinkVerdict.Suspicious : LinkVerdict.NoWarnings;
+        summary ??= knownSite ? $"Looks fine: goes to {trusted}."
+            : verdict == LinkVerdict.Unsafe ? "Looks dangerous."
+            : verdict == LinkVerdict.Suspicious ? "Be careful with this one."
+            : "No warning signs found.";
+        return new LinkReport(start, final, chain, high.Concat(medium).ToList(), verdict, verified, fetched, summary, info, knownSite ? trusted : null);
+    }
     private static string Shown(string url) => Defang.Url(url.Length > LinkFinder.MaxLength ? url[..LinkFinder.MaxLength] : url);
 
     // "mybank.example.com" shown, "evil.example.net" reached. Compared as names, so www. and sub-sites are not a mismatch.
@@ -258,6 +303,7 @@ public sealed partial class LinkInspector : ILinkInspector
         if (!Uri.TryCreate(candidate, UriKind.Absolute, out var shownUri)) return false;
         var shownHost = shownUri.IdnHost.ToLowerInvariant();
         var goesTo = finalHost ?? startHost;
+        // Words that honestly name the link itself (a shortener written out) are not a trick.
         if (SameName(shownHost, goesTo) || SameName(shownHost, startHost)) return false;
         message = $"The link says {Defang.Url(shownRaw)} but it goes to {Defang.Url(goesTo)}.";
         return true;
@@ -268,12 +314,6 @@ public sealed partial class LinkInspector : ILinkInspector
         a = a.StartsWith("www.") ? a[4..] : a;
         b = b.StartsWith("www.") ? b[4..] : b;
         return a == b || a.EndsWith("." + b) || b.EndsWith("." + a);
-    }
-
-    private static bool SameSite(string a, string b)
-    {
-        static string Tail(string h) { var p = h.Split('.'); return p.Length <= 2 ? h : string.Join('.', p[^2..]); }
-        return SameName(a, b) || Tail(a) == Tail(b);
     }
 
     private static readonly HashSet<string> ExecutableTypes =

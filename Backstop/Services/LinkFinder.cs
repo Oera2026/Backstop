@@ -57,9 +57,16 @@ public static class LinkFinder
     }
 
     /// <summary>Returns the address signals that fired (empty when none did), whether any is a problem, and whether the address is disguised.</summary>
-    public static (IReadOnlyList<string> Signals, bool Problem, bool Disguised) Judge(string raw)
+    public const string ShortenerNote = "It is a shortened link, so the real website is hidden.";
+    public const string NotSecureNote = "It is not a secure page.";
+    public const string RiskyWordsNote = "The address mentions signing in, downloading or a prize.";
+    public const string VeryLongNote = "The address is very long.";
+
+    /// <param name="maxLength">Real mail uses <see cref="MaxLength"/>. The Link check on /try allows longer ones, because shop and
+    /// tracking links are often several hundred letters long and that alone says nothing.</param>
+    public static (IReadOnlyList<string> Signals, bool Problem, bool Disguised) Judge(string raw, int maxLength = MaxLength)
     {
-        if (raw.Length > MaxLength) return (["The address is very long."], true, true);
+        if (raw.Length > maxLength) return ([VeryLongNote], true, true);
 
         var hasScheme = raw.Contains("://");
         var candidate = hasScheme ? raw : "http://" + raw;
@@ -78,14 +85,14 @@ public static class LinkFinder
         if (host.Contains("xn--"))
         { notes.Add("It uses look-alike letters."); disguised = true; }
         if (ShortenerHosts.Any(s => bare == s || bare.EndsWith("." + s)) || ShortenerLabels.Contains(bare.Split('.')[0]))
-        { notes.Add("It is a shortened link, so the real website is hidden."); disguised = true; }
+        { notes.Add(ShortenerNote); disguised = true; }
         if (hasScheme && uri.Scheme == Uri.UriSchemeHttp)
-            notes.Add("It is not a secure page.");
+            notes.Add(NotSecureNote);
         if (RiskyWords.IsMatch(host + uri.AbsolutePath))
-            notes.Add("The address mentions signing in, downloading or a prize.");
+            notes.Add(RiskyWordsNote);
 
         // A plain http page alone is not enough to worry about.
-        var problem = notes.Any(n => n != "It is not a secure page.");
+        var problem = notes.Any(n => n != NotSecureNote);
         return (notes, problem, disguised);
     }
 }

@@ -89,6 +89,22 @@ public static partial class MailAnalyzer
     }
 
     /// <summary>
+    /// For the public Try it page only. The links were opened, so what the Link check found replaces the guess made from the address
+    /// alone (a shortener is no longer "hidden" once we know where it goes). Whether a link is bad is decided from the reports by the
+    /// caller; here only the address-only link warnings are taken out, and a disguised link is kept for the "block" rule.
+    /// </summary>
+    public static Analysis WithInspectedLinks(Analysis a, IReadOnlyList<LinkReport> reports)
+    {
+        if (reports.Count == 0) return a;
+        var deceptive = reports.Any(r => r.Disguised);
+        var flags = a.Flags.Where(f => f.Title is not ("The link hides where it goes" or "The link looks unusual")).ToList();
+        var ids = a.SignalIds.Where(i => i is not ("link-hidden" or "link-odd")).ToList();
+        if (deceptive) ids.Add("link-hidden");
+        var tier = new TierResult("Link check", reports.Any(r => r.Verdict != LinkVerdict.NoWarnings) ? TierStatus.Flagged : TierStatus.Passed,
+            $"{reports.Count} link{(reports.Count == 1 ? "" : "s")} opened and checked.");
+        return a with { Links = [], LinkProblems = 0, DeceptiveLink = deceptive, LinkTier = tier, Flags = flags, SignalIds = ids };
+    }
+    /// <summary>
     /// The sender signals as plain sentences for the AI. They are Backstop's own wording about the headers, not the sender's,
     /// and they can only make the AI's answer stricter.
     /// </summary>

@@ -19,4 +19,15 @@ public sealed record LinkReport(
     LinkVerdict Verdict,
     bool Verified,
     bool Fetched,
-    string Summary);
+    string Summary,
+    // Harmless facts (a shortener, a hop count). They never change the verdict. Signals holds only what raises it.
+    IReadOnlyList<string>? Info = null,
+    // The well-known site the link ends at, when every hop was clean. Set means "Looks fine: goes to <domain>".
+    string? TrustedDomain = null)
+{
+    /// <summary>True when what was found is a disguise: a bare number, look-alike letters, a name in front of the address, words that name another site, or a hidden destination.</summary>
+    public bool Disguised => Signals.Any(s =>
+        s.Contains("number instead of a website name") || s.Contains("look-alike") || s.Contains("name in front of the address")
+        || s.StartsWith("The link says") || s.Contains("do not recognise"));
+}
+

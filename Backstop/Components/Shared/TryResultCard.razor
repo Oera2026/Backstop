@@ -4,7 +4,10 @@
         <span class="badge badge--@Kind(Result)"><Icon Name="@IconFor(Result)" /><span>@Word(Result)</span></span>
     </p>
     <h2 id="try-verdict">@Headline(Result)</h2>
-    <p>@Result.Explanation</p>
+    @if (Result.Verified)
+    {
+        <p>@Result.Explanation</p>
+    }
     @if (Result.Verdict != TryVerdict.Safe || !Result.Verified)
     {
         <WatchForTip Tip="@Result.WatchFor" />
@@ -58,6 +61,15 @@
                         }
                     </ul>
                 }
+                @if (l.Info is { Count: > 0 })
+                {
+                    <ul class="plain-list try-signals try-info">
+                        @foreach (var s in l.Info)
+                        {
+                            <li>@s</li>
+                        }
+                    </ul>
+                }
             </div>
         }
     }
@@ -85,6 +97,7 @@
     private static string LinkIcon(LinkReport l) => l.Verdict switch { LinkVerdict.NoWarnings => "check", LinkVerdict.Suspicious => "hourglass", _ => "cross" };
     private static string LinkWord(LinkReport l) => l.Verdict switch
     {
+        LinkVerdict.NoWarnings when l.TrustedDomain is not null => "Looks fine: goes to " + l.TrustedDomain,
         LinkVerdict.NoWarnings => l.Fetched ? "No warning signs" : "No warning signs in the address",
         LinkVerdict.Suspicious => "Be careful",
         _ => l.Verified ? "Looks dangerous" : "Could not verify, treated as unsafe",
@@ -95,7 +108,8 @@
     // Same wording as the user's own screens: a message that is not safe or blocked is being checked by the helper.
     private static string Word(TryResult r) => !r.Verified ? "Your helper checks it" : r.Verdict switch { TryVerdict.Safe => "Safe", TryVerdict.Blocked => "Blocked", _ => "Your helper checks it" };
     // An unverified answer is a hold, so it says the same as any hold. The reason line underneath says why.
-    private static string Headline(TryResult r) => !r.Verified ? "Backstop would hold this for a helper."
+    // When the checker failed, that is what the headline says. Anything found about the links is listed below as information.
+    private static string Headline(TryResult r) => !r.Verified ? "We couldn't finish checking this email, so it's being held to be safe."
         : r.Verdict switch { TryVerdict.Safe => "Backstop would let this through.", TryVerdict.Blocked => "Backstop would block this.", _ => "Backstop would hold this for a helper." };
 
     // Each link's own signals are listed with that link, so they are not listed twice here.
@@ -104,5 +118,5 @@
             ? r.Signals.Where(s => !links.Any(l => s.Title == "Link " + l.StartUrl)).ToList()
             : r.Signals;
     // Only the plain explanation and the next step, never the signals.
-    private static string Speech(TryResult r) => $"{r.Explanation} {r.HelperSees}".Trim();
+    private static string Speech(TryResult r) => $"{(r.Verified ? r.Explanation : Headline(r))} {r.HelperSees}".Trim();
 }

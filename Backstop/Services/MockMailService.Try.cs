@@ -15,6 +15,9 @@ public sealed partial class MockMailService
     // A check on this page costs a Meta call, so each visitor gets a few a minute. The call to Meta has its own caps too.
     internal MetaCallGuard TryGuard { get; set; } = new(limit: 600, visitorLimit: 6);
 
+    /// <summary>All the links in one message share this much time. Each hop is also capped at 5 seconds by the inspector.</summary>
+    internal TimeSpan LinkBudget { get; set; } = TimeSpan.FromSeconds(12);
+
     // Opening a link costs a request to somewhere else, so it has its own, tighter cap per visitor.
     internal MetaCallGuard LinkGuard { get; set; } = new(limit: 300, visitorLimit: 12);
 
@@ -81,15 +84,22 @@ public sealed partial class MockMailService
         var reports = new List<LinkReport>();
         if (linkInspector is null) return (reports, 0);
         var links = LinkInspector.ExtractLinks(text);
+        // The whole link check has one budget, so a slow chain of redirects can never use up the time the AI check needs afterwards.
+        // Any link still open when it runs out is "could not verify", which holds the message exactly as before.
+        using var budget = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        budget.CancelAfter(LinkBudget);
         var tasks = links.Take(LinkInspector.MaxLinksChecked).Select(async l =>
         {
             try
             {
                 if (!LinkGuard.TryEnter(ClientIdentity.Current ?? "unknown", out _, out _, out _))
                     return Unchecked(l.Url, "There have been a lot of link checks. Please try again in a minute.");
-                return await linkInspector.InspectAsync(l.Url, l.Shown, ct);
+                return await linkInspector.InspectAsync(l.Url, l.Shown, budget.Token);
             }
-            catch (Exception) when (!ct.IsCancellationRequested) { return Unchecked(l.Url, "It could not be checked."); }
+            catch (Exception) when (!ct.IsCancellationRequested)
+            {
+                return Unchecked(l.Url, budget.IsCancellationRequested ? "It took too long to check." : "It could not be checked.");
+            }
         }).ToList();
         reports.AddRange(await Task.WhenAll(tasks));
         return (reports, Math.Max(0, links.Count - LinkInspector.MaxLinksChecked));
@@ -105,7 +115,9 @@ public sealed partial class MockMailService
         var list = reports.Select(r =>
         {
             var trip = r.Chain.Count > 1 ? $" It goes through {r.Chain.Count} addresses and ends at {r.FinalUrl ?? "an unknown place"}." : "";
-            return $"Link {r.StartUrl}: {r.Summary} {string.Join(" ", r.Signals)}{trip}".Trim();
+            // Harmless notes are labelled, so the checker does not take a shortener or a redirect for a warning.
+            var harmless = r.Info is { Count: > 0 } ? $" Harmless notes: {string.Join(" ", r.Info)}" : "";
+            return $"Link {r.StartUrl}: {r.Summary} {string.Join(" ", r.Signals)}{trip}{harmless}".Trim();
         }).ToList();
         if (notChecked > 0) list.Add($"{notChecked} more link{(notChecked == 1 ? " was" : "s were")} not checked, so treat {(notChecked == 1 ? "it" : "them")} as unsafe.");
         return list;
@@ -127,6 +139,9 @@ public sealed partial class MockMailService
     private async Task<TryResult> TryIncomingCoreAsync(MailAnalyzer.Analysis analysis, string subject, string body, CancellationToken ct)
     {
         var (reports, notChecked) = await InspectLinksAsync($"{subject}\n{body}", ct);
+        // The links were opened, so what was found replaces the guess made from the address alone. Without that, a harmless shortener
+        // would still be called "hidden" and hold the message by itself, however clean the trip turned out to be.
+        analysis = MailAnalyzer.WithInspectedLinks(analysis, reports);
         var ai = await AskMetaAsync(subject, body, reports.Count > 0 ? Findings(reports, notChecked) : [], ct, MailAnalyzer.SenderFindings(analysis));
         // Same decision as real mail. With no AI answer it is Held, as a real message would be.
         var decision = MailAnalyzer.Decide(analysis, ai);
@@ -141,9 +156,18 @@ public sealed partial class MockMailService
 
         // "Next time, watch for…" for anything that is not Safe: the checker's tip if clean, else the fixed one. Safe gets none.
         var tipIds = analysis.SignalIds.Concat(ai?.Flags.Select(f => f.Id) ?? []).Concat(linkBad ? ["link"] : []).ToList();
-        TryResult Tipped(TryResult r) => r.Verdict == TryVerdict.Safe && r.Verified
-            ? r
-            : r with { WatchFor = decision.WatchFor ?? WatchFor.Choose(ai?.WatchFor, tipIds, r.Explanation) };
+        // The tip comes from a signal that fired. Harmless link notes (a shortener, a redirect) never fire one. When the checker
+        // itself failed, that is a hold with no lesson in it: a tip is shown only if a real warning was found by the local checks.
+        TryResult Tipped(TryResult r)
+        {
+            if (r.Verdict == TryVerdict.Safe && r.Verified) return r;
+            if (ai is null)
+            {
+                var fired = analysis.SignalIds.Concat(linkBad ? ["link"] : []).ToList();
+                return fired.Count == 0 ? r : r with { WatchFor = WatchFor.Fallback(fired) };
+            }
+            return r with { WatchFor = decision.WatchFor ?? WatchFor.Choose(ai.WatchFor, tipIds, r.Explanation) };
+        }
 
         if (ai is null)
             return Tipped(new(TryVerdict.Held, false, signals, "Couldn't verify, so this would be held.",
@@ -184,7 +208,7 @@ public sealed partial class MockMailService
 
         if (ai is null)
             return new(TryVerdict.Held, false, signals, "Couldn't verify, so this would be held.",
-                "Your helper would check it before anything is sent.", WatchFor: WatchFor.Tips["private"]);
+                "Your helper would check it before anything is sent.", WatchFor: check.NeedsPause ? WatchFor.Tips["private"] : null);
         if (check.NeedsPause || aiWorried)
             return new(TryVerdict.Held, true, signals,
                 aiWorried && !string.IsNullOrWhiteSpace(ai.Reason) ? ai.Reason : "This looks like something private, so it is best to check first.",

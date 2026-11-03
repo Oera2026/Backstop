@@ -3,6 +3,8 @@ using System.Net;
 using System.Text;
 using Microsoft.Extensions.Configuration;
 using Backstop.Models;
+using Backstop.Services;
+using Backstop.Services.Api;
 using Backstop.Services.Links;
 
 namespace Backstop.Tests;
@@ -174,7 +176,7 @@ public static class LinkCheckTests
         {
             var (insp, _) = Make((_, _) => Task.FromResult(Html("<form><input name=u><INPUT TYPE='password' name=p></form>")));
             var r = await insp.InspectAsync("https://bank.example.com/");
-            Assert(r.Verified && r.Verdict == LinkVerdict.Suspicious && r.Signals.Contains("The page asks for a password."), "A password box is flagged");
+            Assert(r.Verified && r.Verdict == LinkVerdict.Unsafe && r.Signals.Contains("The page asks for a password."), "A password box on a site that is not a known brand is high");
         }
 
         // ---- The page is read up to 1 MB and no further ----
@@ -216,7 +218,7 @@ public static class LinkCheckTests
             var puny = await insp.InspectAsync("https://xn--pypal-4ve.example.com/");
             Assert(puny.Verdict == LinkVerdict.Unsafe && puny.Signals.Any(s => s.Contains("look-alike")), "Look-alike letters are flagged");
             var shortener = await insp.InspectAsync("https://bit.ly/abc");
-            Assert(shortener.Verdict == LinkVerdict.Unsafe && shortener.Signals.Any(s => s.Contains("shortened")), "A shortener is flagged");
+            Assert(shortener.Verdict == LinkVerdict.Suspicious && shortener.Signals.Any(s => s.Contains("do not recognise")) && shortener.Info!.Any(s => s.Contains("shortened")) && !shortener.Signals.Any(s => s.Contains("shortened")), "A shortener that ends somewhere unknown is medium; the shortener itself is only information");
             var mismatch = await insp.InspectAsync("https://evil.example.net/x", "www.mybank.example.com");
             Assert(mismatch.Verdict == LinkVerdict.Unsafe && mismatch.Signals.Any(s => s.Contains("says") && s.Contains("[.]")), "Link text that names another site is flagged, defanged");
             var same = await insp.InspectAsync("https://www.mybank.example.com/x", "mybank.example.com");
@@ -224,7 +226,7 @@ public static class LinkCheckTests
 
             var (hop, _) = Make((req, _) => Task.FromResult(req.RequestUri!.Host == "go.example.com" ? Redirect("https://other.example.net/landing") : Html("<p>x</p>")));
             var moved = await hop.InspectAsync("https://go.example.com/a");
-            Assert(moved.Verdict == LinkVerdict.Suspicious && moved.Signals.Any(s => s.Contains("different website")) && moved.FinalUrl == "hxxps://other[.]example[.]net/landing", "A redirect to another website is reported, defanged");
+            Assert(moved.Verdict == LinkVerdict.Suspicious && moved.Signals.Any(s => s.Contains("do not recognise")) && !moved.Signals.Any(s => s.Contains("different website")) && moved.FinalUrl == "hxxps://other[.]example[.]net/landing", "A redirect to an unknown website is medium, reported defanged, and never says 'different website' without link text to compare");
 
             // Optional blocklists: a hit makes it unsafe; a failure or silence changes nothing.
             var (listed, _) = Make((_, _) => Task.FromResult(Html("<p>x</p>")), reputation: new StubReputation(() => ["Google Safe Browsing lists this address as dangerous."]));
@@ -253,6 +255,123 @@ public static class LinkCheckTests
             Assert((await insp.InspectAsync("https://bit.ly/x")).Verdict == LinkVerdict.Unsafe, "A shortener stays unsafe");
         }
 
+        // ---- Severity tiers, the trusted list, and the email that was wrongly called dangerous ----
+        {
+            // tinyurl -> viglink -> amazon, with a long tracking address on the end. Real names are used only here, as the list under test.
+            static HttpResponseMessage Trip(HttpRequestMessage req, string end) => req.RequestUri!.Host switch
+            {
+                "tinyurl.com" => Redirect("https://redirect.viglink.com/?key=abc&u=" + new string('u', 300)),
+                "redirect.viglink.com" => Redirect(end),
+                _ => Html("<p>shop</p>"),
+            };
+            var longAmazon = "https://www.amazon.co.uk/dp/B000000000/ref=" + new string('x', 400);
+
+            var (good, _) = Make((req, _) => Task.FromResult(Trip(req, longAmazon)));
+            var fine = await good.InspectAsync("https://tinyurl.com/y8abc123");
+            Assert(fine.Verified && fine.Verdict == LinkVerdict.NoWarnings && fine.TrustedDomain == "amazon.co.uk" && fine.Signals.Count == 0
+                && fine.Summary == "Looks fine: goes to amazon.co.uk.", "A shortener and an affiliate redirect that end at a trusted site look fine");
+            Assert(fine.Info!.Any(s => s.Contains("shortened")) && fine.Info!.Any(s => s.Contains("passes through 2")), "The shortener and the hops are information only");
+
+            // The link text names the same site it reaches: no mismatch.
+            Assert((await good.InspectAsync("https://tinyurl.com/y8abc123", "www.amazon.co.uk/deal")).Verdict == LinkVerdict.NoWarnings, "Link text that names the real destination is fine");
+
+            // A shortener to a look-alike domain is high.
+            var (lookalike, _) = Make((req, _) => Task.FromResult(Trip(req, "https://xn--pypal-4ve.example.com/login")));
+            var bad = await lookalike.InspectAsync("https://tinyurl.com/y8abc123");
+            Assert(bad.Verdict == LinkVerdict.Unsafe && bad.TrustedDomain is null && bad.Signals.Any(s => s.Contains("look-alike")), "A look-alike final domain is high");
+
+            // Suffix tricks are not trusted.
+            foreach (var host in new[] { "amazon.co.uk.evil.example.net", "notamazon.co.uk", "evil-amazon.co.uk", "amazon.co.uk-login.example.net", "sites.google.com", "xn--amazon-9ya.co.uk", "93.184.216.34" })
+                Assert(TrustedDomains.Match(host) is null, $"Not trusted: {host}");
+            foreach (var host in new[] { "amazon.co.uk", "www.amazon.co.uk", "smile.amazon.co.uk", "www.gov.uk", "accounts.google.com", "WWW.PAYPAL.COM." })
+                Assert(TrustedDomains.Match(host) is not null, $"Trusted: {host}");
+            Assert(TrustedDomains.All.Count is >= 45 and <= 70, "About fifty trusted domains");
+            var (suffix, _) = Make((req, _) => Task.FromResult(Trip(req, "https://amazon.co.uk.evil.example.net/")));
+            var trick = await suffix.InspectAsync("https://tinyurl.com/y8abc123");
+            Assert(trick.TrustedDomain is null && trick.Verdict == LinkVerdict.Suspicious && trick.Signals.Any(s => s.Contains("do not recognise")), "amazon.co.uk.evil.example.net is not amazon.co.uk: medium");
+
+            // Link text that names one site while the link goes to another fires, even through a shortener.
+            var (toEvil, _) = Make((req, _) => Task.FromResult(Trip(req, "https://evil.example.net/x")));
+            var mismatch = await toEvil.InspectAsync("https://tinyurl.com/y8abc123", "www.amazon.co.uk");
+            Assert(mismatch.Verdict == LinkVerdict.Unsafe && mismatch.Signals.Any(s => s.Contains("The link says")), "Link text against destination mismatch fires");
+
+            // Every hop is checked: a step that is not secure is high, even when the last stop is trusted.
+            var (plainHop, _) = Make((req, _) => Task.FromResult(Trip(req, "http://www.amazon.co.uk/")));
+            var insecure = await plainHop.InspectAsync("https://tinyurl.com/y8abc123");
+            Assert(insecure.Verdict == LinkVerdict.Unsafe && insecure.TrustedDomain is null && insecure.Signals.Any(s => s.Contains("not secure")), "A hop that is not https is high, and nothing is trusted then");
+
+            // Information alone never raises it: a long address, a hop count, a redirect inside the same site.
+            var (same, _) = Make((req, _) => Task.FromResult(req.RequestUri!.Host == "shop.example.com" ? Redirect("https://www.shop.example.com/" + new string('q', 500)) : Html("<p>x</p>")));
+            var ok = await same.InspectAsync("https://shop.example.com/a");
+            Assert(ok.Verdict == LinkVerdict.NoWarnings && ok.Signals.Count == 0 && ok.Info!.Count > 0, "A redirect inside the same site, with a long address, is information only");
+            var (tld, _) = Make((req, _) => Task.FromResult(req.RequestUri!.Host == "alpha.co.uk" ? Redirect("https://beta.co.uk/") : Html("<p>x</p>")));
+            Assert((await tld.InspectAsync("https://alpha.co.uk/")).Verdict == LinkVerdict.Suspicious, "Two different co.uk sites are not the same site");
+
+            // A sign-in box on a trusted site is expected. On any other site it is high.
+            var (login, _) = Make((_, _) => Task.FromResult(Html("<input type=password>")));
+            Assert((await login.InspectAsync("https://accounts.google.com/")).Verdict == LinkVerdict.NoWarnings, "A password box on a known site is fine");
+            Assert((await login.InspectAsync("https://accounts.google.com.evil.example.net/")).Verdict == LinkVerdict.Unsafe, "A password box on a look-alike is high");
+        }
+
+        // ---- The whole email: the hard negative, and the checker failing on its own ----
+        {
+            var body = "Hi, the item on your list is cheaper this week.\n\n[See the offer](https://tinyurl.com/y8abc123)\n\nDeals team";
+            var mail = new InboundMail("Weekly Deals", "deals@newsletter.example.org", "Your list is on offer", body);
+            var (web, _) = Make((req, _) => Task.FromResult(req.RequestUri!.Host switch
+            {
+                "tinyurl.com" => Redirect("https://redirect.viglink.com/?key=abc"),
+                "redirect.viglink.com" => Redirect("https://www.amazon.co.uk/dp/B000000000/ref=" + new string('x', 400)),
+                _ => Html("<p>shop</p>"),
+            }));
+            MockMailService Svc(Backstop.Services.Api.IMetaScamChecker? meta) =>
+                new(new MailStore(), meta, web) { TryGuard = new MetaCallGuard(100000, null, 100000), LinkGuard = new MetaCallGuard(100000, null, 100000) };
+
+            // Hard negative for the eval set: a legitimate shortener, an affiliate redirect, a trusted shop. Expected: Safe, "Looks fine".
+            var safe = await Svc(new FixedMeta(new(Verdict.LooksSafe, "Looks like a normal message.", [], true))).TryCheckAsync(mail, false);
+            Assert(safe.Verdict == TryVerdict.Safe && safe.Verified && safe.WatchFor is null && safe.Links![0].TrustedDomain == "amazon.co.uk"
+                && safe.Signals.All(s => !s.Title.StartsWith("Link ")), "Eval hard negative: shortener, redirect, trusted shop is Safe and Looks fine");
+            var safeHtml = await RenderAsync(safe);
+            Assert(safeHtml.Contains("Looks fine: goes to amazon.co.uk") && !safeHtml.Contains("Looks dangerous") && !safeHtml.Contains("different website") && !safeHtml.Contains("Next time"),
+                "The card for the hard negative says it looks fine and shows no warning or tip");
+
+            // The checker fails. The headline says so. The link is information and is never blamed.
+            foreach (var meta in new Backstop.Services.Api.IMetaScamChecker?[] { null, new FixedMeta(new(Verdict.LooksSafe, "", [], false, "down")) })
+            {
+                var held = await Svc(meta).TryCheckAsync(mail, false);
+                Assert(held.Verdict == TryVerdict.Held && !held.Verified && held.WatchFor is null, "A failed checker holds the email and shows no tip");
+                Assert(held.Links![0].Verdict == LinkVerdict.NoWarnings && held.Signals.All(s => !s.Title.StartsWith("Link ")), "The trusted link is not listed as a problem");
+                var html = await RenderAsync(held);
+                Assert(html.Contains("We couldn't finish checking this email, so it's being held to be safe."), "The headline names the checker failure");
+                Assert(!html.Contains("Looks dangerous") && !html.Contains("different website") && !html.Contains("Next time") && !html.Contains("What looked wrong")
+                    && html.Contains("Looks fine: goes to amazon.co.uk"), "The link is information, not the reason");
+            }
+
+            // A real link warning during a checker failure is still listed, below the failure headline, with its own tip.
+            var (lookalikeWeb, _) = Make((_, _) => Task.FromResult(Html("<p>x</p>")));
+            var scary = new MockMailService(new MailStore(), null, lookalikeWeb) { TryGuard = new MetaCallGuard(100000, null, 100000), LinkGuard = new MetaCallGuard(100000, null, 100000) };
+            var down = await scary.TryCheckAsync(new InboundMail("Pat", "pat@example.org", "Hi", "See https://xn--pypal-4ve.example.com/login"), false);
+            var downHtml = await RenderAsync(down);
+            Assert(!down.Verified && downHtml.Contains("We couldn't finish checking this email") && downHtml.Contains("Looks dangerous") && down.WatchFor == WatchFor.Tips["link-hidden"],
+                "Checker failed and a link is truly bad: both are shown, the headline stays about the checker, the tip is about the link");
+
+            // The checker answers and is worried for its own reasons: a harmless shortener does not pick the tip.
+            var worried = await Svc(new FixedMeta(new(Verdict.BeCareful, "Take care.", [], true))).TryCheckAsync(mail, false);
+            Assert(worried.Verdict == TryVerdict.Held && worried.WatchFor != WatchFor.Tips["link"] && worried.WatchFor != WatchFor.Tips["link-hidden"], "Info-only link notes never choose the tip");
+
+            // An unknown destination behind a shortener holds the message, and the tip is about links.
+            var (unknownWeb, _) = Make((req, _) => Task.FromResult(req.RequestUri!.Host == "tinyurl.com" ? Redirect("https://landing.example.net/x") : Html("<p>x</p>")));
+            var unk = new MockMailService(new MailStore(), new FixedMeta(new(Verdict.LooksSafe, "Fine.", [], true)), unknownWeb) { TryGuard = new MetaCallGuard(100000, null, 100000), LinkGuard = new MetaCallGuard(100000, null, 100000) };
+            var medium = await unk.TryCheckAsync(mail, false);
+            Assert(medium.Verdict == TryVerdict.Held && medium.Verified && medium.WatchFor == WatchFor.Tips["link-hidden"], "A shortener to an unknown site holds the message with the hidden-link tip");
+
+            // A slow link check cannot use up the time for the AI check.
+            var (slow, _) = Make(async (_, ct) => { await Task.Delay(Timeout.Infinite, ct); return Html("never"); }, timeout: TimeSpan.FromSeconds(30));
+            var budgeted = new MockMailService(new MailStore(), new FixedMeta(new(Verdict.LooksSafe, "Fine.", [], true)), slow)
+            { TryGuard = new MetaCallGuard(100000, null, 100000), LinkGuard = new MetaCallGuard(100000, null, 100000), LinkBudget = TimeSpan.FromMilliseconds(300) };
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var late = await budgeted.TryCheckAsync(mail, false);
+            Assert(sw.Elapsed < TimeSpan.FromSeconds(5) && late.Verdict == TryVerdict.Held && late.Links![0].Verdict == LinkVerdict.Unsafe && !late.Links[0].Verified, "The link check has its own time budget and fails closed");
+        }
         // ---- Finding links, with the words shown for each ----
         {
             var found = LinkInspector.ExtractLinks("Click <a href=\"https://evil.example.net/x\">www.mybank.com</a> or [my bank](https://bad.example.org/y) or https://plain.example.com/z, and bit.ly/abc.");
@@ -261,6 +380,28 @@ public static class LinkCheckTests
         Console.WriteLine("PASS: Link check follows redirects safely, caps them, spots downloads, fails closed on timeouts and errors.");
     }
 
+
+    private sealed class FixedMeta(Backstop.Services.Api.MetaScamAnalysis answer) : Backstop.Services.Api.IMetaScamChecker
+    {
+        public Task<Backstop.Services.Api.MetaScamAnalysis> CheckScamAsync(string? text, byte[]? imageBytes = null, string? mimeType = null, CancellationToken ct = default) => Task.FromResult(answer);
+    }
+
+    private sealed class NoJs : Microsoft.JSInterop.IJSRuntime
+    {
+        public ValueTask<T> InvokeAsync<T>(string identifier, object?[]? args) => default;
+        public ValueTask<T> InvokeAsync<T>(string identifier, CancellationToken ct, object?[]? args) => default;
+    }
+
+    // Renders the result card the way the page does, with a fake browser, and returns its words as plain text.
+    private static async Task<string> RenderAsync(TryResult result)
+    {
+        var sp = new Microsoft.Extensions.DependencyInjection.ServiceCollection().AddSingleton<Microsoft.JSInterop.IJSRuntime>(new NoJs()).BuildServiceProvider();
+        await using var renderer = new Microsoft.AspNetCore.Components.Web.HtmlRenderer(sp, Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance);
+        var html = await renderer.Dispatcher.InvokeAsync(async () =>
+            (await renderer.RenderComponentAsync<Backstop.Components.Shared.TryResultCard>(
+                Microsoft.AspNetCore.Components.ParameterView.FromDictionary(new Dictionary<string, object?> { ["Result"] = result }))).ToHtmlString());
+        return System.Net.WebUtility.HtmlDecode(html);
+    }
     private static int web2Count;
 
     private static HttpResponseMessage WithAttachment(this HttpResponseMessage m)
