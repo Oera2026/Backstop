@@ -21,7 +21,9 @@ public static partial class MailAnalyzer
         bool SenderProblem,
         IReadOnlyList<SenderSignal> SenderSignals,
         TierResult RulesTier,
-        TierResult LinkTier);
+        TierResult LinkTier,
+        // Ids of the warning signs found, used to pick the "watch for" tip: rules ids, link-hidden / link-odd, sender.
+        IReadOnlyList<string> SignalIds);
 
     public sealed record Decision(
         MessageState State,
@@ -29,7 +31,9 @@ public static partial class MailAnalyzer
         Concern Concern,
         int RulesScore,
         IReadOnlyList<Flag> Flags,
-        TierResult PolicyTier);
+        TierResult PolicyTier,
+        // The "Next time, watch for…" tip. Null when the message is Cleared; never empty otherwise.
+        string? WatchFor = null);
 
     /// <summary>Title of the one-line flag a High sender signal adds. Screens that list the signals in full leave this flag out.</summary>
     public const string SenderFlagTitle = "The sender looks wrong";
@@ -76,8 +80,12 @@ public static partial class MailAnalyzer
         if (senderProblem)
             flags.Add(new Flag("user", SenderFlagTitle, senderSignals.First(s => s.Severity == SenderSeverity.High).Reason));
 
+        var signalIds = found.Select(f => f.Id).ToList();
+        if (deceptive) signalIds.Add("link-hidden"); else if (problems > 0) signalIds.Add("link-odd");
+        if (senderProblem) signalIds.Add("sender");
+
         var top = found.OrderByDescending(f => MockRiskRules.Weight(f.Id)).Select(f => MockRiskRules.BecauseFor(f.Id)).FirstOrDefault();
-        return new Analysis(flags, links, score, top, found.Any(f => f.Id == "at-risk"), deceptive, problems, senderProblem, senderSignals, rulesTier, linkTier);
+        return new Analysis(flags, links, score, top, found.Any(f => f.Id == "at-risk"), deceptive, problems, senderProblem, senderSignals, rulesTier, linkTier, signalIds);
     }
 
     /// <summary>
@@ -134,6 +142,9 @@ public static partial class MailAnalyzer
 
         var tier = new TierResult("Policy",
             state == MessageState.Cleared ? TierStatus.Passed : TierStatus.Flagged, note);
-        return new Decision(state, summary, concern, a.RulesScore, flags, tier);
+        // A tip for anything not cleared: the checker's if it is clean, else the fixed one for the strongest sign.
+        var ids = a.SignalIds.Concat(aiWorried ? ai!.Flags.Select(f => f.Id) : []).ToList();
+        var tip = state == MessageState.Cleared ? null : WatchFor.Choose(aiWorried ? ai!.WatchFor : null, ids, summary);
+        return new Decision(state, summary, concern, a.RulesScore, flags, tier, tip);
     }
 }

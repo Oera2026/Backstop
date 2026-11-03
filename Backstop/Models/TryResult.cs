@@ -19,7 +19,9 @@ public sealed record TryResult(
     string HelperSees,
     string? Problem = null,
     IReadOnlyList<LinkReport>? Links = null,
-    IReadOnlyList<SenderSignal>? SenderChecks = null)
+    IReadOnlyList<SenderSignal>? SenderChecks = null,
+    // "Next time, watch for…": one teaching sentence on a Held or Blocked result. Null on Safe.
+    string? WatchFor = null)
 {
     public static TryResult Refused(string problem) => new(TryVerdict.Held, false, [], "", "", problem);
 }

@@ -51,7 +51,9 @@ public sealed record CheckResult(
     bool CallRequested,
     DateTimeOffset CheckedAt,
     // Set when the automatic check could not finish: plain words plus technical detail.
-    FailureInfo? Failure = null);
+    FailureInfo? Failure = null,
+    // "Next time, watch for…": one teaching sentence when the result is not Looks safe or is held. Null otherwise.
+    string? WatchFor = null);
 
 // ---------- Show me ----------
 
@@ -137,6 +139,7 @@ public sealed record ReviewItem(
     IReadOnlyList<RiskFlag> Flags,
     string Reasoning,
     bool CallRequested,
-    DateTimeOffset At);
+    DateTimeOffset At,
+    string? WatchFor = null);
 
 public sealed record ActivityEntry(DateTimeOffset At, string Icon, string Text);

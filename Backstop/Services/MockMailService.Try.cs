@@ -139,9 +139,15 @@ public sealed partial class MockMailService
             signals.Add(new($"Link {r.StartUrl}", r.Summary));
         if (notChecked > 0) signals.Add(new("More links", $"{notChecked} more link{(notChecked == 1 ? " was" : "s were")} not checked, so they are treated as unsafe."));
 
+        // "Next time, watch for…" for anything that is not Safe: the checker's tip if clean, else the fixed one. Safe gets none.
+        var tipIds = analysis.SignalIds.Concat(ai?.Flags.Select(f => f.Id) ?? []).Concat(linkBad ? ["link"] : []).ToList();
+        TryResult Tipped(TryResult r) => r.Verdict == TryVerdict.Safe && r.Verified
+            ? r
+            : r with { WatchFor = decision.WatchFor ?? WatchFor.Choose(ai?.WatchFor, tipIds, r.Explanation) };
+
         if (ai is null)
-            return new(TryVerdict.Held, false, signals, "Couldn't verify, so this would be held.",
-                "Your helper would see it with any warnings found so far, and choose Approve, Block or Call them first.", Links: reports);
+            return Tipped(new(TryVerdict.Held, false, signals, "Couldn't verify, so this would be held.",
+                "Your helper would see it with any warnings found so far, and choose Approve, Block or Call them first.", Links: reports));
 
         var aiWorried = ai.Verdict != Verdict.LooksSafe || ai.NeedsHuman || ai.AtRisk;
         var state = decision.State == MessageState.Cleared && linkBad ? MessageState.Held : decision.State;
@@ -153,7 +159,7 @@ public sealed partial class MockMailService
                 ? (string.IsNullOrWhiteSpace(ai.Reason) ? decision.Summary : ai.Reason)
                 : decision.Summary;
 
-        return state switch
+        return Tipped(state switch
         {
             MessageState.Cleared => new(TryVerdict.Safe, true, signals, explanation,
                 "Nothing. It would go straight to your inbox.", Links: reports),
@@ -161,7 +167,7 @@ public sealed partial class MockMailService
                 "It would be in their Blocked list. You would never see it.", Links: reports),
             _ => new(TryVerdict.Held, true, signals, explanation,
                 "They would see it with these warnings, and choose Approve, Block or Call them first. You would not see it yet.", Links: reports),
-        };
+        });
     }
 
     private async Task<TryResult> TryOutgoingAsync(string to, string subject, string body, CancellationToken ct)
@@ -178,11 +184,12 @@ public sealed partial class MockMailService
 
         if (ai is null)
             return new(TryVerdict.Held, false, signals, "Couldn't verify, so this would be held.",
-                "Your helper would check it before anything is sent.");
+                "Your helper would check it before anything is sent.", WatchFor: WatchFor.Tips["private"]);
         if (check.NeedsPause || aiWorried)
             return new(TryVerdict.Held, true, signals,
                 aiWorried && !string.IsNullOrWhiteSpace(ai.Reason) ? ai.Reason : "This looks like something private, so it is best to check first.",
-                "They would check it first, and nothing would be sent until they say so.");
+                "They would check it first, and nothing would be sent until they say so.",
+                WatchFor: WatchFor.Choose(ai.WatchFor, ["private"], aiWorried ? ai.Reason : null));
         return new(TryVerdict.Safe, true, signals, string.IsNullOrWhiteSpace(ai.Reason) ? "Nothing unusual found." : ai.Reason,
             "Nothing. It would be sent.");
     }

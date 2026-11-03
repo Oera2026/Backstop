@@ -80,13 +80,15 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
 
         // If checking a picture, send image bytes to the multimodal AI endpoint;
         // otherwise, send text only to save vision processing costs.
+        var tip0 = new System.Runtime.CompilerServices.StrongBox<string?>();
         var (finalVerdict, finalReason, reviewStatus, failure) = await ApplyAiAsync(
             isPicture ? c => c.CheckScamAsync(null, request.Picture, imgType, ct) : c => c.CheckScamAsync(display, null, null, ct),
-            aiRequired: isPicture, floorVerdict, MockRiskRules.ReasonFor(floorVerdict, floorBecause), combinedFlags);
+            aiRequired: isPicture, aiTip: tip0, floorVerdict, MockRiskRules.ReasonFor(floorVerdict, floorBecause), combinedFlags);
 
         var flags = combinedFlags.Take(4).ToList();
         var result = new CheckResult(NewId("chk"), request.Kind, finalVerdict, finalReason, flags,
-            display, floor.Highlights.Where(h => flags.Any(f => f.Id == h.FlagId)).ToList(), null, reviewStatus, false, DateTimeOffset.Now, failure);
+            display, floor.Highlights.Where(h => flags.Any(f => f.Id == h.FlagId)).ToList(), null, reviewStatus, false, DateTimeOffset.Now, failure,
+            Tip(finalVerdict, reviewStatus, tip0.Value, combinedFlags, finalReason));
         lock (_gate) _checks[result.Id] = new(result, text.Trim(), reviewStatus == ReviewStatus.Held ? DateTimeOffset.Now : null);
         return result;
     }
@@ -97,10 +99,10 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
     /// (pictures, which local rules cannot read) a missing checker also holds it.
     /// </summary>
     private async Task<(Verdict Verdict, string Reason, ReviewStatus Status, FailureInfo? Failure)> ApplyAiAsync(
-        Func<ILlamaScamChecker, Task<MetaScamAnalysis>> ask, bool aiRequired,
+        Func<ILlamaScamChecker, Task<MetaScamAnalysis>> ask, bool aiRequired, System.Runtime.CompilerServices.StrongBox<string?> aiTip,
         Verdict floorVerdict, string floorReason, List<RiskFlag> flags)
     {
-        var r = await ApplyAiCoreAsync(ask, aiRequired, floorVerdict, floorReason, flags);
+        var r = await ApplyAiCoreAsync(ask, aiRequired, aiTip, floorVerdict, floorReason, flags);
 
         // Someone may be in danger, or the checker wants a human: the helper is always told, whatever else was decided.
         // The local rules and the AI can both raise this. Nothing can lower it.
@@ -110,7 +112,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
     }
 
     private async Task<(Verdict Verdict, string Reason, ReviewStatus Status, FailureInfo? Failure)> ApplyAiCoreAsync(
-        Func<ILlamaScamChecker, Task<MetaScamAnalysis>> ask, bool aiRequired,
+        Func<ILlamaScamChecker, Task<MetaScamAnalysis>> ask, bool aiRequired, System.Runtime.CompilerServices.StrongBox<string?> aiTip,
         Verdict floorVerdict, string floorReason, List<RiskFlag> flags)
     {
         // Fail closed for every kind of content: without the AI checker nothing is called checked, and it is held.
@@ -125,6 +127,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
             return HoldForReview(flags, floorVerdict, "We could not finish checking this, so your helper will look at it.", new("Something went wrong while checking. Please try again in a minute.", $"Code: CHECK_EXCEPTION\nWhat: {ex.GetType().Name}\nTime: {DateTimeOffset.UtcNow:yyyy-MM-dd HH:mm:ss} UTC"));
         }
 
+        aiTip.Value = ai.WatchFor;
         foreach (var flag in ai.Flags)
             if (flags.All(f => f.Id != flag.Id)) flags.Add(flag);
 
@@ -144,6 +147,12 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
             flags.Add(new("review-needed", "hourglass", "Needs helper check", "The automatic check could not finish, so your helper will check this."));
         return (IsStricter(Verdict.BeCareful, floorVerdict) ? Verdict.BeCareful : floorVerdict, reason, ReviewStatus.Held, failure);
     }
+
+    // "Next time, watch for…": for anything that is not Looks safe, and anything held. Never empty, never on a clean result.
+    private static string? Tip(Verdict verdict, ReviewStatus status, string? modelTip, IEnumerable<RiskFlag> flags, string reason) =>
+        verdict == Verdict.LooksSafe && status != ReviewStatus.Held
+            ? null
+            : WatchFor.Choose(modelTip, flags.Select(f => f.Id), reason);
 
     private static bool IsStricter(Verdict a, Verdict b)
     {
@@ -185,15 +194,17 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         var floorVerdict = MockRiskRules.VerdictFor(seen.Sum(f => MockRiskRules.Weight(f.Id)));
         var combinedFlags = new List<RiskFlag>(seen.OrderByDescending(f => MockRiskRules.Weight(f.Id)));
 
+        var tip0 = new System.Runtime.CompilerServices.StrongBox<string?>();
         var (finalVerdict, finalReason, reviewStatus, failure) = await ApplyAiAsync(
-            c => c.CheckScamAsync(display, null, null, ct), aiRequired: false, floorVerdict,
+            c => c.CheckScamAsync(display, null, null, ct), aiRequired: false, aiTip: tip0, floorVerdict,
             MockRiskRules.ReasonFor(floorVerdict, MockRiskRules.BecauseFor(combinedFlags.FirstOrDefault()?.Id), startedFriendly: firstFlagged > 0),
             combinedFlags);
 
         var flags = combinedFlags.Take(4).ToList();
         var result = new CheckResult(NewId("chk"), CheckKind.Conversation, finalVerdict,
             finalReason,
-            flags, display, [], thread, reviewStatus, false, DateTimeOffset.Now, failure);
+            flags, display, [], thread, reviewStatus, false, DateTimeOffset.Now, failure,
+            Tip(finalVerdict, reviewStatus, tip0.Value, combinedFlags, finalReason));
         lock (_gate) _checks[result.Id] = new(result, conversation.Trim(), reviewStatus == ReviewStatus.Held ? DateTimeOffset.Now : null);
         return result;
     }
@@ -661,7 +672,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         var trend = high > 0 ? $" The risk rose across the chat: calm at first, high by message {high} of {r.Thread!.Count}." : "";
         var reasoning = $"{signs}{trend} {User} asked you to look before replying.";
         return new ReviewItem(r.Id, ReviewSource.Check, TitleFor(r, c.Original), Defang.ForHelper(c.Original), r.Verdict, r.Flags,
-            reasoning, r.CallRequested, c.AskedAt ?? r.CheckedAt);
+            reasoning, r.CallRequested, c.AskedAt ?? r.CheckedAt, r.WatchFor);
     }
 
     private static ReviewItem FromMail(MailMessage m) => new(

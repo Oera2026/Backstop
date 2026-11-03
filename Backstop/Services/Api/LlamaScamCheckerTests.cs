@@ -1111,6 +1111,9 @@ public class LlamaScamCheckerTests
         // 34. Read aloud button: renders, hides, toggles, stops.
         await ReadAloudTests.RunAsync();
 
+        // 35. Watch-for tips: fallback library, cleaning, injection, Safe shows none.
+        await WatchForTests.RunAsync();
+
         Console.WriteLine("\nALL TESTS PASSED SUCCESSFULLY.");
     }
 

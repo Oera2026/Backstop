@@ -111,6 +111,7 @@ public static class MockData
         held.SenderSignals = [.. analysis.SenderSignals];
         held.Summary = decision.Summary;
         held.Concern = decision.Concern;
+        held.WatchFor = decision.WatchFor;
         held.RulesScore = decision.RulesScore;
         // Only the local rules have looked at it. No tier record is made up, and it cannot be approved until
         // the AI has scanned it for real (the rescan service does that, and Approve is refused until then).

@@ -235,6 +235,7 @@ public sealed partial class MockMailService(MailStore store, IMetaScamChecker? m
                 msg.SenderSignals = [.. analysis.SenderSignals];
                 msg.Summary = decision.Summary;
                 msg.Concern = decision.Concern;
+                msg.WatchFor = decision.WatchFor;
                 msg.RulesScore = decision.RulesScore;
                 msg.Tiers = done;
                 msg.State = decision.State;
@@ -304,6 +305,7 @@ public sealed partial class MockMailService(MailStore store, IMetaScamChecker? m
                 ? local.Summary
                 : "The automatic check did not finish. Please look at this message with care.";
             msg.Concern = local?.Concern ?? Concern.Unclear;
+            msg.WatchFor = local?.WatchFor ?? WatchFor.Fallback(analysis?.SignalIds);
             msg.RulesScore = analysis?.RulesScore ?? 0;
             msg.ReceivedAt = DateTimeOffset.Now;
             msg.State = MessageState.Held; // explicit Failed -> Held transition, never Blocked or Cleared
@@ -350,6 +352,7 @@ public sealed partial class MockMailService(MailStore store, IMetaScamChecker? m
             m.SenderSignals = [.. analysis.SenderSignals];
             m.Summary = decision.Summary;
             m.Concern = decision.Concern;
+            m.WatchFor = decision.WatchFor;
             m.RulesScore = decision.RulesScore;
             m.Tiers = [analysis.RulesTier, aiTier, analysis.LinkTier, decision.PolicyTier];
             m.State = decision.State;

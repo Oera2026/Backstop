@@ -54,6 +54,7 @@ else if (_r.Status == ReviewStatus.Blocked)
     <PageTitle>Don't reply – Backstop</PageTitle>
     <p><StatusBadge State="MessageState.Blocked" /></p>
     <h1>@Helper says please don't reply to this.</h1>
+    <WatchForTip Tip="@(_r.WatchFor ?? WatchFor.Fallback(_r.Flags.Select(f => f.Id)))" />
     <div class="actions">
         <button type="button" class="btn btn-primary" @onclick="Delete" disabled="@_working"><Icon Name="trash" /> Delete it</button>
     </div>
@@ -62,6 +63,7 @@ else
 {
     <PageTitle>@VerdictCard.WordFor(_r.Verdict) – Backstop</PageTitle>
     <VerdictCard Verdict="_r.Verdict" Reason="@_r.Reason" />
+    <WatchForTip Tip="@_r.WatchFor" />
 
     @if (_r.Flags.Count > 0)
     {

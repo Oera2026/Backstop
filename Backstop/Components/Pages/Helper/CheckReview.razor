@@ -48,6 +48,7 @@ else
             </div>
         }
         <VerdictCard Verdict="_item.Verdict" Reason="@_item.Reasoning" Level="2" />
+        <WatchForTip Tip="@(_item.WatchFor ?? WatchFor.Fallback(_item.Flags.Select(f => f.Id)))" />
 
         @if (_item.Flags.Count > 0)
         {

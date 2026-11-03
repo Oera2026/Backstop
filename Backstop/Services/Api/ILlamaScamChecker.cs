@@ -10,7 +10,9 @@ public sealed record MetaScamAnalysis(
     string? FailureNote = null,
     bool NeedsHuman = false,
     bool AtRisk = false,
-    FailureInfo? Failure = null
+    FailureInfo? Failure = null,
+    // The checker tip "Next time, watch for…", already cleaned by WatchFor.Clean. Null when missing or not safe to show: callers use the fixed library.
+    string? WatchFor = null
 );
 
 public interface IMetaScamChecker

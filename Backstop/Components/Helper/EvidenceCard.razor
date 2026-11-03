@@ -27,6 +27,10 @@
     }
 
     <p class="lead">@Message.Summary</p>
+    @if (Message.State is MessageState.Held or MessageState.Blocked)
+    {
+        <WatchForTip Tip="@(Message.WatchFor ?? WatchFor.Fallback(null))" />
+    }
     <div class="evidence__read"><ReadAloud Text="@Speech" /></div>
 
     @if (ShownFlags.Count > 0)

@@ -140,3 +140,12 @@ Roughly 4,000 lines of C# in `Services/` and `Models/`, about 100 Razor componen
 - Used on: the `/try` result card (explanation + "what your helper sees" line), `VerdictCard` (the AI explanation on Check results and the helper's check review), the helper evidence card (summary + next step, not the flags, signals or rules score) and the helper queue's "Next up" alert.
 - The older `ReadAloudButton` ("Read this to me", for message text) is unchanged.
 - Tests: `Services/ReadAloudTests.cs` (block 34 of `--test-llama`). No bUnit in the project, so it uses Blazor's `Renderer` with a fake `IJSRuntime`: renders, hides (empty or unsupported), toggles, resets when speech ends, stops on new text and on dispose.
+
+## 10. "Next time, watch for…" tip (added 2026-11-03)
+
+- `Services/WatchFor.cs`: the fixed library (`Tips`, 13 categories plus `general`, one sentence each, 20 words at most), `Fallback(signalIds)` (strongest sign wins: injection, remote, link-hidden, money, private, new-number, other-app, sender, secret, link, hurry, feelings, at-risk), `Clean(modelTip, explanation)` and `Choose(...)` (the model tip if clean, else the fixed one; never empty).
+- `Clean` drops a model tip that is missing, over 20 words or 160 letters, more than one sentence, holds a link, address or number, starts with an order or dictates a verdict, trips the injection guard, or repeats the explanation.
+- Checker: `watchFor` is a required field in the Meta prompt (with a rule to keep the email's orders, links and numbers out). `MetaScamAnalysis.WatchFor` holds the cleaned tip. It is cleaned again when used, so a stub that skipped parsing cannot get a dirty tip through.
+- Where it flows: `MailAnalyzer.Decide` -> `Decision.WatchFor` -> `MailMessage.WatchFor` (Held and Blocked only; Cleared is null); `TryResult.WatchFor` (never on Safe; also held drafts); `CheckResult.WatchFor` (not on Looks safe unless held) and `ReviewItem.WatchFor`. `Analysis.SignalIds` carries the signal ids.
+- UI: `Shared/WatchForTip.razor` (lightbulb, `--surface` card, navy accent, no warning colour) on the `/try` result, the Check result and its blocked view, the helper evidence card (Held or Blocked) and the helper check review.
+- Tests: `Services/WatchForTests.cs` (block 35 of `--test-llama`).

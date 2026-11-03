@@ -1,0 +1,12 @@
+@* "Next time, watch for…": one gentle teaching sentence. Calm callout with a lightbulb, not a warning. Shows nothing without a tip. *@
+@if (!string.IsNullOrWhiteSpace(Tip))
+{
+    <aside class="tip" aria-label="A tip for next time">
+        <span class="tip__icon"><Icon Name="lightbulb" /></span>
+        <p><strong>Next time, watch for…</strong> <span>@Tip</span></p>
+    </aside>
+}
+
+@code {
+    [Parameter] public string? Tip { get; set; }
+}

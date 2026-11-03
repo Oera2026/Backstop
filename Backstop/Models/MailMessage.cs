@@ -43,6 +43,9 @@ public sealed class MailMessage
     public List<SenderSignal> SenderSignals { get; set; } = [];
     public Concern Concern { get; set; } = Concern.Unclear;
 
+    /// <summary>"Next time, watch for…": one short teaching sentence for a held or blocked message. Null for cleared mail.</summary>
+    public string? WatchFor { get; set; }
+
     /// <summary>The real score from the local rules (sum of the weights of the warning signs found). Not a probability.</summary>
     public int RulesScore { get; set; }
     public List<TierResult> Tiers { get; set; } = [];

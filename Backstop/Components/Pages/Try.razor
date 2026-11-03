@@ -80,6 +80,10 @@ else if (_result is { } r)
         </p>
         <h2 id="try-verdict">@Headline(r)</h2>
         <p>@r.Explanation</p>
+        @if (r.Verdict != TryVerdict.Safe || !r.Verified)
+        {
+            <WatchForTip Tip="@r.WatchFor" />
+        }
 
         @if (r.Signals.Count > 0)
         {
