@@ -740,26 +740,37 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 /* Wide: the email panel on the left (examples beside the form), the link panel and the answer on the right. The answer slot
    is always there, so nothing moves when an answer arrives. */
 @media (min-width: 64rem) {
-  .page--try { max-width: 90rem; padding-top: 1rem; padding-bottom: 1.5rem; }
+  /* The page fills the screen below the header: the grid takes the height that is left, the email panel stretches to match it,
+     and the message box takes whatever the panel has over. Nothing is sized from a guess at the screen height. */
+  .page--try { max-width: 90rem; display: flex; flex-direction: column; padding-top: .75rem; padding-bottom: 1rem; }
   .try-grid {
+    flex: 1; min-height: 0;
     grid-template-columns: minmax(0, 1fr) minmax(19rem, 26rem);
-    grid-template-rows: auto auto 1fr;
+    grid-template-rows: auto auto minmax(0, 1fr);
     grid-template-areas: "head head" "email link" "email result";
-    column-gap: 1.5rem; align-items: start;
+    column-gap: 1.5rem; row-gap: 1.25rem; align-items: start;
   }
   .try-head { grid-area: head; }
-  .try-head h1 { margin: 0 0 .75rem; }
+  .try-head h1 { margin: 0; line-height: 1.2; }
   .try-panel { margin-bottom: 0; }
-  .try-panel--email { grid-area: email; }
+  .try-panel--email { grid-area: email; align-self: stretch; display: flex; flex-direction: column; min-height: 0; }
   .try-panel--link { grid-area: link; }
-  .try-email { grid-template-columns: minmax(13rem, 16rem) minmax(0, 1fr); column-gap: 1.5rem; align-items: start; }
-  .page--try .try-samples { grid-template-columns: 1fr; margin: 0; gap: .5rem; }
-  .try-grid > .try-slot { grid-area: result; margin: 1.5rem 0 0; position: sticky; top: 1rem; max-height: calc(100vh - 6rem); overflow-y: auto; }
+  .try-email { flex: 1; min-height: 0; grid-template-columns: minmax(13rem, 16rem) minmax(0, 1fr); column-gap: 1.5rem; align-items: stretch; }
+  .page--try .try-samples { grid-template-columns: 1fr; margin: 0; gap: .5rem; align-content: start; }
+  .try-mailform { display: flex; flex-direction: column; min-height: 0; }
+  .try-mailform .field:has(textarea) { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .try-mailform textarea { flex: 1; min-height: 8rem; resize: none; }
+  .try-grid > .try-slot { grid-area: result; margin: 0; align-self: stretch; overflow-y: auto; min-height: 0; }
   .try-form .field { margin-bottom: .75rem; }
-  .try-mailform textarea { min-height: 10rem; height: clamp(10rem, calc(100vh - 34rem), 24rem); }
   .try-pair { grid-template-columns: 1fr 1fr; }
-  .try-mode { margin-bottom: .5rem; }
+  .try-mode { margin-bottom: .25rem; }
   .try-mode__opt { min-height: 48px; }
+  .try-panel > .lead { margin-bottom: .75rem; }
+}
+/* On a short screen the examples run two across, so the panel does not need more height than the form. */
+@media (min-width: 64rem) and (max-height: 56rem) {
+  .try-email { grid-template-columns: minmax(16rem, 22rem) minmax(0, 1fr); }
+  .page--try .try-samples { grid-template-columns: 1fr 1fr; }
 }/* The wait is shown at the foot of the screen, wherever the visitor has scrolled to */
 .try-status { position: fixed; inset-inline: .75rem; bottom: max(.75rem, env(safe-area-inset-bottom)); max-width: 30rem; margin-inline: auto; z-index: 30; padding: 0 1.25rem; background: var(--bg); border: var(--line) solid var(--border); border-radius: var(--radius-lg); }
 .try-status .loading { min-height: 0; padding: .75rem 0; row-gap: .5rem; }
