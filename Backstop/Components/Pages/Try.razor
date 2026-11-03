@@ -19,23 +19,25 @@
         }
     </div>
 
-    <form class="try-form" @onsubmit="Check">
+    <form class="try-form try-mailform" @onsubmit="Check">
         <fieldset class="try-mode">
             <legend>This email is</legend>
             <label class="try-mode__opt"><input type="radio" name="mode" checked="@(!_outgoing)" @onchange="() => _outgoing = false" /> <span>Coming in</span></label>
             <label class="try-mode__opt"><input type="radio" name="mode" checked="@_outgoing" @onchange="() => _outgoing = true" /> <span>Going out</span></label>
         </fieldset>
-        <div class="field">
-            <label for="try-from">@(_outgoing ? "To" : "From")</label>
-            <input id="try-from" type="text" @bind="_from" maxlength="300" autocomplete="off" />
-        </div>
-        @if (!_outgoing)
-        {
+        <div class="try-pair">
             <div class="field">
-                <label for="try-replyto">Replies go to (optional)</label>
-                <input id="try-replyto" type="text" @bind="_replyTo" maxlength="300" autocomplete="off" />
+                <label for="try-from">@(_outgoing ? "To" : "From")</label>
+                <input id="try-from" type="text" @bind="_from" maxlength="300" autocomplete="off" />
             </div>
-        }
+            @if (!_outgoing)
+            {
+                <div class="field">
+                    <label for="try-replyto">Replies go to (optional)</label>
+                    <input id="try-replyto" type="text" @bind="_replyTo" maxlength="300" autocomplete="off" />
+                </div>
+            }
+        </div>
         <div class="field">
             <label for="try-subject">Subject</label>
             <input id="try-subject" type="text" @bind="_subject" maxlength="200" autocomplete="off" />

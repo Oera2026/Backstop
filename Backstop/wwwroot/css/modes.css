@@ -731,13 +731,32 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 .page--try { max-width: 44rem; margin-inline: auto; }
 .try-grid { display: grid; grid-template-columns: minmax(0, 1fr); }
 .try-head > :last-child { margin-bottom: 1.25rem; }
-/* Wide: forms on the left, the answer on the right. The right column is always there, so nothing
-   moves when an answer arrives. The last row is flexible so the tall answer does not stretch the forms. */
-@media (min-width: 70rem) {
-  .page--try { max-width: 62rem; }
-  .try-grid { grid-template-columns: minmax(0, 28rem) minmax(0, 1fr); grid-template-rows: repeat(4, auto) 1fr; column-gap: 2.5rem; align-items: start; }
-  .try-grid > * { grid-column: 1; }
-  .try-grid > .try-slot { grid-column: 2; grid-row: 1 / -1; margin-top: 0; }
+.try-pair { display: grid; grid-template-columns: minmax(0, 1fr); column-gap: 1rem; }
+/* Wide: three columns so it fits one screen. Examples and the single-link check on the left, the
+   email in the middle, the answer on the right. The answer column is always there, so nothing
+   moves when an answer arrives. */
+@media (min-width: 64rem) {
+  .page--try { max-width: 90rem; padding-top: 1rem; padding-bottom: 1.5rem; }
+  .try-grid {
+    grid-template-columns: minmax(18rem, 22rem) minmax(0, 1fr) minmax(18rem, 26rem);
+    grid-template-rows: auto auto 1fr;
+    grid-template-areas: "head mail result" "samples mail result" "link mail result";
+    column-gap: 2rem; align-items: start;
+  }
+  .try-head { grid-area: head; }
+  .try-head h1 { margin-bottom: .25rem; }
+  .try-head > :last-child { margin-bottom: .75rem; }
+  .try-samples { grid-area: samples; grid-template-columns: 1fr 1fr; margin: 0; gap: .5rem; }
+  .try-samples .btn { padding-inline: .5rem; }
+  .try-mailform { grid-area: mail; }
+  .try-linkform { grid-area: link; margin-top: 1.5rem; }
+  .try-grid > .try-slot { grid-area: result; margin-top: 0; position: sticky; top: 1rem; max-height: calc(100vh - 6rem); overflow-y: auto; }
+  .try-form .field { margin-bottom: .75rem; }
+  .try-mailform textarea { min-height: 14rem; height: calc(100vh - 25rem); max-height: 30rem; }
+  .try-pair { grid-template-columns: 1fr 1fr; }
+  .try-mode { margin-bottom: .5rem; }
+  .try-mode__opt { min-height: 48px; }
+  .try-linkform h2 { margin: 0 0 .5rem; }
 }
 /* The wait is shown at the foot of the screen, wherever the visitor has scrolled to */
 .try-status { position: fixed; inset-inline: .75rem; bottom: max(.75rem, env(safe-area-inset-bottom)); max-width: 30rem; margin-inline: auto; z-index: 30; padding: 0 1.25rem; background: var(--bg); border: var(--line) solid var(--border); border-radius: var(--radius-lg); }
