@@ -18,7 +18,8 @@ public sealed record TryResult(
     string Explanation,
     string HelperSees,
     string? Problem = null,
-    IReadOnlyList<LinkReport>? Links = null)
+    IReadOnlyList<LinkReport>? Links = null,
+    IReadOnlyList<SenderSignal>? SenderChecks = null)
 {
     public static TryResult Refused(string problem) => new(TryVerdict.Held, false, [], "", "", problem);
 }

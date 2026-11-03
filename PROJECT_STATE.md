@@ -122,3 +122,14 @@ Roughly 4,000 lines of C# in `Services/` and `Models/`, about 100 Razor componen
   - Requires the .NET 10 SDK. There is no Makefile and no real npm scripts (`npm test` is a stub).
   - After changes (AGENTS.md): run the app and check `/`, `/helper`, and `/demo` with all 7 scenarios.
 - **Hard rules (AGENTS.md):** synthetic data only (`example.com/.net/.org`, `.test`), no secrets in the repo, Meta API is the only network egress, held mail shows no sender or subject, fail closed, AI can only tighten verdicts, and the UI talks only to the service interfaces.
+
+## 8. Sender check (added 2026-11-03)
+
+- `Services/SenderCheck.cs`: `ISenderCheck` / `SenderCheck`. Pure code, never throws. Returns `SenderSignal(Code, Severity, Reason)` (Low, Medium, High) from the From name, From address, Reply-To and the saved contacts. Signals: `brand-name-wrong-address`, `family-name-free-address`, `family-name-unknown-address`, `free-address-person`, `name-matches-contact`, `name-shows-other-address`, `lookalike-domain` (0/o, 1/l, rn/m, vv/w, edit distance, brand joined by a dash), `brand-in-subdomain`, `brand-other-domain`, `idn-homograph` (punycode or Unicode), `reply-to-differs`, `reply-to-lookalike`, `unverified-sender`. Reference lists (about 35 brands, free providers) are in the same file.
+- Policy: `MailAnalyzer.Analyze(mail, contacts, senderCheck)`. A High signal sets `SenderProblem`, so the message can never be Cleared (held for a helper). Medium and Low are evidence only. Nothing lowers a verdict. Unreadable headers give a High `unverified-sender` (fail closed).
+- AI evidence: `IMetaScamChecker.CheckScamWithEvidenceAsync(text, linkFindings, senderFindings)`. `MetaAiScamChecker` adds a "BACKSTOP SENDER CHECK" section after the data (folded, cut, edge lines neutralised).
+- Model: `InboundMail.ReplyTo`, `MailMessage.ReplyTo`, `MailMessage.SenderSignals`, `TryResult.SenderChecks`.
+- UI: `Shared/SenderChecks.razor` shown as "Sender checks" on the helper evidence card and the `/try` result; `/try` has an optional Reply-to box.
+- Demo: scenarios 8 to 11 (`mum-new-address`, `lookalike-bank`, `reply-to-mismatch`, `contact-new-address`) and four matching `/try` examples. They use made-up stand-ins only (`freemail.example.net`, the fictional brand Northbank at `northbank.test`), because the hard rules allow no real domains in messages. The detection lists do name real brands and free providers; they are compared as text and never sent anywhere.
+- Same-company rule: a saved contact's name from another address at the same non-free domain (reception@ vs reminders@) fires nothing. On a free provider it does.
+- Tests: `Services/SenderCheckTests.cs` (block 33 of `--test-llama`). Note: example.* domains count as one registrable name each, so Reply-To tests across different `example.*` endings or `.test` names are used.

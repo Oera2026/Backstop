@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using Backstop.Models;
 using Backstop.Services.Api;
 
@@ -20,6 +19,7 @@ public static partial class MailAnalyzer
         bool DeceptiveLink,
         int LinkProblems,
         bool SenderProblem,
+        IReadOnlyList<SenderSignal> SenderSignals,
         TierResult RulesTier,
         TierResult LinkTier);
 
@@ -31,8 +31,14 @@ public static partial class MailAnalyzer
         IReadOnlyList<Flag> Flags,
         TierResult PolicyTier);
 
-    /// <summary>Rules tier and Link check tier. Pure and fast.</summary>
-    public static Analysis Analyze(InboundMail mail)
+    /// <summary>Title of the one-line flag a High sender signal adds. Screens that list the signals in full leave this flag out.</summary>
+    public const string SenderFlagTitle = "The sender looks wrong";
+
+    /// <summary>
+    /// Rules tier, Link check tier and the Sender check. Pure and fast. <paramref name="contacts"/> are the recipient's saved contacts
+    /// (so "Mum" on a new address can be spotted); with none, the contact check simply has nothing to compare.
+    /// </summary>
+    public static Analysis Analyze(InboundMail mail, IReadOnlyList<Contact>? contacts = null, ISenderCheck? senderCheck = null)
     {
         var text = $"{mail.Subject}\n{mail.Body}";
 
@@ -64,35 +70,22 @@ public static partial class MailAnalyzer
         else if (problems > 0)
             flags.Add(new Flag("link", "The link looks unusual", "The address has words or a form that real senders rarely use."));
 
-        // Sender: the name and the address must agree, and the address must not use look-alike letters.
-        var senderProblem = SenderLooksWrong(mail.FromName, mail.FromAddress);
+        // Sender: who it says it is from, against the address, the Reply-To and the saved contacts. A High signal holds the message.
+        var senderSignals = (senderCheck ?? SenderCheck.Default).Check(mail, contacts ?? []);
+        var senderProblem = SenderSignal.NeedsHold(senderSignals);
         if (senderProblem)
-            flags.Add(new Flag("user", "The sender looks wrong", "The name shown does not match the address, or the address uses look-alike letters."));
+            flags.Add(new Flag("user", SenderFlagTitle, senderSignals.First(s => s.Severity == SenderSeverity.High).Reason));
 
         var top = found.OrderByDescending(f => MockRiskRules.Weight(f.Id)).Select(f => MockRiskRules.BecauseFor(f.Id)).FirstOrDefault();
-        return new Analysis(flags, links, score, top, found.Any(f => f.Id == "at-risk"), deceptive, problems, senderProblem, rulesTier, linkTier);
+        return new Analysis(flags, links, score, top, found.Any(f => f.Id == "at-risk"), deceptive, problems, senderProblem, senderSignals, rulesTier, linkTier);
     }
-
-    [GeneratedRegex(@"[^\s@<>""']+@([^\s@<>""']+)|\b((?:[a-z0-9-]+\.)+[a-z]{2,})\b", RegexOptions.IgnoreCase)]
-    private static partial Regex AddressOrDomain();
 
     /// <summary>
-    /// True when the sender name carries a different address or website than the real one, or the real address
-    /// is written with look-alike (xn--) letters. Attachments are not part of InboundMail, so none are checked.
+    /// The sender signals as plain sentences for the AI. They are Backstop's own wording about the headers, not the sender's,
+    /// and they can only make the AI's answer stricter.
     /// </summary>
-    private static bool SenderLooksWrong(string fromName, string fromAddress)
-    {
-        var at = fromAddress.LastIndexOf('@');
-        var host = (at >= 0 ? fromAddress[(at + 1)..] : fromAddress).Trim().ToLowerInvariant();
-        if (host.Length == 0 || host.Contains("xn--")) return true;
-
-        foreach (Match m in AddressOrDomain().Matches(fromName ?? ""))
-        {
-            var shown = (m.Groups[1].Success ? m.Groups[1].Value : m.Groups[2].Value).ToLowerInvariant().TrimEnd('.');
-            if (shown != host && !host.EndsWith("." + shown) && !shown.EndsWith("." + host)) return true;
-        }
-        return false;
-    }
+    public static IReadOnlyList<string> SenderFindings(Analysis a) =>
+        a.SenderSignals.Select(s => $"Sender check ({s.Severity.ToString().ToLowerInvariant()}): {s.Reason}").ToList();
 
     /// <summary>
     /// Policy tier. Cleared only when every local check is clean AND Meta AI answered and agreed.
@@ -130,7 +123,7 @@ public static partial class MailAnalyzer
             summary = MockRiskRules.ReasonFor(MockRiskRules.VerdictFor(a.RulesScore), a.TopBecause);
         else if (aiWorried) summary = ai!.Reason;
         else if (a.LinkProblems > 0) summary = "A link in this message looks unusual.";
-        else if (a.SenderProblem) summary = "The sender of this message looks wrong.";
+        else if (a.SenderProblem) summary = a.SenderSignals.First(s => s.Severity == SenderSeverity.High).Reason;
         else summary = "The automatic check could not finish, so please look at this message with care.";
 
         // Worked out from the checks that ran. Cleared mail claims nothing about risk.

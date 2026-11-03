@@ -26,7 +26,12 @@ public sealed partial class MockMailService
         var subject = (mail.Subject ?? "").Trim();
         var body = (mail.Body ?? "").Trim();
 
-        if (from.Length + subject.Length + body.Length > TryMaxChars)
+        // A name sent apart from the address ("Mum", "mum@...") is the same as "Mum <mum@...>", the way the page sends it.
+        var shownName = (mail.FromName ?? "").Trim();
+        if (!outgoing && shownName.Length > 0 && shownName != from && !from.Contains('<')) from = $"{shownName} <{from}>";
+
+        var replyTo = string.IsNullOrWhiteSpace(mail.ReplyTo) ? null : mail.ReplyTo.Trim();
+        if (from.Length + subject.Length + body.Length + (replyTo?.Length ?? 0) > TryMaxChars)
             return TryResult.Refused($"That is too long. Please keep it under {TryMaxChars:N0} letters.");
         if (subject.Length == 0 && body.Length == 0)
             return TryResult.Refused("Please type a subject or a message.");
@@ -37,7 +42,7 @@ public sealed partial class MockMailService
         if (!TryGuard.TryEnter(ClientIdentity.Current ?? "unknown", out var wait, out _, out _))
             return TryResult.Refused($"That is a lot of checks. Please wait {Math.Max(1, wait)} seconds and try again.");
 
-        return outgoing ? await TryOutgoingAsync(from, subject, body, ct) : await TryIncomingAsync(from, subject, body, ct);
+        return outgoing ? await TryOutgoingAsync(from, subject, body, ct) : await TryIncomingAsync(from, subject, body, replyTo, ct);
     }
 
     /// <summary>A single link, with the words shown for it if there are any. Goes through the same checks as a message that holds only that link.</summary>
@@ -54,15 +59,17 @@ public sealed partial class MockMailService
     }
 
     // Meta AI's answer, or null on any failure, a missing key or an odd reply. Null always means "could not verify".
-    private async Task<MetaScamAnalysis?> AskMetaAsync(string subject, string body, IReadOnlyList<string> linkFindings, CancellationToken ct)
+    private async Task<MetaScamAnalysis?> AskMetaAsync(string subject, string body, IReadOnlyList<string> linkFindings, CancellationToken ct, IReadOnlyList<string>? senderFindings = null)
     {
         if (metaChecker is null) return null;
         try
         {
             var text = $"{subject}\n\n{body}";
-            var ai = linkFindings.Count > 0
-                ? await metaChecker.CheckScamWithLinksAsync(text, linkFindings, ct)
-                : await metaChecker.CheckScamAsync(text, null, null, ct);
+            var ai = senderFindings is { Count: > 0 }
+                ? await metaChecker.CheckScamWithEvidenceAsync(text, linkFindings, senderFindings, ct)
+                : linkFindings.Count > 0
+                    ? await metaChecker.CheckScamWithLinksAsync(text, linkFindings, ct)
+                    : await metaChecker.CheckScamAsync(text, null, null, ct);
             return ai.Success ? ai : null;
         }
         catch (Exception) { return null; }
@@ -104,19 +111,27 @@ public sealed partial class MockMailService
         return list;
     }
 
-    private async Task<TryResult> TryIncomingAsync(string from, string subject, string body, CancellationToken ct)
+    private async Task<TryResult> TryIncomingAsync(string from, string subject, string body, string? replyTo, CancellationToken ct)
     {
         // "Name <address>" or just an address. The same sender check as real mail compares the two.
         var open = from.LastIndexOf('<');
         var (name, address) = open >= 0 && from.EndsWith('>') ? (from[..open].Trim(), from[(open + 1)..^1].Trim()) : (from, from);
-        var mail = new InboundMail(name.Length == 0 ? address : name, address, subject, body);
+        var mail = new InboundMail(name.Length == 0 ? address : name, address, subject, body, replyTo);
 
-        var analysis = MailAnalyzer.Analyze(mail);
+        // The demo household's saved contacts stand in for the visitor's address book. They are made-up people.
+        var analysis = MailAnalyzer.Analyze(mail, store.Contacts(), senderCheck);
+        var result = await TryIncomingCoreAsync(analysis, subject, body, ct);
+        return result with { SenderChecks = analysis.SenderSignals };
+    }
+
+    private async Task<TryResult> TryIncomingCoreAsync(MailAnalyzer.Analysis analysis, string subject, string body, CancellationToken ct)
+    {
         var (reports, notChecked) = await InspectLinksAsync($"{subject}\n{body}", ct);
-        var ai = await AskMetaAsync(subject, body, reports.Count > 0 ? Findings(reports, notChecked) : [], ct);
+        var ai = await AskMetaAsync(subject, body, reports.Count > 0 ? Findings(reports, notChecked) : [], ct, MailAnalyzer.SenderFindings(analysis));
         // Same decision as real mail. With no AI answer it is Held, as a real message would be.
         var decision = MailAnalyzer.Decide(analysis, ai);
-        var signals = Signals(decision.Flags, analysis.Links);
+        // The sender warnings have their own "Sender checks" section, so the one-line flag for them is not repeated.
+        var signals = Signals(decision.Flags.Where(f => f.Title != MailAnalyzer.SenderFlagTitle).ToList(), analysis.Links);
 
         // A link that is unsafe, or could not be checked, means the message cannot be called safe.
         var linkBad = reports.Any(r => r.Verdict != LinkVerdict.NoWarnings) || notChecked > 0;

@@ -629,6 +629,7 @@ public class LlamaScamCheckerTests
                 ["family-photos"] = MessageState.Cleared, ["gp-reminder"] = MessageState.Cleared, ["remote-support"] = MessageState.Held,
                 ["off-channel"] = MessageState.Held, ["payment-redirect"] = MessageState.Held, ["prompt-injection"] = MessageState.Held,
                 ["link-chain"] = MessageState.Blocked,
+                ["mum-new-address"] = MessageState.Held, ["lookalike-bank"] = MessageState.Held, ["reply-to-mismatch"] = MessageState.Held, ["contact-new-address"] = MessageState.Held,
             };
             foreach (var s in MockData.Scenarios)
             {
@@ -959,13 +960,14 @@ public class LlamaScamCheckerTests
             {
                 ["phishing"] = TryVerdict.Held, ["redirect"] = TryVerdict.Blocked, ["install"] = TryVerdict.Held,
                 ["off-thread"] = TryVerdict.Held, ["family"] = TryVerdict.Safe, ["legit"] = TryVerdict.Safe,
+                ["mum"] = TryVerdict.Held, ["lookalike"] = TryVerdict.Held, ["reply-to"] = TryVerdict.Held, ["contact"] = TryVerdict.Held,
             };
-            Assert(safeAi.TrySamples.Count == 6 && safeAi.TrySamples.All(s => expected.ContainsKey(s.Id)), "Six samples");
+            Assert(safeAi.TrySamples.Count == 10 && safeAi.TrySamples.All(s => expected.ContainsKey(s.Id)), "Ten samples");
             foreach (var s in safeAi.TrySamples)
             {
                 var r = await safeAi.TryCheckAsync(s.Mail, s.Outgoing);
                 Assert(r.Problem is null && r.Verified && r.Verdict == expected[s.Id], $"Try {s.Id}: expected {expected[s.Id]} but got {r.Verdict}");
-                Assert(r.Verdict == TryVerdict.Safe || r.Signals.Count > 0, $"Try {s.Id}: a blocked or held result says why");
+                Assert(r.Verdict == TryVerdict.Safe || r.Signals.Count > 0 || r.SenderChecks is { Count: > 0 }, $"Try {s.Id}: a blocked or held result says why");
                 Assert(r.Explanation.Length > 0 && r.HelperSees.Length > 0, $"Try {s.Id}: explanation and helper line");
             }
             Assert(store.Query(_ => true).Count == before, "Try it stores nothing");
@@ -1102,6 +1104,9 @@ public class LlamaScamCheckerTests
             Assert(plainBody is not null && !plainBody.Contains("BACKSTOP LINK CHECK"), "No facts, no extra section in the prompt");
             Console.WriteLine("PASS: Link check feeds /try only: links hold a message, the AI is told, real mail never opens a link.");
         }
+
+        // 33. Sender check: impersonation signals, held when High, fed to the AI as evidence, shown on /try and to the helper.
+        await SenderCheckTests.RunAsync();
 
         Console.WriteLine("\nALL TESTS PASSED SUCCESSFULLY.");
     }

@@ -24,6 +24,14 @@ public interface IMetaScamChecker
     /// </summary>
     Task<MetaScamAnalysis> CheckScamWithLinksAsync(string? text, IReadOnlyList<string> linkFindings, CancellationToken ct = default) =>
         CheckScamAsync(text, null, null, ct);
+
+    /// <summary>
+    /// Same check, with facts from Backstop's own checks: the Link check (if any) and the Sender check (who the message says it is from).
+    /// Both are Backstop's wording, not the sender's, and can only make the answer stricter. A checker that does not know about the
+    /// sender facts ignores them; the caller's own policy still holds the message.
+    /// </summary>
+    Task<MetaScamAnalysis> CheckScamWithEvidenceAsync(string? text, IReadOnlyList<string> linkFindings, IReadOnlyList<string> senderFindings, CancellationToken ct = default) =>
+        linkFindings.Count > 0 ? CheckScamWithLinksAsync(text, linkFindings, ct) : CheckScamAsync(text, null, null, ct);
 }
 
 // Keep ILlamaScamChecker as a backwards-compatible alias for existing code

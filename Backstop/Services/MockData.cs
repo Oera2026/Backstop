@@ -47,6 +47,27 @@ public static class MockData
             "A parcel message with a shortened link and a fee.",
             new("Parcel Desk", "notify@parcel-update.example.net", "Your parcel could not be delivered",
                 "Your parcel could not be delivered.\n\nPay a £1.45 re-delivery fee here: http://short.example.net/x7Qp2\n\nYour parcel will be returned in 24 hours.")),
+
+        new("mum-new-address", "Example 8: \"Mum\" from a new address",
+            "A kind note from \"Mum\", sent from a free email address nobody saved.",
+            new("Mum", "mum.4471@freemail.example.net", "My new email address",
+                "Hello love,\n\nMy old email stopped working, so I have a new one. Please use this one from now on.\n\nRing me when you have a minute.\n\nMum")),
+
+        new("lookalike-bank", "Example 9: look-alike bank address",
+            "A calm statement notice. The address swaps the letter o for a zero.",
+            new("Northbank Security", "security@n0rthbank.test", "Your October statement",
+                "Dear customer,\n\nYour October statement is ready. Sign in to your usual Northbank account to read it.\n\nNorthbank")),
+
+        new("reply-to-mismatch", "Example 10: replies go somewhere else",
+            "A normal water bill. If you reply, the answer goes to a different place.",
+            new("Oakfield Water", "accounts@oakfield-water.example.net", "Your water bill",
+                "Hello,\n\nYour bill for this quarter is ready. If you have a question about it, just reply to this email.\n\nOakfield Water",
+                ReplyTo: "billing.help@payments-desk.test")),
+
+        new("contact-new-address", "Example 11: a contact's name, a new address",
+            "Looks like Priya, but the address is not the one saved.",
+            new("Priya Sandhu", "priya.sandhu@freemail.example.net", "My new email address",
+                "Hi Mum,\n\nThis is my new email address. Please use it from now on.\n\nLove, Priya")),
     ];
 
     public static MailMessage CreateMessage(InboundMail m) => new()
@@ -56,6 +77,7 @@ public static class MockData
         FromAddress = m.FromAddress,
         Subject = m.Subject,
         Body = m.Body,
+        ReplyTo = m.ReplyTo,
         State = MessageState.Received,
     };
 
@@ -81,11 +103,12 @@ public static class MockData
 
         // Already held when the demo starts. Its flags come from the local rules; it is not AI-scanned yet.
         var held = CreateMessage(Scenarios.First(s => s.Id == "payment-redirect").Mail);
-        var analysis = MailAnalyzer.Analyze(held.AsInbound());
+        var analysis = MailAnalyzer.Analyze(held.AsInbound(), SeedContacts());
         var decision = MailAnalyzer.Decide(analysis, null);
         held.ReceivedAt = now.AddMinutes(-35);
         held.Flags = [.. decision.Flags];
         held.Links = [.. analysis.Links];
+        held.SenderSignals = [.. analysis.SenderSignals];
         held.Summary = decision.Summary;
         held.Concern = decision.Concern;
         held.RulesScore = decision.RulesScore;

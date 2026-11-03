@@ -134,6 +134,7 @@ builder.Services.AddScoped<DemoTour>();
 // MOCK: swap these registrations for real implementations later. No other code needs to change.
 builder.Services.AddScoped<AskSession>();
 builder.Services.AddSingleton<MailStore>();
+builder.Services.AddSingleton<ISenderCheck, SenderCheck>();
 builder.Services.AddSingleton<IMailService, MockMailService>();
 builder.Services.AddSingleton<IGuardianService, MockGuardianService>();
 builder.Services.AddHostedService<MailRescanService>();

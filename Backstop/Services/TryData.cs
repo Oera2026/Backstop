@@ -5,6 +5,8 @@ namespace Backstop.Services;
 /// <summary>Made-up examples for the Try it page. All names and domains are fictional (example.* and .test only).</summary>
 public static class TryData
 {
+    private static InboundMail Demo(string scenarioId) => MockData.Scenarios.First(s => s.Id == scenarioId).Mail;
+
     public static IReadOnlyList<TrySample> Samples { get; } =
     [
         new("phishing", "Phishing link",
@@ -26,6 +28,12 @@ public static class TryData
         new("family", "Normal family email",
             new("Priya Sandhu", "priya.sandhu@example.com", "Photos from the beach",
                 "Hi Mum,\n\nHere are the photos from Saturday. Tomas loved the sea!\n\nCan I ring you on Sunday?\n\nLove, Priya")),
+
+        // The sender examples are the demo's own, so /try and /demo show the same emails.
+        new("mum", "\"Mum\" from a new address", Demo("mum-new-address")),
+        new("lookalike", "Look-alike address", Demo("lookalike-bank")),
+        new("reply-to", "Replies go elsewhere", Demo("reply-to-mismatch")),
+        new("contact", "Contact, new address", Demo("contact-new-address")),
 
         new("legit", "Tricky but real",
             new("Oakfield Pharmacy", "hello@oakfield-pharmacy.example.org", "Your prescription is ready today",

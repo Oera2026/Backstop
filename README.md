@@ -13,6 +13,8 @@ Built with .NET 10 Blazor Server and plain CSS. No UI framework.
 
 Every incoming message goes through four checks, in order: **Rules**, **Meta AI**, **Link check**, **Policy**.
 
+Alongside the Rules, a **Sender check** (`ISenderCheck`, pure code, no AI call) looks at who the message says it is from: the name shown against the address (a brand, a family word like "Mum", or a saved contact on a different address), look-alike and punycode domains, and a Reply-To on another domain. Its findings go to Meta AI as evidence and show in a "Sender checks" section for the helper and on `/try`. A serious finding always holds the message, whatever Meta AI says. Headers that cannot be read are treated as unverified and held.
+
 - **Cleared** only when the local checks are clean and Meta AI answered and agreed.
 - **Held** for the helper when anything looks wrong, or when a check fails.
 - **Blocked** (final, invisible to the user) only for a disguised link together with a strong warning sign, and never when someone may be at risk.
@@ -104,7 +106,7 @@ Notes for the host:
 
 ## Try it (for judges, no sign-in)
 
-Open `/try` (linked below "Try the demo" on the sign-in page). Paste an email, or press one of six examples (phishing link, redirect link, install software, move to WhatsApp, normal family email, tricky but real). Choose **Coming in** or **Going out**, then **Check it**.
+Open `/try` (linked below "Try the demo" on the sign-in page). Paste an email, or press one of ten examples (phishing link, redirect link, install software, move to WhatsApp, normal family email, "Mum" from a new address, look-alike address, replies go elsewhere, contact with a new address, tricky but real). Choose **Coming in** or **Going out**, then **Check it**.
 
 You get a verdict (**Blocked**, **Held for helper** or **Safe**), the warning signs found, a plain explanation, and what the trusted helper would see.
 
@@ -118,7 +120,7 @@ You get a verdict (**Blocked**, **Held for helper** or **Safe**), the warning si
 ## Try the demo
 
 1. Open `/demo`. Side by side is on by default.
-2. Pick one of the seven example emails (or write your own) and press **Simulate incoming email**.
+2. Pick one of the eleven example emails (or write your own) and press **Simulate incoming email**.
 3. Safe mail appears in the user pane. Held mail appears in the helper pane, and the user pane only shows that a message is being checked.
 4. Approve in the helper pane and the message moves into the user inbox live.
 5. Tick "Make the checker crash" to see fail-closed behaviour.

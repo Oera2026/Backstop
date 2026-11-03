@@ -27,14 +27,14 @@
     }
 
     <p class="lead">@Message.Summary</p>
-    <div class="evidence__read"><ReadAloudButton Text="@($"{VerdictHead} {Message.Summary} {string.Join(' ', Message.Flags.Select(f => f.Title + ". " + f.Explanation))}")" /></div>
+    <div class="evidence__read"><ReadAloudButton Text="@($"{VerdictHead} {Message.Summary} {string.Join(' ', ShownFlags.Select(f => f.Title + ". " + f.Explanation))} {string.Join(' ', Message.SenderSignals.Select(s => s.Reason))}")" /></div>
 
-    @if (Message.Flags.Count > 0)
+    @if (ShownFlags.Count > 0)
     {
         <section class="card" aria-labelledby="ev-flags">
             <h2 id="ev-flags">What looked wrong</h2>
             <ul class="flags">
-                @foreach (var f in Message.Flags)
+                @foreach (var f in ShownFlags)
                 {
                     <li class="flag">
                         <span class="flag__icon"><Icon Name="@f.Icon" /></span>
@@ -45,6 +45,18 @@
                     </li>
                 }
             </ul>
+        </section>
+    }
+
+    @if (Message.SenderSignals.Count > 0)
+    {
+        <section class="card" aria-labelledby="ev-sender">
+            <h2 id="ev-sender">Sender checks</h2>
+            @if (!string.IsNullOrWhiteSpace(Message.ReplyTo))
+            {
+                <p class="preview-meta">Replies go to <code>@Defang.ForHelper(Message.ReplyTo)</code></p>
+            }
+            <SenderChecks Signals="Message.SenderSignals" />
         </section>
     }
 
@@ -156,6 +168,11 @@
     [Parameter] public EventCallback OnRescan { get; set; }
 
     private bool _scanning;
+
+    // The one-line sender flag is left out when the "Sender checks" card lists the signals in full.
+    private List<Flag> ShownFlags => Message.SenderSignals.Count > 0
+        ? Message.Flags.Where(f => f.Title != MailAnalyzer.SenderFlagTitle).ToList()
+        : Message.Flags;
 
     private async Task Rescan()
     {

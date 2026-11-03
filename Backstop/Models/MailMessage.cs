@@ -27,6 +27,9 @@ public sealed class MailMessage
     public required string FromAddress { get; init; }
     public required string Subject { get; init; }
     public required string Body { get; init; }
+
+    /// <summary>Where a reply would go, when the sender set a Reply-To. Null when there is none.</summary>
+    public string? ReplyTo { get; init; }
     public DateTimeOffset ReceivedAt { get; set; } = DateTimeOffset.Now;
 
     public MessageState State { get; set; } = MessageState.Received;
@@ -35,6 +38,9 @@ public sealed class MailMessage
     public string Summary { get; set; } = "";
     public List<Flag> Flags { get; set; } = [];
     public List<LinkCheck> Links { get; set; } = [];
+
+    /// <summary>What the sender check found about who sent this, most serious first. Evidence for the helper; empty when nothing looked wrong.</summary>
+    public List<SenderSignal> SenderSignals { get; set; } = [];
     public Concern Concern { get; set; } = Concern.Unclear;
 
     /// <summary>The real score from the local rules (sum of the weights of the warning signs found). Not a probability.</summary>
@@ -53,7 +59,7 @@ public sealed class MailMessage
     /// <summary>"Approved" or "Blocked" when a person decided; null when the system decided.</summary>
     public string? HelperDecision { get; set; }
 
-    public InboundMail AsInbound() => new(FromName, FromAddress, Subject, Body);
+    public InboundMail AsInbound() => new(FromName, FromAddress, Subject, Body, ReplyTo);
 
     public string Preview
     {

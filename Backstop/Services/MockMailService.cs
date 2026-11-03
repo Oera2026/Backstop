@@ -6,7 +6,7 @@ using Backstop.Services.Links;
 namespace Backstop.Services;
 
 /// <summary>MOCK user-side service with live Meta AI Dev API checking where available.</summary>
-public sealed partial class MockMailService(MailStore store, IMetaScamChecker? metaChecker = null, ILinkInspector? linkInspector = null) : IMailService
+public sealed partial class MockMailService(MailStore store, IMetaScamChecker? metaChecker = null, ILinkInspector? linkInspector = null, ISenderCheck? senderCheck = null) : IMailService
 {
     public event Action? Changed
     {
@@ -197,7 +197,7 @@ public sealed partial class MockMailService(MailStore store, IMetaScamChecker? m
         {
             store.Update(() => msg.State = MessageState.Scanning);
             // The local result is worked out first and kept, so a failure later still leaves the helper the evidence.
-            analysis = MailAnalyzer.Analyze(mail);
+            analysis = MailAnalyzer.Analyze(mail, store.Contacts(), senderCheck);
 
             // Tier 0: Rules.
             Step(0, onTier);
@@ -209,7 +209,7 @@ public sealed partial class MockMailService(MailStore store, IMetaScamChecker? m
             Step(1, onTier);
             if (simulateFailure) throw new InvalidOperationException("Simulated checker failure");
             if (metaChecker is null) throw new InvalidOperationException("No Meta AI checker is configured");
-            var ai = await metaChecker.CheckScamAsync($"{mail.Subject}\n\n{mail.Body}", null, null);
+            var ai = await metaChecker.CheckScamWithEvidenceAsync($"{mail.Subject}\n\n{mail.Body}", [], MailAnalyzer.SenderFindings(analysis));
             if (!ai.Success)
                 throw new InvalidOperationException("Meta AI check failed or timed out: " + (ai.FailureNote ?? "Unknown error"));
             var aiTier = new TierResult("Meta AI",
@@ -232,6 +232,7 @@ public sealed partial class MockMailService(MailStore store, IMetaScamChecker? m
             {
                 msg.Flags = [.. decision.Flags];
                 msg.Links = [.. analysis.Links];
+                msg.SenderSignals = [.. analysis.SenderSignals];
                 msg.Summary = decision.Summary;
                 msg.Concern = decision.Concern;
                 msg.RulesScore = decision.RulesScore;
@@ -298,6 +299,7 @@ public sealed partial class MockMailService(MailStore store, IMetaScamChecker? m
             msg.Tiers = done;
             msg.Flags = [new Flag("alert", "The checker had a problem", "We could not finish checking this message, so it is held until a person looks at it."), .. local?.Flags ?? []];
             msg.Links = analysis is null ? [] : [.. analysis.Links];
+            msg.SenderSignals = analysis is null ? [] : [.. analysis.SenderSignals];
             msg.Summary = local is not null && (analysis!.RulesScore + analysis.LinkProblems > 0 || analysis.AtRisk || analysis.SenderProblem)
                 ? local.Summary
                 : "The automatic check did not finish. Please look at this message with care.";
@@ -333,8 +335,8 @@ public sealed partial class MockMailService(MailStore store, IMetaScamChecker? m
     private async Task<bool> RescanOne(MailMessage msg)
     {
         var mail = msg.AsInbound();
-        var analysis = MailAnalyzer.Analyze(mail);
-        var ai = await metaChecker!.CheckScamAsync($"{mail.Subject}\n\n{mail.Body}", null, null);
+        var analysis = MailAnalyzer.Analyze(mail, store.Contacts(), senderCheck);
+        var ai = await metaChecker!.CheckScamWithEvidenceAsync($"{mail.Subject}\n\n{mail.Body}", [], MailAnalyzer.SenderFindings(analysis));
         if (!ai.Success) return false;
 
         var aiTier = new TierResult("Meta AI",
@@ -345,6 +347,7 @@ public sealed partial class MockMailService(MailStore store, IMetaScamChecker? m
         {
             m.Flags = [.. decision.Flags];
             m.Links = [.. analysis.Links];
+            m.SenderSignals = [.. analysis.SenderSignals];
             m.Summary = decision.Summary;
             m.Concern = decision.Concern;
             m.RulesScore = decision.RulesScore;

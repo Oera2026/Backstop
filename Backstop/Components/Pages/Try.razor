@@ -24,6 +24,13 @@
         <label for="try-from">@(_outgoing ? "To" : "From")</label>
         <input id="try-from" type="text" @bind="_from" maxlength="300" autocomplete="off" />
     </div>
+    @if (!_outgoing)
+    {
+        <div class="field">
+            <label for="try-replyto">Reply-to (optional)</label>
+            <input id="try-replyto" type="text" @bind="_replyTo" maxlength="300" autocomplete="off" />
+        </div>
+    }
     <div class="field">
         <label for="try-subject">Subject</label>
         <input id="try-subject" type="text" @bind="_subject" maxlength="200" autocomplete="off" />
@@ -85,6 +92,12 @@ else if (_result is { } r)
             </ul>
         }
 
+        @if (r.SenderChecks is { Count: > 0 })
+        {
+            <h3>Sender checks</h3>
+            <SenderChecks Signals="r.SenderChecks" />
+        }
+
         @if (r.Links is { Count: > 0 })
         {
             <h3>Links found</h3>
@@ -130,7 +143,7 @@ else if (_result is { } r)
 
 @code {
     private bool _outgoing, _busy, _focusResult;
-    private string _from = "", _subject = "", _body = "";
+    private string _from = "", _subject = "", _body = "", _replyTo = "";
     private string _link = "", _linkText = "";
     private string? _problem, _linkProblem;
     private TryResult? _result;
@@ -149,12 +162,13 @@ else if (_result is { } r)
     {
         _outgoing = s.Outgoing;
         _from = s.Mail.FromName + " <" + s.Mail.FromAddress + ">";
+        _replyTo = s.Mail.ReplyTo ?? "";
         _subject = s.Mail.Subject;
         _body = s.Mail.Body;
         await Check();
     }
 
-    private Task Check() => Run(() => Mail.TryCheckAsync(new InboundMail(_from, _from, _subject, _body), _outgoing), forLink: false);
+    private Task Check() => Run(() => Mail.TryCheckAsync(new InboundMail(_from, _from, _subject, _body, _outgoing ? null : _replyTo), _outgoing), forLink: false);
 
     private Task CheckLink() => Run(() => Mail.TryCheckLinkAsync(_link, _linkText), forLink: true);
 
@@ -192,5 +206,5 @@ else if (_result is { } r)
     private static string Word(TryResult r) => !r.Verified ? "Held for helper" : r.Verdict switch { TryVerdict.Safe => "Safe", TryVerdict.Blocked => "Blocked", _ => "Held for helper" };
     private static string Headline(TryResult r) => !r.Verified ? "Couldn't verify, so this would be held."
         : r.Verdict switch { TryVerdict.Safe => "Backstop would let this through.", TryVerdict.Blocked => "Backstop would block this.", _ => "Backstop would hold this for a helper." };
-    private static string Speech(TryResult r) => $"{Headline(r)} {(r.Verified ? r.Explanation : "")} {r.HelperSees}";
+    private static string Speech(TryResult r) => $"{Headline(r)} {(r.Verified ? r.Explanation : "")} {string.Join(' ', r.SenderChecks?.Select(s => s.Reason) ?? [])} {r.HelperSees}";
 }

@@ -1,0 +1,18 @@
+@* The sender signals, one row each: icon + word + colour, then the reason in plain words. Text only. *@
+<ul class="sender-checks">
+    @foreach (var s in Signals)
+    {
+        <li class="sender-check">
+            <span class="badge badge--@Kind(s)"><Icon Name="@IconFor(s)" /><span>@Word(s)</span></span>
+            <span class="sender-check__text">@s.Reason</span>
+        </li>
+    }
+</ul>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<SenderSignal> Signals { get; set; } = [];
+
+    private static string Kind(SenderSignal s) => s.Severity switch { SenderSeverity.High => "block", SenderSeverity.Medium => "check", _ => "safe" };
+    private static string IconFor(SenderSignal s) => s.Severity switch { SenderSeverity.High => "alert", SenderSeverity.Medium => "hourglass", _ => "user" };
+    private static string Word(SenderSignal s) => s.Severity switch { SenderSeverity.High => "Looks wrong", SenderSeverity.Medium => "Be careful", _ => "Worth knowing" };
+}
