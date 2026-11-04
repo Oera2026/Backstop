@@ -176,6 +176,14 @@ body { transition: background-color .3s ease, color .3s ease; }
   .boot .skel__bar.boot__tile { height: 72px; }
 }
 body:has(#main) .boot { display: none; }
+/* Older browsers have no :has(). backstop.js marks the page once it has arrived, so the start-up shapes cannot stay on screen. */
+@supports not selector(:has(a)) { .booted .boot { display: none; } }
+/* "Starting…" floats over the shapes, so nothing moves when the page arrives. It needs JavaScript to ever finish, so it shows only with it. */
+.boot__status { display: none; position: fixed; z-index: 2; left: 1rem; right: 1rem; bottom: calc(5rem + env(safe-area-inset-bottom)); max-width: 28rem; margin-inline: auto; padding: .75rem 1rem; background: var(--bg); border: var(--line) solid var(--border); border-radius: var(--radius-lg); text-align: center; font-weight: 700; }
+.js .boot__status { display: block; }
+.boot__status p { margin: 0; }
+.boot__status .btn { width: 100%; margin-top: .75rem; }
+.boot__noscript { margin: 0; padding: 1rem; background: var(--check-soft); color: var(--text); font-weight: 700; text-align: center; }
 
 /* On a phone the guide card sits at the bottom, so the page needs room to scroll the lit-up thing above it */
 @media (max-width: 699px) { .tour-on .shell > .page { padding-bottom: 22rem; } }

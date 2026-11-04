@@ -71,3 +71,33 @@ document.addEventListener('keydown', function (e) {
   var next = all[all.indexOf(f) + 1];
   if (next) next.focus();
 });
+
+// The skip link moves focus inside this page. With <base href="/">, following "#main" would go to the Inbox instead.
+document.addEventListener('click', function (e) {
+  var link = e.target && e.target.closest && e.target.closest('a.skip-link');
+  if (!link) return;
+  e.preventDefault();
+  e.stopPropagation();
+  var main = document.getElementById('main');
+  if (main) { main.focus(); main.scrollIntoView({ block: 'start' }); }
+}, true);
+
+// While the page connects: says it is starting, and offers a reload if that takes too long.
+(function () {
+  var LONG_MS = 20000;
+  function arrived() { return document.getElementById('main'); }
+  function done() { document.documentElement.classList.add('booted'); }
+  if (arrived()) { done(); return; }
+  var slow = setTimeout(function () {
+    if (arrived()) return;
+    var line = document.getElementById('boot-status'), again = document.getElementById('boot-reload');
+    if (line) line.textContent = 'This is taking a long time. Please reload this page.';
+    if (again) { again.hidden = false; again.addEventListener('click', function () { location.reload(); }); }
+  }, LONG_MS);
+  var watch = setInterval(function () {
+    if (!arrived()) return;
+    clearInterval(watch);
+    clearTimeout(slow);
+    done();
+  }, 250);
+})();
