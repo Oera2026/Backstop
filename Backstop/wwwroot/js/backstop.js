@@ -19,10 +19,10 @@ window.backstop = {
     el.focus({ preventScroll: true });
     el.scrollIntoView({ block: "start", behavior: calm ? "auto" : "smooth" });
   },
-  // Focus the first match, making it focusable if it is not. Says whether there was one.
+  // Focus the first match, making it focusable if it is not. Says whether there was one on show.
   focusSel(selector) {
     const el = document.querySelector(selector);
-    if (!el) return false;
+    if (!el || el.getClientRects().length === 0) return false;
     if (!el.matches('a[href], button, input, select, textarea, [tabindex]')) el.setAttribute('tabindex', '-1');
     el.focus();
     return true;
@@ -41,19 +41,28 @@ window.backstop = {
         inert.push(s);
       }
     }
-    b._modal = { inert, back: document.activeElement, returnSel };
+    const target = document.querySelector(focusSel);
+    b._modal = { inert, back: document.activeElement, returnSel, dialog: target ? target.closest('[role="dialog"]') : null };
     b.focusSel(focusSel);
   },
   // Focus goes back only if it was lost with the dialog. If the page has moved on and focused its heading, it stays there.
+  // This call can arrive just before the dialog leaves the page, so it waits for that.
   modalClose() {
     const b = window.backstop, m = b._modal;
     if (!m) return;
     b._modal = null;
     for (const s of m.inert) s.inert = false;
-    const a = document.activeElement;
-    if (a && a !== document.body && a.isConnected) return;
-    if (m.back && m.back !== document.body && m.back.isConnected) m.back.focus();
-    else if (m.returnSel) b.focusSel(m.returnSel);
+    const restore = tries => {
+      const a = document.activeElement;
+      if (m.dialog && m.dialog.isConnected && m.dialog.contains(a)) {
+        if (tries > 0) setTimeout(() => restore(tries - 1), 50);
+        return;
+      }
+      if (a && a !== document.body && a.isConnected) return;
+      if (m.back && m.back !== document.body && m.back.isConnected) m.back.focus();
+      else if (m.returnSel) b.focusSel(m.returnSel);
+    };
+    restore(20);
   },
   canSpeak() {
     return 'speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined';

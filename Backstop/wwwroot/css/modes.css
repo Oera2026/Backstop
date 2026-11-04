@@ -560,7 +560,7 @@ section.chat .chat__log { max-height: min(24rem, calc(100vh - 22rem)); max-heigh
 .profile__name { display: block; font-weight: 800; }
 .profile__status { display: block; font-size: calc(.9rem * var(--tx)); font-weight: 700; color: var(--text-2); }
 .profile__scrim { position: fixed; inset: 0; z-index: -1; background: transparent; border: 0; cursor: default; }
-.profile__panel { position: absolute; left: 0; bottom: calc(100% + .6rem); width: min(21rem, calc(100vw - 1.5rem)); max-height: calc(100vh - 6.5rem); max-height: calc(100dvh - 6.5rem); overflow-y: auto; overscroll-behavior: contain; display: grid; gap: 1rem; padding: 1.1rem; background: var(--bg); border: var(--line) solid var(--border); border-radius: var(--radius-lg); }
+.profile__panel { position: absolute; left: 0; bottom: calc(100% + .6rem); width: min(21rem, calc(100vw - 1.5rem)); max-height: calc(100vh - 6.5rem); max-height: calc(100dvh - 6.5rem); overflow-y: auto; overscroll-behavior: contain; display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; padding: 1.1rem; background: var(--bg); border: var(--line) solid var(--border); border-radius: var(--radius-lg); }
 .profile__head { display: flex; align-items: center; gap: 1rem; }
 .profile__head > div { display: grid; gap: .3rem; justify-items: start; }
 .profile__opts { display: grid; gap: .5rem; }
@@ -779,7 +779,7 @@ section.chat .chat__log { max-height: min(24rem, calc(100vh - 22rem)); max-heigh
 @media (max-width: 959px) {
   .site-header:not(.site-header--helper) .site-nav a[href="/help"],
   .site-header:not(.site-header--helper) .site-nav a[href="/settings"] { display: none; }
-  .profile__links { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+  .profile__links { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 7rem), 1fr)); gap: .5rem; }
   .profile { right: max(.75rem, env(safe-area-inset-right)); }
 }
 

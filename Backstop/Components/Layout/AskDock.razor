@@ -52,7 +52,11 @@
         _wasOpen = open;
         _wasAt = Nav.Uri;
         if (firstRender || sameOpenState || !samePage) return;
-        try { await JS.InvokeAsync<bool>("backstop.focusSel", open ? "#ask-dock h2" : ".dock-tab, main"); }
+        try
+        {
+            if (open) await JS.InvokeAsync<bool>("backstop.focusSel", "#ask-dock h2");
+            else if (!await JS.InvokeAsync<bool>("backstop.focusSel", ".dock-tab")) await JS.InvokeAsync<bool>("backstop.focusSel", "main");
+        }
         catch (Exception) { /* focus is a nicety */ }
     }
 

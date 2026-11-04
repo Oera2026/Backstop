@@ -131,7 +131,9 @@ input, select, textarea { font-size: calc(max(16px, 1rem) * var(--tx)); }
 
 @media (max-width: 600px) {
   /* Four tab labels fit at 360px: "Remember" is the longest. */
-  .appnav__item { font-size: calc(.85rem * var(--tx)); letter-spacing: -.02em; padding-inline: 0; }
+  /* Bigger text grows the labels only as far as the phone's width lets five of them fit. */
+  .appnav__item { font-size: min(calc(.85rem * var(--tx)), max(.85rem, 4.4vw)); letter-spacing: -.02em; padding-inline: 0; }
+  .appnav__item .nav-count { font-size: .9rem; }
 
   /* Examples on Try: two across, so the form is not five screens down. */
   .try-samples { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; }
