@@ -153,7 +153,7 @@
     /// <summary>True in the dock on the right: no page heading, and the layout fits a narrow panel. The full page gets chat--page, which fits the viewport.</summary>
     [Parameter] public bool Compact { get; set; }
 
-    private const long MaxPicture = 10 * 1024 * 1024;
+    private const long MaxPicture = 6 * 1024 * 1024;
 
     private static string Esc(string s) => Uri.EscapeDataString(s);
 
@@ -254,14 +254,6 @@
         await ScrollDown();
     }
 
-    /// <summary>A picture, or a plain question about a scam, goes through Check (the full verdict). Everything else is a conversation with the AI.</summary>
-    private static bool WantsCheck(string text, bool hasPicture)
-    {
-        if (hasPicture) return true;
-        var t = text.ToLowerInvariant();
-        return new[] { "is this safe", "is this real", "is this a scam", "is this genuine", "is it a scam", "scam", "suspicious", "is this message", "is this email" }.Any(t.Contains);
-    }
-
     private async Task<AskLine> MakeStory(string text)
     {
         var made = await Api.MakeStoryAsync(new StoryRequest(text, null));
@@ -273,13 +265,27 @@
         var page = Session.Page;
         var context = new AskContext(Clock.Today, page?.MessageId, page?.DraftTo, page?.DraftSubject, page?.DraftBody);
 
-        if (WantsCheck(text, picture is not null))
+        // Only a Cleared email is read.
+        var open = !string.IsNullOrWhiteSpace(page?.MessageId) ? Mail.GetClearedMessage(page.MessageId) : null;
+        var route = AskIntent.Route(text, picture is not null, open is not null);
+
+        if (route == AskRoute.AskWhatToCheck)
+            return new AskLine(false, "What should I check? Please paste the message here, or add a picture.");
+
+        if (route == AskRoute.ExplainPicture)
         {
-            // "Is this a scam?" with an email open, and nothing pasted, means that email. Only a Cleared one is read.
-            var open = picture is null && text.Length < 200 && !string.IsNullOrWhiteSpace(page?.MessageId) ? Mail.GetClearedMessage(page.MessageId) : null;
-            var result = picture is not null
-                ? await Api.CheckContentAsync(new CheckRequest(CheckKind.Picture, null, picture.Bytes, picture.Name))
-                : await Api.CheckContentAsync(new CheckRequest(CheckKind.Message, open is not null ? $"{open.Subject}\n{open.Body}" : text));
+            var read = await Api.ExplainContentAsync(new ExplainRequest(null, picture!.Bytes, picture.Name, ReadingLevel.Simple, ExplainFormat.Summary));
+            return new AskLine(false, read.Overview, Href: $"explain/{read.Id}", LinkText: "Read the whole page");
+        }
+
+        if (route != AskRoute.Talk)
+        {
+            var result = route switch
+            {
+                AskRoute.CheckPicture => await Api.CheckContentAsync(new CheckRequest(CheckKind.Picture, text, picture!.Bytes, picture.Name)),
+                AskRoute.CheckOpenEmail => await Api.CheckContentAsync(new CheckRequest(CheckKind.Message, $"{open!.Subject}\n{open.Body}")),
+                _ => await Api.CheckContentAsync(new CheckRequest(CheckKind.Message, text)),
+            };
             return new AskLine(false, result.Reason, Verdict: result.Verdict, Href: $"check/{result.Id}", LinkText: "See the whole check", Failure: result.Failure);
         }
 

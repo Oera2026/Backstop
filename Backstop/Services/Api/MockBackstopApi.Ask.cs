@@ -13,14 +13,19 @@ public sealed partial class MockBackstopApi
     /// </summary>
     public async Task<AskReply> AskAsync(IReadOnlyList<AskTurn> history, string message, AskContext? context = null, CancellationToken ct = default)
     {
-        await Wait(200, ct);
         var text = (message ?? "").Trim();
         if (text.Length == 0) throw new BackstopApiException("Please type something first.");
         if (text.Length > MaxAskLength) throw new BackstopApiException("That is a bit long for me. Please make it shorter.");
 
         var floor = MockRiskRules.Scan(Defang.ForUser(text));
         var localRisk = floor.Flags.Any(f => f.Id == "at-risk");
-        var looksScammy = floor.Flags.Any(f => f.Id is not ("at-risk" or "injection" or "link")) || LinkFinder.Inspect(text).Problems > 0;
+        var linkProblems = LinkFinder.Inspect(text).Problems > 0;
+        var looksScammy = floor.Flags.Any(f => f.Id is not ("at-risk" or "injection" or "link")) || linkProblems;
+        var reportedScam = AskIntent.IsScamReport(text);
+
+        // Someone who may be in danger: the helper is told first, so a slow or failed AI answer can never delay it.
+        if (localRisk) Escalate(text, atRisk: true, history);
+        await Wait(200, ct);
 
         var today = context?.Today ?? DateOnly.FromDateTime(DateTime.Now);
         var (material, links) = GatherMaterial(text, context, today);
@@ -37,9 +42,13 @@ public sealed partial class MockBackstopApi
                 Failure: new("Something went wrong. Please try again in a minute.", $"Code: ASSISTANT_EXCEPTION\nWhat: {ex.GetType().Name}\nTime: {DateTimeOffset.UtcNow:yyyy-MM-dd HH:mm:ss} UTC")); }
         }
 
-        // Someone may be in danger, or the assistant wants a human: the helper is always told.
-        var told = localRisk || reply.NeedsHuman || reply.AtRisk;
-        if (told) Escalate(text, atRisk: localRisk || reply.AtRisk, history);
+        // The assistant wants a human, the signs are strong, the person says they were scammed, or the AI could not answer
+        // something that looks worrying: the helper is told. Nothing here can stop a helper being told.
+        var strongSigns = MockRiskRules.VerdictFor(floor.Score) == Verdict.DontReply;
+        var worrying = floor.Score > 0 || linkProblems || reportedScam;
+        var tellNow = !localRisk && (reply.NeedsHuman || reply.AtRisk || strongSigns || reportedScam || (!reply.Success && worrying));
+        if (tellNow) Escalate(text, atRisk: reply.AtRisk, history);
+        var told = localRisk || tellNow;
 
         string answer;
         if (reply.Success)
@@ -54,6 +63,9 @@ public sealed partial class MockBackstopApi
             var plain = reply.Failure?.Message ?? "Sorry, I could not think of an answer just now. Please try again in a moment.";
             answer = told ? $"{plain} I have asked {Helper} to look at your message." : plain;
         }
+        // Fixed words, not the AI's: whatever it wrote, someone being asked for money is told to wait.
+        if (looksScammy && (floor.Score >= 2 || linkProblems))
+            answer = $"Please wait before you send money or share private details. Ask {Helper} first. {answer}";
 
         // Only fixed pages of the app can be suggested, never anything taken from the message or the reply.
         // An email that itself looks like a scam is never helped with: no draft, and the person is pointed to Check.
@@ -174,8 +186,14 @@ public sealed partial class MockBackstopApi
         if (d is null || mail is null) return null;
         var subject = d.Subject;
 
-        bool NameMatches(string? name, string other) =>
-            !string.IsNullOrWhiteSpace(name) && (other.Contains(name, StringComparison.OrdinalIgnoreCase) || name.Contains(other, StringComparison.OrdinalIgnoreCase));
+        // Whole names only, so "Ann" never picks "Joanne".
+        static string[] Names(string s) => s.ToLowerInvariant().Split([' ', '-', '.', ',', '\''], StringSplitOptions.RemoveEmptyEntries);
+        bool NameMatches(string? name, string other)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return false;
+            string[] a = Names(name), b = Names(other);
+            return a.Length > 0 && b.Length > 0 && (a.All(b.Contains) || b.All(a.Contains));
+        }
 
         if (open is not null && !NoReply.IsNoReply(open.FromAddress) && (string.IsNullOrWhiteSpace(d.ToName) || NameMatches(d.ToName, open.FromName)))
         {
@@ -183,9 +201,10 @@ public sealed partial class MockBackstopApi
             return new AskDraft(null, subject, d.Body, open.Id);
         }
 
-        var contact = string.IsNullOrWhiteSpace(d.ToName) ? null
-            : mail.GetContacts().FirstOrDefault(c => NameMatches(d.ToName, c.Name) && !NoReply.IsNoReply(c.Address));
-        if (contact is not null) return new AskDraft(contact.Address, subject, d.Body);
+        // More than one person with that name: the person chooses, so no address is guessed.
+        var matches = string.IsNullOrWhiteSpace(d.ToName) ? []
+            : mail.GetContacts().Where(c => NameMatches(d.ToName, c.Name) && !NoReply.IsNoReply(c.Address)).ToList();
+        if (matches.Count == 1) return new AskDraft(matches[0].Address, subject, d.Body);
 
         // Improving a message already being written: keep who it was for.
         if (string.IsNullOrWhiteSpace(d.ToName) && InputGuard.IsPlainAddress(context?.DraftTo) && !NoReply.IsNoReply(context!.DraftTo))
@@ -198,9 +217,37 @@ public sealed partial class MockBackstopApi
     private static AskEvent? ResolveEvent(AssistantEvent? e, DateOnly today) =>
         e is null || e.Date < today || e.Date > today.AddYears(2) ? null : new AskEvent(e.Title, e.Date, e.Time, e.Place);
 
+    /// <summary>
+    /// The one safeguarding scan for anything a person types or a photo says, run before the AI is asked. A sign that someone
+    /// may be in danger always reaches the helper's queue, whatever the AI goes on to do.
+    /// </summary>
+    private void TellHelperIfAtRisk(string? words)
+    {
+        if (string.IsNullOrWhiteSpace(words)) return;
+        var text = words.Trim();
+        if (MockRiskRules.Scan(Defang.ForUser(text)).Flags.Any(f => f.Id == "at-risk")) Escalate(text, atRisk: true, []);
+    }
+
+    /// <summary>A topic the AI says needs a person. The helper gets the title only, because the document stays with the visitor.</summary>
+    private void AskHelperToLook(string title)
+    {
+        lock (_gate)
+        {
+            if (_help.Any(h => !h.Done && h.Step == 0 && h.Title == title)) return;
+            var help = new HelpRequest(NewId("h"), DateTimeOffset.Now, title, 0, false);
+            _help.Add(help);
+            MarkVisitorItem(help.Id);
+            Log("hand", $"{User} would like your help with \"{title}\".");
+        }
+        Changed?.Invoke();
+    }
+
+    private const int MaxEscalatedChars = 2000;
+
     /// <summary>Puts the conversation in the helper's queue, held, so a person looks at it.</summary>
     private void Escalate(string text, bool atRisk, IReadOnlyList<AskTurn> history)
     {
+        if (text.Length > MaxEscalatedChars) text = Trim(text, MaxEscalatedChars);
         // The helper reads the last few turns, not only the final message, so they can see how it got here.
         var original = string.Join("\n", history.TakeLast(6).Select(t => $"{(t.FromUser ? User : "Ask Me")}: {t.Text}").Append($"{User}: {text}"));
         var flag = atRisk
