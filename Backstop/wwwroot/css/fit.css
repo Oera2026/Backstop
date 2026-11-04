@@ -169,3 +169,23 @@ input, select, textarea { font-size: max(16px, 1rem); }
   .try-mailform textarea { min-height: 7rem; }
 }
 @media (min-width: 1500px) { .try-mailform .actions { margin: 0; } .try-mailform .field:has(textarea) { margin-bottom: .75rem; } .page.page--try:not(.page--login):not(.page--demo) { padding-bottom: 2.5rem; } }
+
+/* ---------- Phone and tablet navigation (tab bar layouts, 959px and under) ---------- */
+@media (max-width: 959px) {
+  /* The header holds the logo, the Guide and your picture. The way back to the welcome screen is a labelled button in the profile menu. */
+  .site-header .site-nav a.welcome-link--desk { display: none; }
+  .profile__welcome { width: 100%; }
+  /* The Guide button says its word, so it is not mistaken for Help. */
+  .guide-toggle__text { display: inline; }
+  .guide-toggle { padding: 0 .75rem; min-width: 0; }
+  .site-header--helper, .site-header:not(.site-header--helper) { flex-wrap: nowrap; }
+  .site-header .site-nav { flex-wrap: nowrap; margin-inline-start: auto; }
+  /* Your picture in the corner: round, no second ring around it. */
+  .profile__btn { border: 0; background: transparent; padding: 0; min-height: 48px; }
+  .profile__btn .pic { border-radius: 50%; }
+}
+@media (max-width: 600px) {
+  /* Helper header: "Helper" only. Whose helper you are is on the first screen. */
+  .role-tag__who { display: none; }
+}
+@media (max-width: 359px) { .guide-toggle__text { display: none; } .guide-toggle { min-width: 48px; justify-content: center; } }

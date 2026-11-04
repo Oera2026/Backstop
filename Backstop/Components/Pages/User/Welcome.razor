@@ -24,7 +24,7 @@ else
     <h1 @ref="_heading" tabindex="-1">You are ready</h1>
     <p class="lead">What would you like to do first?</p>
     <div class="actions">
-        <button type="button" class="btn btn-primary" @onclick="@(() => Done("/"))"><Icon Name="mail" /> Open my inbox</button>
+        <button type="button" class="btn btn-primary" @onclick="@(() => Done("/inbox"))"><Icon Name="mail" /> Open my inbox</button>
         <button type="button" class="btn btn-quiet" @onclick="@(() => Done("compose"))"><Icon Name="pen" /> Write a message</button>
     </div>
 }
@@ -67,7 +67,7 @@ else
     private void Next() => Go(_step + 1);
     private void Back() => Go(_step - 1);
 
-    private Task Finish() => Done("/");
+    private Task Finish() => Done("/inbox");
 
     private async Task Done(string to)
     {

@@ -15,8 +15,8 @@ public sealed class PageHistory : IDisposable
         _nav.LocationChanged += OnMoved;
     }
 
-    /// <summary>Base-relative path to go back to. "/" when nothing else has been seen.</summary>
-    public string Back { get; private set; } = "/";
+    /// <summary>Base-relative path to go back to. "/inbox" when nothing else has been seen.</summary>
+    public string Back { get; private set; } = "/inbox";
 
     private void OnMoved(object? sender, LocationChangedEventArgs e) => Note(e.Location);
 

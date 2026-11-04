@@ -26,8 +26,8 @@ public sealed class DemoTour
     public static readonly IReadOnlyList<TourStep> UserSteps =
     [
         S("Home", "home", "Home", "Your start page. Big buttons for the things you do most.", ".appnav__item[href='home'], .site-header .brand"),
-        S("Inbox", "/", "Inbox", "Your mail. Tap a message to read it.", ".home__list .row, .emptystate"),
-        S("Inbox", "/", "Write", "Start a new message here.", ".home__side .btn-primary"),
+        S("Inbox", "inbox", "Inbox", "Your mail. Tap a message to read it.", ".home__list .row, .emptystate"),
+        S("Inbox", "inbox", "Write", "Start a new message here.", ".home__side .btn-primary"),
         S("Ask Me", "ask-me", "Ask Me", "Type a question in plain words. You get a plain answer.", ".composer textarea"),
         S("Ask Me", "check", "Check a message", "Not sure about a message? Paste it here.", "#check-text"),
         S("Messages", "messages", "Messages", "Chats with the people you know.", ".appnav__item[href='messages']"),

@@ -33,7 +33,7 @@
             <p><StatusBadge State="MessageState.Held" /></p>
             <h1 id="asked-title">We have not sent your message.</h1>
             <p class="lead">Your helper will look at it first.</p>
-            <p class="actions"><a class="btn btn-primary" href="/">Back to inbox</a></p>
+            <p class="actions"><a class="btn btn-primary" href="/inbox">Back to inbox</a></p>
         </section>
         break;
 
@@ -55,13 +55,13 @@
         <section aria-labelledby="sent-title">
             <p><span class="badge badge--safe"><Icon Name="check" /><span>Sent</span></span></p>
             <h1 id="sent-title">Your message has been sent.</h1>
-            <p class="actions"><a class="btn btn-primary" href="/">Back to inbox</a></p>
+            <p class="actions"><a class="btn btn-primary" href="/inbox">Back to inbox</a></p>
         </section>
         break;
 
     default:
         <PageTitle>@(_reply is null ? "Write a message" : "Reply") – Backstop</PageTitle>
-        <BackLink Href="@(_reply is null ? "/" : $"message/{_reply.Id}")" Text="@(_reply is null ? "Inbox" : "The message")" />
+        <BackLink Href="@(_reply is null ? "/inbox" : $"message/{_reply.Id}")" Text="@(_reply is null ? "Inbox" : "The message")" />
         <h1>@(_reply is null ? "Write a message" : $"Reply to {_reply.FromName}")</h1>
         <form class="form" @onsubmit="Send" novalidate>
             <div class="field">

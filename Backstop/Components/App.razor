@@ -96,7 +96,7 @@
     // makes everything flash and jump; the start-up shapes above fill the gap instead.
     private static readonly IComponentRenderMode InteractiveNoPrerender = new InteractiveServerRenderMode(prerender: false);
 
-    private static readonly string[] ListPaths = ["", "messages", "stories", "remember", "contacts", "sent", "helper", "helper/messages", "helper/history"];
+    private static readonly string[] ListPaths = ["", "inbox", "messages", "stories", "remember", "contacts", "sent", "helper", "helper/messages", "helper/history"];
     // Pages with no side bar or tab bar: start page, the demo panel and the welcome walkthroughs.
     private static readonly string[] NoNavPaths = ["demo-start", "demo", "welcome", "helper/welcome", "try"];
     private string Path => (HttpContext?.Request.Path.Value ?? "").Trim('/').ToLowerInvariant();
