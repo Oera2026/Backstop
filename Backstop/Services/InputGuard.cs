@@ -18,7 +18,8 @@ public static partial class InputGuard
 
     /// <summary>
     /// Folds text so look-alike tricks cannot hide a phrase from the rules: zero-width and direction-control
-    /// characters are removed, full-width and styled letters become plain ones, spaces are tidied.
+    /// characters are removed, full-width and styled letters become plain ones, spaces are tidied, and curly
+    /// quotes become straight ones (a phone keyboard types don’t, and the rules look for don't).
     /// </summary>
     public static string Fold(string? text)
     {
@@ -29,26 +30,64 @@ public static partial class InputGuard
 
         var sb = new StringBuilder(normal.Length);
         foreach (var ch in normal)
-        {
-            var cat = char.GetUnicodeCategory(ch);
-            if (cat == UnicodeCategory.Format || cat == UnicodeCategory.PrivateUse || cat == UnicodeCategory.OtherNotAssigned) continue;
-            if (cat == UnicodeCategory.Control && ch is not ('\n' or '\r' or '\t')) continue;
-            sb.Append(Confusable(ch));
-        }
+            if (Keep(ch)) sb.Append(Confusable(ch));
         return sb.ToString();
     }
 
-    // The few Cyrillic and Greek letters that look exactly like Latin ones and are used to dodge word lists.
+    /// <summary>
+    /// The same fold, with a way back: <paramref name="map"/>[i] is where character i of the result came from in the text
+    /// (one extra entry holds the text's length). So a link found in the folded copy can be taken out of the text as written,
+    /// leaving every other word exactly as the sender typed it.
+    /// </summary>
+    public static string FoldWithMap(string text, out int[] map)
+    {
+        var sb = new StringBuilder(text.Length);
+        var from = new List<int>(text.Length + 1);
+        for (var i = 0; i < text.Length;)
+        {
+            var len = char.IsSurrogatePair(text, i) ? 2 : 1;
+            string piece;
+            if (text[i] < 0x80) piece = text[i].ToString();
+            else
+            {
+                piece = text.Substring(i, len);
+                try { piece = piece.Normalize(NormalizationForm.FormKC); }
+                catch (ArgumentException) { /* a broken surrogate: keep it as it is */ }
+            }
+            foreach (var ch in piece)
+            {
+                if (!Keep(ch)) continue;
+                sb.Append(Confusable(ch));
+                from.Add(i);
+            }
+            i += len;
+        }
+        from.Add(text.Length);
+        map = [.. from];
+        return sb.ToString();
+    }
+
+    private static bool Keep(char ch)
+    {
+        var cat = char.GetUnicodeCategory(ch);
+        if (cat is UnicodeCategory.Format or UnicodeCategory.PrivateUse or UnicodeCategory.OtherNotAssigned) return false;
+        return cat != UnicodeCategory.Control || ch is '\n' or '\r' or '\t';
+    }
+
+    // Look-alikes used to dodge word lists: Cyrillic and Greek letters that look exactly like Latin ones, curly quotes, and dots that browsers read as dots.
     private static char Confusable(char c) => c switch
     {
+        '\u2018' or '\u2019' or '\u201A' or '\u201B' or '\u02BC' or '\u2032' or '\u0060' or '\u00B4' => '\'',
+        '\u201C' or '\u201D' or '\u201E' or '\u201F' or '\u2033' => '"',
+        '\u3002' => '.',
         'а' => 'a', 'е' => 'e', 'о' => 'o', 'р' => 'p', 'с' => 'c', 'х' => 'x', 'у' => 'y', 'і' => 'i', 'ѕ' => 's',
         'А' => 'A', 'В' => 'B', 'Е' => 'E', 'К' => 'K', 'М' => 'M', 'Н' => 'H', 'О' => 'O', 'Р' => 'P', 'С' => 'C', 'Т' => 'T', 'Х' => 'X',
         'ο' => 'o', 'α' => 'a', 'ε' => 'e', 'ι' => 'i', 'ν' => 'v', 'Ο' => 'O', 'Α' => 'A', 'Ε' => 'E', 'Ι' => 'I', 'Ν' => 'N',
         _ => c,
     };
 
-    /// <summary>True if the text was longer than the checker reads.</summary>
-    public static bool IsTooLong(string? text) => (text?.Length ?? 0) > MaxCheckedChars;
+    /// <summary>True if the checker cannot read all of it. Measured after folding, because folding can make text longer, and the cut happens after folding.</summary>
+    public static bool IsTooLong(string? text) => Fold(text).Length > MaxCheckedChars;
 
     /// <summary>Folds, then cuts to the length the checker reads.</summary>
     public static string ForChecker(string? text)

@@ -20,5 +20,5 @@ public static class SensitivePatterns
     public static Regex Secret { get; } = new(SecretTerms, Options);
 
     /// <summary>Anything a message may not ask for or give away: card, bank and secret-code wording.</summary>
-    public static Regex Private { get; } = new($@"\bcard details\b|{BankTerms}|{SecretTerms}", Options);
+    public static Regex Private { get; } = new($@"\bcard (?:details|number)\b|\b(?:log[- ]?in|sign[- ]?in|online banking) details\b|\bdate of birth\b|\bmemorable word\b|\bmother'?s maiden name\b|\bnational insurance number\b|\bpassport (?:number|details)\b|{BankTerms}|{SecretTerms}", Options);
 }

@@ -14,10 +14,12 @@ public static class LinkFinder
 
     public sealed record Scan(IReadOnlyList<LinkCheck> Links, int Problems, bool Deceptive);
 
-    // Bare addresses need a known ending, so "end.Next" or "3.5" are not mistaken for links. Not after @ (an email address).
+    // Bare addresses need a known ending, or a path after any ending, so "end.Next" or "3.5" are not mistaken for links. Not after @ (an email address).
+    // Short endings that are also everyday words (.to, .it, .in) count only with a path, so "Thanks.It was lovely" keeps its words.
     public const string PatternText =
-        @"\b(?:https?://|www\.)[^\s<>""')\]]+" +
-        @"|(?<![@\w./-])(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+(?:com|net|org|uk|gov|edu|info|biz|io|ly|gl|gd|xyz|top|click|link|live|online|site|shop|store|app|dev|test|ru|cn|tk|cc|co(?=/))(?![\w@-])(?:/[^\s<>""')\]]*)?";
+        @"\b(?:https?|ftps?|sftp|file|smb|ssh|telnet)://[^\s<>""')\]]+|\bwww\.[^\s<>""')\]]+" +
+        @"|(?<![@\w./-])(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.){1,12}(?:(?:com|co|org|net|gov|ac|edu)\.[a-z]{2}(?![a-z0-9-])|com|net|org|uk|gov|edu|info|biz|io|ly|gl|gd|xyz|top|click|link|live|online|site|shop|store|app|dev|test|ru|cn|tk|cc|me|ai|support|help|de|fr|eu|ca|au|icu|vip|club|cam|cloud|website|mobi|tech|ws|pw|su|ml|ga|cf|gq|[a-z]{2,24}(?=[:/]))(?![\w@-])(?::\d{1,5})?(?:/[^\s<>""')\]]*)?" +
+        @"|(?<![@\w./-])(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)(?![\w@-]|\.\d)(?::\d{1,5})?(?:/[^\s<>""')\]]*)?";
 
     private const RegexOptions Options = RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled;
 
@@ -41,7 +43,9 @@ public static class LinkFinder
     {
         try
         {
-            var all = Pattern.Matches(text).Select(m => m.Value.TrimEnd('.', ',', ';', ':', '!', '?')).Where(v => v.Length > 0).Distinct().ToList();
+            // As written first, so look-alike letters in an address are still seen. Then folded, so hidden characters cannot hide a link at all.
+            var all = Pattern.Matches(text).Concat(Pattern.Matches(InputGuard.Fold(text)))
+                .Select(m => m.Value.TrimEnd('.', ',', ';', ':', '!', '?')).Where(v => v.Length > 0).Distinct().ToList();
             var links = new List<LinkCheck>();
             var problems = 0;
             var deceptive = false;
@@ -73,6 +77,7 @@ public static class LinkFinder
     public const string RiskyWordsNote = "The address mentions signing in, downloading or a prize.";
     public const string VeryLongNote = "The address is very long.";
     public const string CouldNotCheckNote = "The link could not be fully checked.";
+    public const string NotWebNote = "It is not an ordinary web address.";
 
     /// <param name="maxLength">Real mail uses <see cref="MaxLength"/>. The Link check on /try allows longer ones, because shop and
     /// tracking links are often several hundred letters long and that alone says nothing.</param>
@@ -100,6 +105,8 @@ public static class LinkFinder
         { notes.Add(ShortenerNote); disguised = true; }
         if (hasScheme && uri.Scheme == Uri.UriSchemeHttp)
             notes.Add(NotSecureNote);
+        if (hasScheme && uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
+            notes.Add(NotWebNote);
         try
         {
             if (RiskyWords.IsMatch(host + uri.AbsolutePath))

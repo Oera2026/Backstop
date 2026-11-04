@@ -1152,6 +1152,9 @@ public class MetaScamCheckerTests
         // 37. Review fixes: decisions vs rescans, backoff, retry budget, caps, per-visitor demo switch, sign-in locks.
         await ReviewFixTests.RunAsync();
 
+        // 37d. Local rules and the link check: both directions, hidden links, hostile input.
+        await LocalRuleTests.RunAsync();
+
         // 37b. Visitor data: own emails are never stored, and what goes to Meta AI is disposed of after its time.
         await VisitorDataTests.RunAsync();
 
