@@ -69,6 +69,10 @@
             <StatusBadge State="state" ForHelper="true" />
             <p>@OutcomeText</p>
         }
+        @if (_refused)
+        {
+            <p class="form-error" role="alert">Too many tries. Please wait a minute.</p>
+        }
     </div>
 </section>
 
@@ -126,7 +130,7 @@
 
 @code {
     private string _scenarioId = MockData.Scenarios[0].Id;
-    private bool _fail, _running, _split = true, _ownRun;
+    private bool _fail, _running, _split = true, _ownRun, _refused;
     private MessageState? _state;
     private TierResult[] _tiers = Fresh();
 
@@ -150,9 +154,11 @@
 
     private async Task Run()
     {
+        if (_running) return;
         if (_scenarioId == Own && string.IsNullOrWhiteSpace(_ownBody)) return;
         _running = true;
         _state = null;
+        _refused = false;
         _ownRun = _scenarioId == Own;
         _tiers = Fresh();
         try
@@ -165,9 +171,11 @@
             if (_ownRun)
             {
                 _state = await Mail.CheckOnceAsync(new InboundMail(_ownFrom.Trim(), _ownFrom.Trim(), _ownSubject.Trim(), _ownBody), _fail, OnTier);
-                _ownSubject = _ownBody = "";
+                // A refused email keeps its words, so it can be tried again.
+                if (_state is not null) _ownSubject = _ownBody = "";
             }
             else _state = (await Mail.ReceiveAsync(_scenarioId, _fail, OnTier))?.State;
+            _refused = _state is null;
         }
         finally
         {
@@ -197,6 +205,7 @@
         if (!reset.Done) return;
         _fail = false;
         _state = null;
+        _refused = false;
         _tiers = Fresh();
     }
 }
