@@ -13,6 +13,35 @@ html { font-size: 20px; font-size: clamp(16px, calc(12px + 1.1vh), 20px); font-s
 /* Real viewport height, so a phone's address bar does not hide the bottom */
 body { min-height: 100vh; min-height: 100dvh; }
 
+/* Way back to the welcome screen, in every header. Icon only on small phones; hidden inside the demo split-screen frames. */
+.welcome-link { gap: .4rem; font-weight: 700; }
+.framed .welcome-link { display: none; }
+@media (max-width: 480px) { .welcome-link span { display: none; } .site-header .site-nav a.welcome-link { padding-inline: .6rem; } }
+
+/* Phones: each welcome card is one compact row. The whole card is the button; the arrow is the go sign. */
+@media (max-width: 600px) {
+  .page--login h1 { font-size: calc(1.5rem * var(--tx)); margin-bottom: .4rem; }
+  .page--login .lead { font-size: calc(1rem * var(--tx)); line-height: 1.4; margin-bottom: 0; }
+  .page--login .sidecards { margin: .75rem 0; gap: .6rem; }
+  .page--login .sidecard {
+    grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "pic title go" "pic text go";
+    column-gap: .75rem; padding: .6rem .75rem;
+  }
+  .page--login .sidecard .pic { width: 3rem; height: 3rem; }
+  .page--login .sidecard .pic .icon { width: 1.7rem; height: 1.7rem; }
+  .page--login .sidecard__title { font-size: calc(1.15rem * var(--tx, 1)); line-height: 1.25; }
+  .page--login .sidecard__text { line-height: 1.3; }
+  .page--login .sidecard__go { margin: 0; min-width: 56px; padding: 0; }
+  .page--login .sidecard__go-text { display: none; }
+}
+/* Demo panel header on phones: the logo and the links share one row, nothing pushes the page sideways. */
+@media (max-width: 600px) {
+  .site-header--demo { flex-wrap: nowrap; padding-right: 1rem; gap: 0 .25rem; }
+  .site-header--demo .brand > span { display: none; }
+  .site-header--demo .site-nav { flex-wrap: nowrap; min-width: 0; }
+  .site-header--demo .site-nav a { padding-inline: .5rem; }
+}
+
 /* 2. Density steps. Spacing flexes; the 56px buttons do not. */
 @media (max-height: 800px) {
   .page { padding-top: 1rem; padding-bottom: 2rem; }
@@ -37,6 +66,21 @@ body { min-height: 100vh; min-height: 100dvh; }
   .modecard { min-height: 80px; padding: .75rem 1rem; }
   .modecards--lead > li:first-child .modecard { min-height: 96px; }
   .sidecard__go { margin-top: .4rem; }
+}
+
+/* Try page on a short desktop window: the examples sit in a row of five above the form, not in a tall column beside it. */
+@media (min-width: 64rem) and (max-height: 900px) {
+  .try-email { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); row-gap: .6rem; }
+  .page--try .try-samples { grid-template-columns: repeat(5, minmax(0, 1fr)); grid-auto-rows: auto; align-content: start; }
+  .page--try .try-sample { font-size: calc(.85rem * var(--tx)); padding-inline: .3rem; line-height: 1.2; }
+  .try-grid { grid-template-columns: minmax(0, 1fr) minmax(19rem, 22rem); }
+  .try-mode { flex-direction: row; align-items: center; gap: 0 1.5rem; margin: 0; }
+  .try-mode legend { float: left; margin: 0 1.5rem 0 0; padding-top: .35rem; }
+  /* From, Replies go to and Subject share one row; the message and the button take the full width. */
+  .try-mailform { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 1rem; align-content: start; }
+  .try-mailform .try-pair { display: contents; }
+  .try-mailform > .try-mode, .try-mailform > .field:has(textarea), .try-mailform > .form-error, .try-mailform > .actions { grid-column: 1 / -1; }
+  .try-mailform textarea { min-height: 5rem; }
 }
 
 /* 3. Spacious: width and height both allow it. Start page cards go side by side. */
@@ -64,4 +108,14 @@ body { min-height: 100vh; min-height: 100dvh; }
   .page--login .sidecard .pic .icon { width: 1.6rem; height: 1.6rem; }
   .page--login .sidecard__title { font-size: calc(1.2rem * var(--tx, 1)); }
   .page--login .sidecard__text { margin-bottom: .25rem; line-height: 1.4; }
+}
+
+/* Welcome steps (user and helper): the three-step list goes across when there is width, and the heading and gaps tighten when there is not much height. */
+@media (min-width: 760px) { .flowlist { grid-template-columns: repeat(3, minmax(0, 1fr)); } .flowlist li { flex-direction: column; align-items: flex-start; } }
+@media (max-height: 700px), (max-width: 600px) {
+  .progress { margin-bottom: .6rem; }
+  .flowlist { margin: .75rem 0; gap: .5rem; }
+  .flowlist li, .can li { padding: .5rem .75rem; }
+  .page:has(.flowlist) h1 { font-size: calc(1.5rem * var(--tx)); }
+  .page:has(.flowlist) .lead { line-height: 1.4; margin-bottom: 0; }
 }
