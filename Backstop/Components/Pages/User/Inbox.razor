@@ -45,7 +45,8 @@
         }
         else
         {
-            @foreach (var group in inbox.GroupBy(m => DayName(m.ReceivedAt)))
+            var shown = _all ? inbox : inbox.Take(FirstPage).ToList();
+            @foreach (var group in shown.GroupBy(m => DayName(m.ReceivedAt)))
             {
                 <h2>@group.Key</h2>
                 <ul class="rows" aria-label="@group.Key">
@@ -65,11 +66,19 @@
                     }
                 </ul>
             }
+            @if (!_all && inbox.Count > FirstPage)
+            {
+                <p class="actions"><button type="button" class="btn btn-quiet" @onclick="() => _all = true">Show older messages (@(inbox.Count - FirstPage))</button></p>
+            }
         }
     </div>
 </div>
 
 @code {
+    // The newest messages first; the rest wait behind one button, so the page stays short.
+    private const int FirstPage = 15;
+    private bool _all;
+
     private string DayName(DateTimeOffset at)
     {
         var day = DateOnly.FromDateTime(Clock.Local(at).DateTime);
