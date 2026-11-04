@@ -53,8 +53,8 @@
                             <a class="row" href="message/@m.Id">
                                 <span class="pic pic--blue" aria-hidden="true"><Icon Name="mail" /></span>
                                 <span class="row__main">
-                                    <span class="row__from">@m.FromName</span>
-                                    <span class="row__subject">@m.Subject</span>
+                                    <span class="row__from">@Defang.ForUser(m.FromName)</span>
+                                    <span class="row__subject">@Defang.ForUser(m.Subject)</span>
                                     <span class="row__time">@Clock.When(m.ReceivedAt)</span>
                                     <span class="row__preview">@Defang.ForUser(m.Preview)</span>
                                 </span>

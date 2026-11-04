@@ -18,7 +18,8 @@
 
     @if (_open)
     {
-        <div id="profile-panel" class="profile__panel" role="dialog" aria-label="Your profile">
+        <div id="profile-panel" class="profile__panel" role="dialog" aria-modal="true" aria-label="Your profile">
+            <ModalFocus Root=".profile" Focus=".profile__panel" Return=".profile__btn" />
             <div class="profile__head">
                 <ProfileAvatar Profile="p" Large="true" ShowStatus="true" />
                 <div>
@@ -28,14 +29,16 @@
             </div>
 
             <div role="radiogroup" aria-label="Your status" class="profile__opts">
-                <button type="button" role="radio" aria-checked="@(p.Presence == Presence.Online ? "true" : "false")" class="profile__opt @(p.Presence == Presence.Online ? "profile__opt--on" : "")" @onclick="@(() => Api.SetPresence(Role, Presence.Online))">
+                <label class="profile__opt @(p.Presence == Presence.Online ? "profile__opt--on" : "")">
+                    <input type="radio" class="sr-note" name="profile-status" checked="@(p.Presence == Presence.Online)" @onchange="@(() => Api.SetPresence(Role, Presence.Online))" />
                     <span class="presence-dot presence-dot--online" aria-hidden="true"></span>
                     <span><strong>Online</strong><span class="profile__hint">People see you are here.</span></span>
-                </button>
-                <button type="button" role="radio" aria-checked="@(p.Presence == Presence.Hidden ? "true" : "false")" class="profile__opt @(p.Presence == Presence.Hidden ? "profile__opt--on" : "")" @onclick="@(() => Api.SetPresence(Role, Presence.Hidden))">
+                </label>
+                <label class="profile__opt @(p.Presence == Presence.Hidden ? "profile__opt--on" : "")">
+                    <input type="radio" class="sr-note" name="profile-status" checked="@(p.Presence == Presence.Hidden)" @onchange="@(() => Api.SetPresence(Role, Presence.Hidden))" />
                     <span class="presence-dot presence-dot--hidden"><Icon Name="minus" /></span>
                     <span><strong>Hidden</strong><span class="profile__hint">You look offline to others.</span></span>
-                </button>
+                </label>
             </div>
 
             <div class="profile__pic-actions">

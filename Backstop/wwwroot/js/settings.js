@@ -1,6 +1,7 @@
 // Device settings (text size, light or dark, contrast, spacing, motion, voice speed). Stored in this browser only.
 // Loaded in <head> so the saved look is applied before the page paints.
 (function () {
+  document.documentElement.classList.add('js');
   var KEY = 'backstop.settings';
   var DEFAULTS = { size: 'normal', theme: 'light', contrast: 'standard', spacing: 'normal', motion: 'normal', rate: 'normal' };
   var HKEY = 'backstop.helperWelcomed';

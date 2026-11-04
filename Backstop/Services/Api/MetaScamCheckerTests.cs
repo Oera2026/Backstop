@@ -1170,6 +1170,9 @@ public class MetaScamCheckerTests
         // 37e. Page behaviour: double taps, undo, changing story, refused runs, Check again, changing links, uploads, the camera.
         await PageBehaviourTests.RunAsync();
 
+        // 37f. Accessibility: links in subjects and senders, skip link, error bar, read aloud, dialog focus.
+        await AccessibilityTests.RunAsync();
+
         // 38. Show me: the AI writes the guide; unsafe goals are refused; failures give a plain error, never a canned guide.
         {
             static HttpResponseMessage Say(string json)

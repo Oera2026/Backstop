@@ -12,7 +12,7 @@
 }
 else
 {
-    <PageTitle>Check: @m.Subject – Backstop Helper</PageTitle>
+    <PageTitle>Check: @Defang.ForHelper(m.Subject) – Backstop Helper</PageTitle>
     <EvidenceCard Message="m"
                   OnRescan="@(() => Mail.RescanAsync(m.Id))" />
 }

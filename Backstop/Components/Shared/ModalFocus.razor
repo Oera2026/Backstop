@@ -1,0 +1,25 @@
+@* Put inside a dialog. While it is on the page, everything outside Root is inert and focus sits in the dialog. When it goes, focus returns. Draws nothing. *@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+@code {
+    /// <summary>Selector for what stays usable. Everything outside it goes inert.</summary>
+    [Parameter, EditorRequired] public string Root { get; set; } = "";
+    /// <summary>Selector for where focus goes when it opens.</summary>
+    [Parameter, EditorRequired] public string Focus { get; set; } = "";
+    /// <summary>Selector for where focus goes when it closes, if the element that opened it has gone.</summary>
+    [Parameter] public string? Return { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try { await JS.InvokeVoidAsync("backstop.modalOpen", Root, Focus, Return); }
+        catch (Exception) { /* no JS: the dialog still works, only focus is not moved */ }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try { await JS.InvokeVoidAsync("backstop.modalClose"); }
+        catch (Exception) { /* the page has gone */ }
+    }
+}

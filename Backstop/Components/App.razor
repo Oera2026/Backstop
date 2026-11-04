@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#0F4C5C" />
     <meta name="description" content="Backstop is a simple, easy-to-read email app." />
+    <meta name="format-detection" content="telephone=no" />
     <base href="/" />
     <script src="@Assets["js/settings.js"]"></script>
     <link rel="manifest" href="manifest.webmanifest" />
@@ -27,10 +28,15 @@
 </head>
 
 <body>
-    <div class="boot" aria-hidden="true">
+    <div class="boot">
         @* The same frame the real page gets (header, side bar or tab bar, page column), so nothing moves when the page arrives. *@
-        <div class="site-header"><span class="brand"><Logo /> <span class="brand__word">Backstop</span></span></div>
-        <div class="shell">
+        <noscript><p class="boot__noscript">Backstop needs JavaScript. Please turn it on, then reload this page.</p></noscript>
+        <div class="boot__status">
+            <p id="boot-status" role="status">Starting…</p>
+            <button type="button" id="boot-reload" class="btn btn-primary" hidden>Reload this page</button>
+        </div>
+        <div class="site-header" aria-hidden="true"><span class="brand"><Logo /> <span class="brand__word">Backstop</span></span></div>
+        <div class="shell" aria-hidden="true">
             @if (HasNav)
             {
                 <div class="boot__nav">
@@ -76,7 +82,7 @@
         </div>
         @if (HasNav)
         {
-            <div class="boot__tabs"></div>
+            <div class="boot__tabs" aria-hidden="true"></div>
         }
     </div>
     <Routes @rendermode="PageRenderMode" TimeZone="@HttpContext?.Request.Cookies["backstop.tz"]" />

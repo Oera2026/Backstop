@@ -6,8 +6,8 @@
     <p class="evidence__status">
         <StatusBadge State="Message.State" ForHelper="true" />
     </p>
-    <h1 id="ev-title">@Message.Subject</h1>
-    <p class="evidence__who">From <strong>@Message.FromName</strong> <code>@Defang.ForHelper(Message.FromAddress)</code></p>
+    <h1 id="ev-title">@Defang.ForHelper(Message.Subject)</h1>
+    <p class="evidence__who">From <strong>@Defang.ForHelper(Message.FromName)</strong> <code>@Defang.ForHelper(Message.FromAddress)</code></p>
 
     @if (Message.State == MessageState.Held)
     {

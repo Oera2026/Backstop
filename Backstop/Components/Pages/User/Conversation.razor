@@ -47,6 +47,11 @@ else
             }
         </ChatLog>
 
+        @if (_messages.Count > 0)
+        {
+            <div class="convo__read"><ReadAloudButton Text="@Speech" /></div>
+        }
+
         <ChatComposer Label="@($"Message to {_person.Name}")" OnSend="Send" />
     </div>
 }
@@ -58,6 +63,9 @@ else
     private IReadOnlyList<ChatMessage> _messages = [];
     private int _held;
     private string? _problem;
+
+    // The last few messages, newest last, so it reads like the conversation on screen.
+    private string Speech => string.Join(" ", _messages.TakeLast(5).Select(m => $"{(m.FromMe ? "You" : _person?.Name)} said: {Defang.ForUser(m.Text)}."));
 
     protected override Task OnParametersSetAsync()
     {

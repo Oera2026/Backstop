@@ -1,13 +1,14 @@
 @implements IDisposable
 @inject AskSession Session
 @inject NavigationManager Nav
+@inject IJSRuntime JS
 
 @* The Ask Me page is the same chat at full size, so the dock stays out of its way there. Home already has an Ask Me card. *@
 @if (!OnAskPage)
 {
     @if (Session.DockOpen)
     {
-        <aside id="ask-dock" class="dock" aria-label="Ask Me">
+        <aside id="ask-dock" class="dock" aria-label="Ask Me" @onkeydown="OnKey">
             <div class="dock__head">
                 <h2>Ask Me</h2>
                 <a class="btn btn-text dock__full" href="ask-me">Open full page</a>
@@ -20,7 +21,7 @@
     }
     else if (!OnHome)
     {
-        <button type="button" class="dock-tab" aria-expanded="false" aria-controls="ask-dock" @onclick="() => Session.SetDock(true)">
+        <button type="button" class="dock-tab" aria-expanded="false" @onclick="() => Session.SetDock(true)">
             <Icon Name="chat" /> <span>Ask Me</span>
         </button>
     }
@@ -32,6 +33,32 @@
 
     private bool OnHome =>
         Nav.ToBaseRelativePath(Nav.Uri).Split('?', '#')[0].Equals("home", StringComparison.OrdinalIgnoreCase);
+
+    private bool _wasOpen;
+    private string _wasAt = "";
+
+    private void OnKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape") Session.SetDock(false);
+    }
+
+    // Opening moves focus into the dock, and closing moves it back, because the button that was pressed has gone.
+    // Moving to another page is left alone: the new page puts focus on its own heading.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        var open = Session.DockOpen && !OnAskPage;
+        var sameOpenState = open == _wasOpen;
+        var samePage = Nav.Uri == _wasAt;
+        _wasOpen = open;
+        _wasAt = Nav.Uri;
+        if (firstRender || sameOpenState || !samePage) return;
+        try
+        {
+            if (open) await JS.InvokeAsync<bool>("backstop.focusSel", "#ask-dock h2");
+            else if (!await JS.InvokeAsync<bool>("backstop.focusSel", ".dock-tab")) await JS.InvokeAsync<bool>("backstop.focusSel", "main");
+        }
+        catch (Exception) { /* focus is a nicety */ }
+    }
 
     protected override void OnInitialized()
     {

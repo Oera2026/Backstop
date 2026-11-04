@@ -39,7 +39,7 @@
 .chat--dock .storytheatre { padding: .25rem 0; }
 .storytheatre__bar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0 0 .4rem; border-bottom: 1px solid var(--rule); }
 .storytheatre__title { margin: 0; font-size: calc(1.25rem * var(--tx)); }
-.storytheatre__exit { min-height: 48px; }
+.storytheatre__exit { min-height: 56px; }
 .storytheatre__exit { flex: none; }
 .storytheatre__body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; justify-content: safe center; padding: .5rem 0; }
 .storytheatre .storyplayer { border: 0; padding: 0; margin: 0; text-align: center; }

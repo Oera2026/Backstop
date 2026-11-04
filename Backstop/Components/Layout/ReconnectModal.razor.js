@@ -2,6 +2,10 @@
 const reconnectModal = document.getElementById("components-reconnect-modal");
 reconnectModal.addEventListener("components-reconnect-state-changed", handleReconnectStateChanged);
 
+// Escape must not close this. Behind it the page is not connected, so nothing on it would work.
+reconnectModal.addEventListener("cancel", event => event.preventDefault());
+reconnectModal.addEventListener("keydown", event => { if (event.key === "Escape") event.preventDefault(); });
+
 const retryButton = document.getElementById("components-reconnect-button");
 retryButton.addEventListener("click", retry);
 

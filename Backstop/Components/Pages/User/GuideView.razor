@@ -52,6 +52,7 @@ else
             {
                 <BackLink OnClick="() => _at--" Text="Back a step" />
             }
+            <div class="actions actions--quiet"><ReadAloudButton Text="@($"Step {_at + 1}. {_g.Steps[_at]}")" /></div>
             <div class="actions actions--stick">
                 <button type="button" class="btn btn-primary" @onclick="Next"><Icon Name="arrow-right" /> @(_at == _g.Steps.Count - 1 ? "Finish" : "Next")</button>
                 <button type="button" class="btn btn-quiet" @onclick="() => _stuck = true"><Icon Name="question" /> I'm stuck</button>
@@ -102,6 +103,7 @@ else
                 }
             </ol>
 
+            <div class="actions actions--quiet"><ReadAloudButton Text="@OverviewSpeech" /></div>
             <p class="done-note" role="status">@if (_saved is not null){<Icon Name="check" /><span>Saved to Remember. <a href="remember/@_saved.Id">Open it</a></span>}</p>
             @if (_saveProblem is not null)
             {
@@ -134,6 +136,15 @@ else
     private bool _loading = true, _saving, _stuck, _helpSent, _helpBusy;
     private string? _problem, _saveProblem, _helpProblem;
     private MemoryCard? _saved;
+
+    private string OverviewSpeech
+    {
+        get
+        {
+            var care = _g!.NeedsCare is { } c ? $"Take care: {c.Topic}. {c.Text} " : "";
+            return $"{_g.Title}. {care}" + string.Join(" ", _g.Steps.Select((s, i) => $"Step {i + 1}. {s}"));
+        }
+    }
 
     protected override Task OnParametersSetAsync() => Load();
 
