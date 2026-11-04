@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Release build
+        working-directory: Backstop
+        run: dotnet build -c Release
+      # No keys here on purpose: the checks use stubs and must pass with no AI key.
+      - name: Checks
+        working-directory: Backstop
+        run: dotnet run -- --test-llama
