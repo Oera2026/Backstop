@@ -9,6 +9,9 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 COPY --from=build /app/publish ./
 
+# Not root: /try fetches untrusted addresses on the server. The app writes no files, and PORT on the host is above 1024.
+USER $APP_UID
+
 ENV ASPNETCORE_ENVIRONMENT=Production
 EXPOSE 5106
 
