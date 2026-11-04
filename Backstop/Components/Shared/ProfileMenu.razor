@@ -90,6 +90,10 @@
         {
             _error = "That picture is too big. Please choose a smaller one.";
         }
+        catch (Exception)
+        {
+            _error = "We could not read that file. Please try again.";
+        }
     }
 
     private void Remove() { Api.RemoveProfilePhoto(Role); _error = null; }
