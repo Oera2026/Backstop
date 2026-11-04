@@ -351,7 +351,7 @@ public class MetaScamCheckerTests
                 Assert(mail.Send("a@example.com\r\nBcc: b@example.com", "Hi", "x").Message is null, "Line break in address refused");
                 Assert(mail.Send("a@example.com, b@example.com", "Hi", "x").Message is null, "Two addresses refused");
                 Assert(mail.Send("a@example.com", "Hi\r\nBcc: b@example.com", "x").Message is null, "Line break in subject refused");
-                Assert(!mail.HoldOutgoing("not an address", "Hi", "x", []), "Odd address cannot be queued");
+                Assert(mail.HoldOutgoing("not an address", "Hi", "x", []) is not null, "Odd address cannot be queued");
                 Assert(mail.CheckOutgoing("a@example.com", "Hi", "my card is ４１１１ １１１１ １１１１ １１１１").NeedsPause, "Full-width card number is still seen");
             }
             Console.WriteLine("PASS: Outgoing mail is validated and cannot carry hidden headers.");
@@ -376,7 +376,7 @@ public class MetaScamCheckerTests
 
             var (c3, _) = CreateChecker(_ => Task.FromResult(Reply("\"needsHelper\":\"true\",\"personAtRisk\":1,")));
             var r3 = await c3.CheckScamAsync("Hello");
-            Assert(!r3.NeedsHuman && r3.Verdict == Verdict.LooksSafe, "Only a real JSON true counts");
+            Assert(r3.NeedsHuman && !r3.AtRisk && r3.Verdict != Verdict.LooksSafe, "The word true brings a helper in too. Anything else, such as 1, does not count");
             Console.WriteLine("PASS: The AI can ask for a human, and only ever adds care.");
 
             // Through the app: held for the helper even when the AI says Safe, and even with no AI at all.
@@ -1154,6 +1154,9 @@ public class MetaScamCheckerTests
 
         // 37b. Visitor data: own emails are never stored, and what goes to Meta AI is disposed of after its time.
         await VisitorDataTests.RunAsync();
+
+        // 37d. Reliability: Meta limits and retries, caps, resets, tiers, Send and held mail.
+        await ReliabilityFixTests.RunAsync();
 
         // 37c. Page flows: real pages rendered with real services and no AI key.
         await PageFlowTests.RunAsync();

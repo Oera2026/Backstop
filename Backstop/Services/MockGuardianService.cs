@@ -16,7 +16,7 @@ public sealed class MockGuardianService(MailStore store) : IGuardianService
     public HelperPermissions Access => HelperPermissions.Clamp(store.HelperAccess);
     public void SetAccess(HelperPermissions access) => store.SetHelperAccess(HelperPermissions.Clamp(access));
     public bool Allows(HelperCapability capability) => Access.Allows(capability);
-    public IReadOnlyList<ActivityEntry> GetMailActivity() => store.Activity();
+    public IReadOnlyList<ActivityEntry> GetMailActivity() => Allows(HelperCapability.SeeActivitySummary) ? store.Activity() : [];
 
     public IReadOnlyList<MailMessage> GetQueue() =>
         store.Query(m => m.State == MessageState.Held);
@@ -89,17 +89,24 @@ public sealed class MockGuardianService(MailStore store) : IGuardianService
     internal bool AutoCommit { get; set; } = true;
     internal Action? SaveCheck { get; set; }
 
+    private const string Taken = "A decision on this message is already waiting. Undo it first to change it.";
+
     public DecisionResult Propose(string id, bool safe)
     {
         var m = store.Find(id);
         if (m is null || m.State != MessageState.Held) return new(false, "This message is not waiting for you any more.");
         if (safe && m.AwaitingScan) return new(false, "The checker has not finished with this one. Please check it again first.");
+        // One decision at a time. /helper can be open in two tabs, and one tab's Undo must not cancel the other tab's choice.
+        lock (_pendingGate)
+        {
+            if (_pending.ContainsKey(id)) return new(false, Taken);
+        }
         // Marked on the message itself, so a rescan cannot release it while the helper's decision waits out its window.
         if (!store.TryChange(id, x => x.State == MessageState.Held && !(safe && x.AwaitingScan), x => x.DecisionPending = true))
             return new(false, "This message is not waiting for you any more.");
         lock (_pendingGate)
         {
-            _pending[id] = (safe, Now());
+            if (!_pending.TryAdd(id, (safe, Now()))) return new(false, Taken);
             _failures.Remove(id);
             if (AutoCommit)
             {

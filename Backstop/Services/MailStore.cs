@@ -78,24 +78,27 @@ public sealed class MailStore
         lock (_gate) return _all.FirstOrDefault(m => m.Id == id)?.Snapshot();
     }
 
-    public void Add(MailMessage message)
+    /// <summary>False when the store is full of mail nobody may drop. The message is then refused, never added.</summary>
+    public bool Add(MailMessage message)
     {
         lock (_gate)
         {
+            if (_all.Count >= MaxMessages) MakeRoom();
+            if (_all.Count >= MaxMessages) return false;
             _all.Add(message);
-            if (_all.Count > MaxMessages) TrimMessages(keep: message);
         }
         Raise();
+        return true;
     }
 
-    // Oldest first: blocked mail, then cleared, then held. A message still being checked is never dropped. Caller holds the lock.
-    private void TrimMessages(MailMessage keep)
+    // Oldest first: blocked mail, then cleared. Held mail, and mail still being checked, is never dropped: a helper must still see it. Caller holds the lock.
+    private void MakeRoom()
     {
         var drop = _all
-            .Where(m => m != keep && m.State is MessageState.Blocked or MessageState.Cleared or MessageState.Held)
-            .OrderBy(m => m.State switch { MessageState.Blocked => 0, MessageState.Cleared => 1, _ => 2 })
+            .Where(m => m.State is MessageState.Blocked or MessageState.Cleared)
+            .OrderBy(m => m.State == MessageState.Blocked ? 0 : 1)
             .ThenBy(m => m.ReceivedAt)
-            .Take(_all.Count - MaxMessages)
+            .Take(_all.Count - MaxMessages + 1)
             .ToHashSet();
         _all.RemoveAll(drop.Contains);
     }

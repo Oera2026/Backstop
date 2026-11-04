@@ -143,6 +143,7 @@ public sealed partial class MockMailService
         var (reports, notChecked) = serious ? ([], 0) : await InspectLinksAsync($"{subject}\n{body}", ct);
         // The links were opened, so what was found replaces the guess made from the address alone. Without that, a harmless shortener
         // would still be called "hidden" and hold the message by itself, however clean the trip turned out to be.
+        var byAddressOnly = analysis;
         analysis = MailAnalyzer.WithInspectedLinks(analysis, reports);
         // Blocked or held by the local checks alone: no AI answer could change that, so it is not asked and the answer is instant.
         var ai = MailAnalyzer.SkipsAi(analysis) ? null
@@ -198,8 +199,11 @@ public sealed partial class MockMailService
 
         return Tipped(state switch
         {
+            // Only this page opens links. Real mail judges a link by its address, so it may still wait for the helper.
             MessageState.Cleared => new(TryVerdict.Safe, true, signals, explanation,
-                "Nothing. It would go straight to your inbox.", Links: reports),
+                reports.Count > 0 && MailAnalyzer.Decide(byAddressOnly, ai).State != MessageState.Cleared
+                    ? "If this came as real mail, they would check the link first."
+                    : "Nothing. It would go straight to your inbox.", Links: reports),
             MessageState.Blocked => new(TryVerdict.Blocked, true, signals, explanation,
                 "It would be in their Blocked list. You would never see it.", Links: reports),
             _ => new(TryVerdict.Held, true, signals, explanation,

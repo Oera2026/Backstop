@@ -91,16 +91,18 @@ public static class HelperDecisionTests
         r.Pass(11);
         Assert(r.Fresh(m).State == MessageState.Cleared && !r.Guardian.Undo(m.Id), "Undo after a decision was saved does nothing");
 
-        // The latest tap wins, with a fresh window.
+        // One decision at a time: a second tab cannot replace the first tab's choice. Undo, then choose again.
         r = new Rig();
         m = await r.Held();
-        r.Guardian.Propose(m.Id, true);
-        r.Pass(6);
         r.Guardian.Propose(m.Id, false);
         r.Pass(6);
-        Assert(r.Fresh(m).State == MessageState.Held && r.Guardian.GetPending(m.Id) is { Safe: false }, "Changing your mind restarts the window");
+        var second = r.Guardian.Propose(m.Id, true);
+        Assert(!second.Ok && second.Error is { Length: > 0 } && r.Guardian.GetPending(m.Id) is { Safe: false }, "A second choice is refused while one is waiting");
+        Assert(r.Guardian.Undo(m.Id) && r.Guardian.Propose(m.Id, true).Ok && r.Guardian.GetPending(m.Id) is { Safe: true }, "After Undo a new choice is taken, with a fresh window");
+        r.Pass(6);
+        Assert(r.Fresh(m).State == MessageState.Held, "The fresh window is still running");
         r.Pass(4);
-        Assert(r.Fresh(m).State == MessageState.Blocked, "The second choice is the one saved");
+        Assert(r.Fresh(m).State == MessageState.Cleared, "The new choice is the one saved");
 
         // Fail closed: a decision that cannot be saved leaves the message held, and says so once.
         r = new Rig();

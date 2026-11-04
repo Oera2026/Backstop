@@ -95,6 +95,11 @@ public sealed partial class MockMailService(MailStore store, IMetaScamChecker? m
         if (NoReply.IsNoReply(to))
             return new SendResult(null, false, "That is a no-reply address. Nobody reads messages sent to it.");
 
+        // Fail closed: private details are never sent straight out, whichever page asked. They go to the helper through HoldOutgoing.
+        var check = CheckOutgoing(to, subject, body ?? "");
+        if (check.NeedsPause)
+            return new SendResult(null, false, "That looks private, so it was not sent. Please ask your helper first.");
+
         var isNew = !store.IsKnownRecipient(to);
         var contact = store.FindContact(to);
         var sent = new SentMessage
@@ -114,13 +119,16 @@ public sealed partial class MockMailService(MailStore store, IMetaScamChecker? m
         return new SendResult(sent, isNew, null);
     }
 
-    public bool HoldOutgoing(string to, string subject, string body, IReadOnlyList<string> reasons)
+    // Fail closed: anything refused here is not queued, and the caller is told why.
+    public string? HoldOutgoing(string to, string subject, string body, IReadOnlyList<string> reasons)
     {
         to = to.Trim();
-        if (body is null || !InputGuard.IsPlainAddress(to) || !InputGuard.IsSingleLine(subject, 200) || body.Length > 20000) return false; // fail closed: no body, nothing queued
-        if (NoReply.IsNoReply(to)) return false; // fail closed: nobody reads it, so nothing is queued
+        if (!InputGuard.IsPlainAddress(to)) return "Please type one email address, like name@example.com.";
+        if (!InputGuard.IsSingleLine(subject, 200)) return "The subject must be one short line.";
+        if (body is null || body.Length > 20000) return "That message is too long. Please make it shorter.";
+        if (NoReply.IsNoReply(to)) return "That is a no-reply address. Nobody reads messages sent to it, so we cannot send this.";
         store.HoldOutgoing(to, subject, body, reasons);
-        return true;
+        return null;
     }
 
     public IReadOnlyList<Contact> GetContacts() => store.Contacts().Where(c => !NoReply.IsNoReply(c.Address)).ToList();
@@ -183,6 +191,10 @@ public sealed partial class MockMailService(MailStore store, IMetaScamChecker? m
     // Each visitor can add a few messages a minute, so nobody can fill the shared queue and push other held mail out.
     internal MetaCallGuard ReceiveGuard { get; set; } = new(limit: 600, visitorLimit: 12);
 
+    // The timer's rescans have no visitor, so the per-visitor caps cannot hold them back. They get their own small share of Meta,
+    // so a pile of held mail can never use up the day's calls or crowd out people who are waiting for an answer.
+    internal MetaCallGuard RescanGuard { get; set; } = new(limit: 6, dayLimit: 150);
+
     /// <summary>Subject and body together. Longer text is refused, never checked, like the page limits.</summary>
     internal const int ReceiveMaxChars = 20000;
 
@@ -190,7 +202,7 @@ public sealed partial class MockMailService(MailStore store, IMetaScamChecker? m
     {
         if (!MayReceive(mail)) return null;
         var msg = MockData.CreateMessage(mail);
-        store.Add(msg); // state Received: invisible to the user
+        if (!store.Add(msg)) return null; // the store is full of mail a helper must still decide. Refused, never checked or shown.
         await RunChecksAsync(msg, mail, simulateFailure, onTier);
         return store.Find(msg.Id) ?? msg;
     }
@@ -385,7 +397,9 @@ public sealed partial class MockMailService(MailStore store, IMetaScamChecker? m
             lock (_scanGate)
             {
                 if (id is null && _backoff.TryGetValue(msg.Id, out var b) && now < b.NextTry) continue;
-                if (!_scanning.Add(msg.Id)) continue; // already being scanned
+                if (_scanning.Contains(msg.Id)) continue; // already being scanned
+                if (id is null && !RescanGuard.TryEnter(out _, out _)) break; // this sweep's share is used up: the rest wait, still held
+                _scanning.Add(msg.Id);
             }
             var ok = false;
             try { ok = await RescanOne(msg); }
