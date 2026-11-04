@@ -15,7 +15,7 @@ else if (_problem is not null)
     <h1>Story</h1>
     <ErrorState Message="@_problem" OnRetry="() => Load()" />
 }
-else if (_story is null)
+else if (_story is null || _story.Pages.Count == 0)
 {
     <PageTitle>Not found – Backstop</PageTitle>
     <h1>We cannot find that story</h1>
@@ -71,9 +71,19 @@ else
     private Story? _story;
     private int _at;
     private bool _loading = true, _finished;
-    private string? _problem;
+    private string? _problem, _loadedId;
 
-    protected override Task OnParametersSetAsync() => Load();
+    protected override Task OnParametersSetAsync()
+    {
+        // The dock can open a different story on this same page. It starts at its own first page.
+        if (Id != _loadedId)
+        {
+            _loadedId = Id;
+            _at = 0;
+            _finished = false;
+        }
+        return Load();
+    }
 
     private async Task Load()
     {

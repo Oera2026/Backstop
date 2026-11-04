@@ -129,7 +129,7 @@
                     <div class="actions__links">
                         @if (!Message.CallRequested)
                         {
-                            <button type="button" class="btn btn-text" @onclick="@(() => Guardian.CallFirst(Message.Id))"><Icon Name="phone" /> Call @Message.FromName first</button>
+                            <button type="button" class="btn btn-text" @onclick="@(() => Guardian.CallFirst(Message.Id))"><Icon Name="phone" /> Call @UserName first</button>
                         }
                     </div>
                 </div>
@@ -141,7 +141,7 @@
             @if (Message.CallRequested)
             {
                 <p class="call-note" role="status">
-                    <span>You will call @Message.FromName on a number you already have before you decide.</span>
+                    <span>You will call @UserName before you decide.</span>
                     <button type="button" class="btn btn-text" @onclick="@(() => Guardian.CancelCall(Message.Id))">Undo</button>
                 </p>
             }
