@@ -1,7 +1,7 @@
 // Demo guide: lights up one thing on the page, dims the rest, and keeps the guide card next to it.
 // The page underneath stays clickable.
 (function () {
-  var spot = null, target = null, settled = null, sel = '', started = 0, frame = 0, glideTimer = 0;
+  var spot = null, target = null, settled = null, sel = '', started = 0, frame = 0, queued = 0, glideTimer = 0;
   var PHONE = 700, GAP = 16, M = 12;
 
   function ensure() {
@@ -119,11 +119,24 @@
     }, 500);
   }
 
-  function loop() { place(); frame = requestAnimationFrame(loop); }
+  // Scrolling and resizing move the spot at once. A slower check catches the page changing under it, and finds the thing
+  // while the page is still drawing. Nothing runs every frame, which saves a phone's battery.
+  function follow() {
+    if (queued) return;
+    queued = requestAnimationFrame(function () { queued = 0; place(); });
+  }
+  function loop() { place(); frame = setTimeout(loop, target ? 300 : 100); }
+  function listen(on) {
+    var change = on ? 'addEventListener' : 'removeEventListener';
+    window[change]('scroll', follow, { passive: true, capture: true });
+    window[change]('resize', follow);
+  }
 
   function hide() {
     target = null; settled = null; sel = '';
-    cancelAnimationFrame(frame);
+    clearTimeout(frame);
+    cancelAnimationFrame(queued); queued = 0;
+    listen(false);
     document.documentElement.classList.remove('tour-on');
     if (spot) { spot.remove(); spot = null; }
   }
@@ -137,7 +150,7 @@
     window.scrollBy(0, r.top - 96);
   }
 
-  // Lights up the thing the selector names. The page may still be drawing, so the search goes on every frame until it is found,
+  // Lights up the thing the selector names. The page may still be drawing, so the search goes on until it is found,
   // and starts again if the page replaces it.
   function show(selector) {
     if (framed()) { hide(); return; }
@@ -145,7 +158,7 @@
     target = null; settled = null;
     document.documentElement.classList.add('tour-on');
     sel = selector; started = Date.now();
-    ensure(); cancelAnimationFrame(frame); loop();
+    ensure(); clearTimeout(frame); listen(false); listen(true); loop();
   }
 
   // "Show me" taps the lit-up link for the visitor. Says whether there was something to tap.

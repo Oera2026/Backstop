@@ -1,6 +1,6 @@
 /* Fit to the screen. Loaded last.
    1. The root size follows the height as well as the width, so a short window gets smaller type, not a longer page.
-      Everything is in rem, so buttons, gaps and cards follow. The 56px button height and the 16px type floor never change.
+      Everything is in rem, so buttons, gaps and cards follow. The 56px button height never changes.
    2. Short windows get tighter spacing (density steps).
    3. Wide windows put choice cards side by side instead of stacking them. */
 
@@ -78,7 +78,7 @@ body { min-height: 100vh; min-height: 100dvh; }
   .page--try .try-form .field { margin-bottom: 1.1rem; }
   .try-mode { flex-direction: row; flex-wrap: wrap; align-items: center; gap: .25rem 1.5rem; margin: 0 0 1rem; }
   .try-mode legend { float: none; margin: 0; padding: 0; }
-  .try-mode__opt { min-height: 48px; }
+  .try-mode__opt { min-height: 56px; }
   .try-mailform .actions, .try-linkform .actions { margin: .5rem 0 0; }
   .try-grid > .try-slot { overflow: visible; align-self: start; min-height: 0; }
 }
@@ -124,14 +124,14 @@ body { min-height: 100vh; min-height: 100dvh; }
 /* ---------- Phones ---------- */
 /* Tap targets respond at once, inputs never trigger the iOS zoom-on-focus, and a drag past the end does not pull the page. */
 a, button, input, select, textarea, summary, label { touch-action: manipulation; }
-input, select, textarea { font-size: max(16px, 1rem); }
+input, select, textarea { font-size: calc(max(16px, 1rem) * var(--tx)); }
 
 /* The welcome link keeps its word when the header has room (Try, welcome steps). */
 .site-header:has(.site-nav > .welcome-link:only-child) .welcome-link span { display: inline; }
 
 @media (max-width: 600px) {
   /* Four tab labels fit at 360px: "Remember" is the longest. */
-  .appnav__item { font-size: .85rem; letter-spacing: -.02em; padding-inline: 0; }
+  .appnav__item { font-size: calc(.85rem * var(--tx)); letter-spacing: -.02em; padding-inline: 0; }
 
   /* Examples on Try: two across, so the form is not five screens down. */
   .try-samples { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; }
@@ -181,7 +181,7 @@ input, select, textarea { font-size: max(16px, 1rem); }
   .site-header--helper, .site-header:not(.site-header--helper) { flex-wrap: nowrap; }
   .site-header .site-nav { flex-wrap: nowrap; margin-inline-start: auto; }
   /* Your picture in the corner: round, no second ring around it. */
-  .profile__btn { border: 0; background: transparent; padding: 0; min-height: 48px; }
+  .profile__btn { border: 0; background: transparent; padding: 0; min-height: 56px; }
   .profile__btn .pic { border-radius: 50%; }
 }
 @media (max-width: 600px) {

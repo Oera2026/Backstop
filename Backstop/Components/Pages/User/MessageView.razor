@@ -17,11 +17,11 @@
 else
 {
     var noReply = NoReply.IsNoReply(m.FromAddress);
-    <PageTitle>@m.Subject – Backstop</PageTitle>
+    <PageTitle>@Defang.ForUser(m.Subject) – Backstop</PageTitle>
     <BackLink />
     <article class="reading" aria-labelledby="subject">
-        <h1 id="subject">@m.Subject</h1>
-        <p class="reading__from">From <strong>@m.FromName</strong> (@m.FromAddress)<br />@Clock.Long(m.ReceivedAt)</p>
+        <h1 id="subject">@Defang.ForUser(m.Subject)</h1>
+        <p class="reading__from">From <strong>@Defang.ForUser(m.FromName)</strong> (@m.FromAddress)<br />@Clock.Long(m.ReceivedAt)</p>
         <div class="reading__body">
             @foreach (var line in Defang.ForUser(m.Body).Split('\n'))
             {
@@ -39,7 +39,7 @@ else
         <p class="note"><Icon Name="cross" /> <span>You cannot reply to this message.</span></p>
     }
     <div class="actions actions--stick">
-        <ReadAloudButton Primary="true" Text="@($"Message from {m.FromName}. {m.Subject}. {Defang.ForUser(m.Body)}")" />
+        <ReadAloudButton Primary="true" Text="@($"Message from {Defang.ForUser(m.FromName)}. {Defang.ForUser(m.Subject)}. {Defang.ForUser(m.Body)}")" />
         @if (!noReply)
         {
             <a class="btn btn-quiet" href="compose?reply=@m.Id"><Icon Name="pen" /> Reply</a>
