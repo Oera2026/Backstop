@@ -209,7 +209,11 @@ public sealed partial class MockBackstopApi
         var result = new CheckResult(NewId("chk"), CheckKind.Message, Verdict.BeCareful,
             atRisk ? "Someone may need help." : "Ask Me was not sure how to help.",
             [flag], Defang.ForUser(text), [], null, ReviewStatus.Held, false, DateTimeOffset.Now);
-        lock (_gate) _checks[result.Id] = new(result, original, DateTimeOffset.Now);
+        lock (_gate)
+        {
+            _checks[result.Id] = new(result, original, DateTimeOffset.Now);
+            MarkVisitorItem(result.Id);
+        }
         Changed?.Invoke();
     }
 }

@@ -188,11 +188,28 @@ public sealed partial class MockMailService(MailStore store, IMetaScamChecker? m
 
     public async Task<MailMessage?> ReceiveAsync(InboundMail mail, bool simulateFailure, Action<int, TierResult>? onTier = null)
     {
-        if (mail.Subject.Length + mail.Body.Length > ReceiveMaxChars) return null;
-        if (!ReceiveGuard.TryEnter(ClientIdentity.Current ?? "anonymous", out _, out _, out _)) return null;
+        if (!MayReceive(mail)) return null;
         var msg = MockData.CreateMessage(mail);
         store.Add(msg); // state Received: invisible to the user
+        await RunChecksAsync(msg, mail, simulateFailure, onTier);
+        return store.Find(msg.Id) ?? msg;
+    }
 
+    public async Task<MessageState?> CheckOnceAsync(InboundMail mail, bool simulateFailure, Action<int, TierResult>? onTier = null)
+    {
+        if (!MayReceive(mail)) return null;
+        // Never added to the store, so no inbox, queue or rescan ever holds it. Only the outcome leaves this method.
+        var msg = MockData.CreateMessage(mail);
+        await RunChecksAsync(msg, mail, simulateFailure, onTier);
+        return msg.State is MessageState.Cleared or MessageState.Blocked ? msg.State : MessageState.Held;
+    }
+
+    private bool MayReceive(InboundMail mail) =>
+        mail.Subject.Length + mail.Body.Length <= ReceiveMaxChars
+        && ReceiveGuard.TryEnter(ClientIdentity.Current ?? "anonymous", out _, out _, out _);
+
+    private async Task RunChecksAsync(MailMessage msg, InboundMail mail, bool simulateFailure, Action<int, TierResult>? onTier)
+    {
         var done = new List<TierResult>();
         MailAnalyzer.Analysis? analysis = null;
         try
@@ -253,7 +270,6 @@ public sealed partial class MockMailService(MailStore store, IMetaScamChecker? m
                 catch (Exception) { msg.State = MessageState.Held; msg.AwaitingScan = true; }
             }
         }
-        return store.Find(msg.Id) ?? msg;
     }
 
     private static TierResult AiTier(MetaScamAnalysis ai) =>

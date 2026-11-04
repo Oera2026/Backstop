@@ -116,8 +116,11 @@ public interface IBackstopApi
     Task<IReadOnlyList<ActivityEntry>> GetActivityAsync(CancellationToken ct = default);
     Task<IReadOnlyList<MemoryCard>> GetSharedMemoriesAsync(CancellationToken ct = default);
 
-    /// <summary>A photo the user added (Show me, or a memory card). Served by /mode-photo/{id}.</summary>
+    /// <summary>A profile picture. Served by /mode-photo/{id}.</summary>
     ContactPhoto? GetPhoto(string id);
+
+    /// <summary>Deletes what visitors sent to Meta AI once its time is up. An open safeguarding alert stays, without their words. Returns how many items went.</summary>
+    int DisposeExpiredVisitorData();
 
     // --- Demo support ---
     void ResetDemo();

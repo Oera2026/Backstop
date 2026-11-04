@@ -64,9 +64,9 @@
     <h2 id="pipe-title">Checking steps</h2>
     <PipelineTimeline Tiers="_tiers" />
     <div class="outcome" role="status">
-        @if (_result is not null)
+        @if (_state is { } state)
         {
-            <StatusBadge State="_result.State" ForHelper="true" />
+            <StatusBadge State="state" ForHelper="true" />
             <p>@OutcomeText</p>
         }
     </div>
@@ -126,8 +126,8 @@
 
 @code {
     private string _scenarioId = MockData.Scenarios[0].Id;
-    private bool _fail, _running, _split = true;
-    private MailMessage? _result;
+    private bool _fail, _running, _split = true, _ownRun;
+    private MessageState? _state;
     private TierResult[] _tiers = Fresh();
 
     private const string Own = "own";
@@ -138,10 +138,13 @@
     private static TierResult[] Fresh() =>
         [.. MockData.TierNames.Select(n => new TierResult(n, TierStatus.Pending, "Waiting"))];
 
-    private string OutcomeText => _result?.State switch
+    private string OutcomeText => (_state, _ownRun) switch
     {
-        MessageState.Cleared => "Cleared. It is now in the user's inbox.",
-        MessageState.Blocked => "Blocked. The user never sees it.",
+        (MessageState.Cleared, true) => "Cleared. Your email was not kept.",
+        (MessageState.Blocked, true) => "Blocked. Your email was not kept.",
+        (_, true) => "Held. Your email was not kept.",
+        (MessageState.Cleared, _) => "Cleared. It is now in the user's inbox.",
+        (MessageState.Blocked, _) => "Blocked. The user never sees it.",
         _ => "Held. It is in the helper's queue. The user only sees a count.",
     };
 
@@ -149,7 +152,8 @@
     {
         if (_scenarioId == Own && string.IsNullOrWhiteSpace(_ownBody)) return;
         _running = true;
-        _result = null;
+        _state = null;
+        _ownRun = _scenarioId == Own;
         _tiers = Fresh();
         try
         {
@@ -158,9 +162,12 @@
                 _tiers[i] = r;
                 _ = InvokeAsync(StateHasChanged);
             }
-            _result = _scenarioId == Own
-                ? await Mail.ReceiveAsync(new InboundMail(_ownFrom.Trim(), _ownFrom.Trim(), _ownSubject.Trim(), _ownBody), _fail, OnTier)
-                : await Mail.ReceiveAsync(_scenarioId, _fail, OnTier);
+            if (_ownRun)
+            {
+                _state = await Mail.CheckOnceAsync(new InboundMail(_ownFrom.Trim(), _ownFrom.Trim(), _ownSubject.Trim(), _ownBody), _fail, OnTier);
+                _ownSubject = _ownBody = "";
+            }
+            else _state = (await Mail.ReceiveAsync(_scenarioId, _fail, OnTier))?.State;
         }
         finally
         {
@@ -189,7 +196,7 @@
         _resetProblem = reset.Problem;
         if (!reset.Done) return;
         _fail = false;
-        _result = null;
+        _state = null;
         _tiers = Fresh();
     }
 }

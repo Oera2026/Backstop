@@ -5,12 +5,12 @@ namespace Backstop.Services.Api;
 /// <summary>Shared helpers for failed Meta calls. Nothing here ever writes the key.</summary>
 internal static class MetaHttp
 {
-    /// <summary>Logs the final URL, status and the first 300 characters of the reply body.</summary>
-    public static async Task LogFailureAsync(ILogger logger, string caller, HttpResponseMessage response, MetaAiOptions options)
+    /// <summary>Logs the final URL and status. Never the reply body, which could quote what a visitor sent.</summary>
+    public static Task LogFailureAsync(ILogger logger, string caller, HttpResponseMessage response, MetaAiOptions options)
     {
-        var body = await SnippetAsync(response, options.ApiKey, 300);
-        logger.LogError("Meta AI ({Caller}) failed: status {StatusCode} for {Url} (model {Model}). Body: {Body}",
-            caller, (int)response.StatusCode, response.RequestMessage?.RequestUri?.ToString() ?? options.ChatUrl, options.Model, body);
+        logger.LogError("Meta AI ({Caller}) failed: status {StatusCode} for {Url} (model {Model}).",
+            caller, (int)response.StatusCode, response.RequestMessage?.RequestUri?.ToString() ?? options.ChatUrl, options.Model);
+        return Task.CompletedTask;
     }
 
     /// <summary>Reads at most the first <paramref name="maxChars"/> characters of the body, on one line, with the key blanked out.</summary>

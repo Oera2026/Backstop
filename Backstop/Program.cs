@@ -138,6 +138,7 @@ builder.Services.AddHostedService<MailRescanService>();
 // The Check, Show me, Explain, Remember and trusted-person modes.
 builder.Services.AddSingleton<MockApiOptions>();
 builder.Services.AddSingleton<IBackstopApi, MockBackstopApi>();
+builder.Services.AddHostedService<VisitorDataDisposalService>();
 builder.Services.AddSingleton<IDemoControl, DemoControl>();
 
 // The visitor's address, taken when a circuit opens, for the per-visitor cap on Meta calls.
@@ -201,7 +202,7 @@ app.MapGet("/contact-photo/{id}", (string id, HttpContext http, IMailService mai
     return Results.File(photo.Bytes, photo.ContentType);
 });
 
-// Photos added in Show me. MOCK: served from memory, typed by the sniffed bytes.
+// The user's and helper's profile pictures. MOCK: served from memory, typed by the sniffed bytes.
 app.MapGet("/mode-photo/{id}", (string id, HttpContext http, IBackstopApi api) =>
 {
     var photo = api.GetPhoto(id);

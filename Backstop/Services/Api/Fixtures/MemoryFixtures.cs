@@ -19,7 +19,7 @@ public static class MemoryFixtures
         [
             new("m1", "Resetting the internet box", today.AddDays(-12),
                 "The internet stopped working. Turning the box off and on fixed it.",
-                null, "router", ["internet", "home", "wifi"],
+                "router", ["internet", "home", "wifi"],
                 [
                     "Find the white box with the lights, next to the phone socket.",
                     "Turn it off at the wall switch.",
@@ -32,7 +32,7 @@ public static class MemoryFixtures
 
             new("m2", "Washing woollen jumpers", today.AddDays(-20),
                 "Jumpers go on the Wool setting so they do not shrink.",
-                null, "washer", ["washing", "clothes", "jumper"],
+                "washer", ["washing", "clothes", "jumper"],
                 [
                     "Check the label says you can machine wash it.",
                     "Turn the big dial to \"Wool\".",
@@ -45,7 +45,7 @@ public static class MemoryFixtures
 
             new("m3", "Council Tax letter", today.AddDays(-30),
                 "The council checked you still live alone. You sent the form back in the free envelope.",
-                null, "letter", ["letters", "council", "money"],
+                "letter", ["letters", "council", "money"],
                 [
                     "Find the form in the envelope.",
                     "Tick if you still live alone.",
@@ -57,7 +57,7 @@ public static class MemoryFixtures
 
             new("m4", "Making the bed", today.AddDays(-41),
                 "The fitted sheet goes on one corner at a time.",
-                null, "bed", ["home", "bedroom", "sheets"],
+                "bed", ["home", "bedroom", "sheets"],
                 [
                     "Put the fitted sheet over one top corner.",
                     "Pull it over the other three corners.",
@@ -69,7 +69,7 @@ public static class MemoryFixtures
 
             new("m5", "Bus pass renewal form", today.AddDays(-58),
                 "You filled in the bus pass form and added a new photo.",
-                null, "form", ["forms", "bus", "travel"],
+                "form", ["forms", "bus", "travel"],
                 [
                     "Write your name in capital letters.",
                     "Stick the new photo in the box at the top.",

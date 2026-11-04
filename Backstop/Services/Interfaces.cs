@@ -68,6 +68,12 @@ public interface IMailService
     Task<MailMessage?> ReceiveAsync(InboundMail mail, bool simulateFailure, Action<int, TierResult>? onTier = null);
 
     /// <summary>
+    /// Same pipeline for an email a visitor wrote, but it is never stored: no inbox, no helper queue, no rescan.
+    /// Returns only the outcome, or null when refused. Any error is Held.
+    /// </summary>
+    Task<MessageState?> CheckOnceAsync(InboundMail mail, bool simulateFailure, Action<int, TierResult>? onTier = null);
+
+    /// <summary>
     /// Scans held mail that is waiting for the AI again (all of it, or just <paramref name="id"/>). Mail leaves
     /// the held state only when the AI answers. Returns how many got an answer. A failure leaves the mail held.
     /// </summary>

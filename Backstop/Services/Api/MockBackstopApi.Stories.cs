@@ -33,6 +33,7 @@ public sealed partial class MockBackstopApi
         lock (_gate)
         {
             _stories[story.Id] = new(story, text);
+            MarkVisitorItem(story.Id);
             if (notify) Log("story", $"{User} made a story about \"{Shorten(text)}\". It may be a sensitive topic, so you may want to ask how they are.");
         }
         Changed?.Invoke();

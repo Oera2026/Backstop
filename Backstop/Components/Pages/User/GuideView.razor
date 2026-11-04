@@ -80,15 +80,6 @@ else
         default:
             <h1>@_g.Title</h1>
             <div class="figures">
-                @if (_g.PhotoUrl is not null)
-                {
-                    <figure class="figure">
-                        <figcaption>Your photo</figcaption>
-                        <div class="figure__frame">
-                            <img src="@_g.PhotoUrl" alt="The photo you took" />
-                        </div>
-                    </figure>
-                }
                 <figure class="figure">
                     <figcaption><span class="figure__label">Guide picture – a guide only</span></figcaption>
                     <div class="figure__frame">

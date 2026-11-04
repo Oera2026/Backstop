@@ -1152,6 +1152,9 @@ public class MetaScamCheckerTests
         // 37. Review fixes: decisions vs rescans, backoff, retry budget, caps, per-visitor demo switch, sign-in locks.
         await ReviewFixTests.RunAsync();
 
+        // 37b. Visitor data: own emails are never stored, and what goes to Meta AI is disposed of after its time.
+        await VisitorDataTests.RunAsync();
+
         // 38. Show me: the AI writes the guide; unsafe goals are refused; failures give a plain error, never a canned guide.
         {
             static HttpResponseMessage Say(string json)
@@ -1206,7 +1209,7 @@ public class MetaScamCheckerTests
                 new CareNote("Chemicals", "Washing liquid can hurt if swallowed."), "washer", ["home", "washing"], "set the washing machine");
             var api = new MockBackstopApi(new MockGuardianService(new MailStore()), new MockApiOptions(), null, null, null, null, null, new StubGuide(draft));
             var guide = await api.GenerateGuideAsync(new GuideRequest("set the washing machine", png, "a.png"));
-            Assert(guide is not null && guide.Steps.Count == 5 && guide.Picture == "washer" && guide.PhotoUrl is not null, "Through the app: the AI guide is stored with its photo");
+            Assert(guide is not null && guide.Steps.Count == 5 && guide.Picture == "washer", "Through the app: the AI guide is stored");
             var card = await api.SaveGuideToMemoryAsync(guide!.Id);
             Assert(card.Title == draft.Title && card.Steps.Count == 5 && card.Picture == "washer", "Saving it keeps the AI words and picture");
             Console.WriteLine("PASS: Show me guides are written by the AI, refused when unsafe, and fail closed.");

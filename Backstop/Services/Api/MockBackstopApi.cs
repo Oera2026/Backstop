@@ -116,7 +116,11 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         var result = new CheckResult(NewId("chk"), request.Kind, finalVerdict, finalReason, flags,
             display, floor.Highlights.Where(h => flags.Any(f => f.Id == h.FlagId)).ToList(), null, reviewStatus, false, DateTimeOffset.Now, failure,
             Tip(finalVerdict, reviewStatus, tip0.Value, combinedFlags, finalReason));
-        lock (_gate) _checks[result.Id] = new(result, text.Trim(), reviewStatus == ReviewStatus.Held ? DateTimeOffset.Now : null);
+        lock (_gate)
+        {
+            _checks[result.Id] = new(result, text.Trim(), reviewStatus == ReviewStatus.Held ? DateTimeOffset.Now : null);
+            MarkVisitorItem(result.Id);
+        }
         return result;
     }
 
@@ -232,7 +236,11 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
             finalReason,
             flags, display, [], thread, reviewStatus, false, DateTimeOffset.Now, failure,
             Tip(finalVerdict, reviewStatus, tip0.Value, combinedFlags, finalReason));
-        lock (_gate) _checks[result.Id] = new(result, conversation.Trim(), reviewStatus == ReviewStatus.Held ? DateTimeOffset.Now : null);
+        lock (_gate)
+        {
+            _checks[result.Id] = new(result, conversation.Trim(), reviewStatus == ReviewStatus.Held ? DateTimeOffset.Now : null);
+            MarkVisitorItem(result.Id);
+        }
         return result;
     }
 
@@ -287,7 +295,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         }
 
         // The AI writes the guide for any goal, looking at the photo when there is one.
-        // An unsafe goal is refused (null): there is nothing to show it with, so the photo is not kept.
+        // An unsafe goal is refused (null). The photo goes to the AI and is never kept.
         if (guideWriter is null)
             throw new BackstopApiException("Show me is not switched on yet. Please tell the person who looks after this app.");
         var draft = await guideWriter.WriteAsync(request.Goal.Trim(), request.Photo, photoType, ct);
@@ -295,16 +303,13 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
             throw new BackstopApiException(draft.Failure?.Message ?? "Something went wrong. Please try again in a minute.");
         if (draft.Refused) return null;
 
-        string? photoUrl = null;
-        if (photoType is not null)
-        {
-            var photoId = "p" + Guid.NewGuid().ToString("N"); // long and unguessable: photo addresses are not secret by sign-in alone
-            KeepModePhoto(photoId, new ContactPhoto(request.Photo!, photoType));
-            photoUrl = $"/mode-photo/{photoId}";
-        }
-        var guide = new Guide(NewId("g"), draft.Title, request.Goal.Trim(), photoUrl, draft.Picture, draft.Steps,
+        var guide = new Guide(NewId("g"), draft.Title, request.Goal.Trim(), draft.Picture, draft.Steps,
             draft.Care, DateTimeOffset.Now);
-        lock (_gate) _guides[guide.Id] = new StoredGuide(guide, draft.Tags, draft.PastTense);
+        lock (_gate)
+        {
+            _guides[guide.Id] = new StoredGuide(guide, draft.Tags, draft.PastTense);
+            MarkVisitorItem(guide.Id);
+        }
         return guide;
     }
 
@@ -321,7 +326,9 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         {
             var title = _guides.TryGetValue(guideId, out var g) ? g.Guide.Title : "a task";
             Log("hand", $"{User} is stuck on step {stepNumber} of \"{title}\" and would like your help.");
-            _help.Add(new HelpRequest(NewId("h"), DateTimeOffset.Now, title, stepNumber, false));
+            var help = new HelpRequest(NewId("h"), DateTimeOffset.Now, title, stepNumber, false);
+            _help.Add(help);
+            MarkVisitorItem(help.Id);
         }
         Changed?.Invoke();
     }
@@ -354,7 +361,11 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
             throw new BackstopApiException(reading.Failure?.Message ?? "Something went wrong. Please try again in a minute.");
 
         var explanation = BuildExplanation(reading, typed ?? Defang.ForUser(reading.Text), request.Level, request.Format);
-        lock (_gate) _explanations[explanation.Id] = explanation;
+        lock (_gate)
+        {
+            _explanations[explanation.Id] = explanation;
+            MarkVisitorItem(explanation.Id);
+        }
         return explanation;
     }
 
@@ -442,7 +453,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
             if (!_guides.TryGetValue(guideId, out var g)) throw new BackstopApiException("We could not find that guide. Please try Show me again.");
             var steps = g.Guide.Steps;
             card = new MemoryCard(NewId("m"), g.Guide.Title, Today, $"You asked: \"{g.Guide.Goal}\". {steps.Count} steps.",
-                g.Guide.PhotoUrl, g.Guide.Picture, g.Tags, steps,
+                g.Guide.Picture, g.Tags, steps,
                 $"Last time you {g.PastTense} in {steps.Count} steps. The first one was: {LowerFirst(steps[0])}",
                 MemorySource.ShowMe, false);
             AddMemory(guideId, card);
@@ -459,7 +470,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         {
             if (Existing(explanationId) is { } saved) return saved;
             var e = _explanations.GetValueOrDefault(explanationId) ?? throw new BackstopApiException("We could not find that page. Please explain it again.");
-            card = new MemoryCard(NewId("m"), e.Title, Today, e.Overview, null, "letter", ["letters"],
+            card = new MemoryCard(NewId("m"), e.Title, Today, e.Overview, "letter", ["letters"],
                 e.Actions.Count > 0 ? e.Actions : e.Chunks.Select(c => c.Body).Take(4).ToList(),
                 $"Last time, the {LowerFirst(e.Title)} said this: {e.Overview}", MemorySource.Explain, false);
             AddMemory(explanationId, card);
@@ -607,30 +618,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         lock (_gate) return _photos.GetValueOrDefault(id);
     }
 
-    // Show me photos are kept in memory on a small free host shared by every visitor, so they have a total budget.
-    // Past it the oldest go first (their guide then shows no photo). Profile pictures are separate and replace each other.
     internal const int MaxModePhotoBytes = 10 * 1024 * 1024;
-    internal const long ModePhotoBudgetBytes = 64L * 1024 * 1024;
-    private readonly Queue<string> _modePhotoOrder = new();
-    private long _modePhotoBytes;
-
-    internal void KeepModePhoto(string id, ContactPhoto photo)
-    {
-        lock (_gate)
-        {
-            _photos[id] = photo;
-            _modePhotoOrder.Enqueue(id);
-            _modePhotoBytes += photo.Bytes.Length;
-            while (_modePhotoBytes > ModePhotoBudgetBytes && _modePhotoOrder.Count > 1)
-            {
-                var old = _modePhotoOrder.Dequeue();
-                if (_photos.Remove(old, out var gone)) _modePhotoBytes -= gone.Bytes.Length;
-            }
-        }
-    }
-
-    /// <summary>Bytes held by Show me photos now. For tests.</summary>
-    internal long ModePhotoBytes { get { lock (_gate) return _modePhotoBytes; } }
 
     // ---------------- Demo support ----------------
 
@@ -639,9 +627,10 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         lock (_gate)
         {
             _checks.Clear(); _stories.Clear(); _guides.Clear(); _explanations.Clear(); _photos.Clear(); _savedFrom.Clear();
-            _modePhotoOrder.Clear(); _modePhotoBytes = 0;
+            _visitorItems.Clear();
             _memories = MemoryFixtures.Seed();
             _activity = SeedActivity();
+            _seededAt = DateTimeOffset.Now;
             _help = SeedHelp();
             ResetProfiles();
             ResetChat();
@@ -679,6 +668,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
     {
         _memories.Add(card);
         _savedFrom[sourceId] = card.Id;
+        MarkVisitorItem(card.Id);
         Log("plus", $"{User} saved \"{card.Title}\" to Remember.");
     }
 

@@ -68,8 +68,6 @@ public sealed record Guide(
     string Id,
     string Title,
     string Goal,
-    // The user's own photo, or null when they did not add one.
-    string? PhotoUrl,
     // Key of the "what it looks like when done" guide picture.
     string Picture,
     IReadOnlyList<string> Steps,
@@ -112,8 +110,6 @@ public sealed record MemoryCard(
     string Title,
     DateOnly Date,
     string Summary,
-    // The user's photo when there is one; otherwise Picture is drawn.
-    string? PhotoUrl,
     string Picture,
     IReadOnlyList<string> Tags,
     IReadOnlyList<string> Steps,
