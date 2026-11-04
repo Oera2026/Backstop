@@ -3,7 +3,6 @@
 (function () {
   var KEY = 'backstop.settings';
   var DEFAULTS = { size: 'normal', theme: 'light', contrast: 'standard', spacing: 'normal', motion: 'normal', rate: 'normal' };
-  var WKEY = 'backstop.welcomed';
   var HKEY = 'backstop.helperWelcomed';
   var RATES = { slow: 0.7, normal: 0.9, fast: 1.1 };
 
@@ -37,15 +36,9 @@
     set: function (key, value) { var s = read(); s[key] = value; return write(s); },
     reset: function () { return write(Object.assign({}, DEFAULTS)); },
     speechRate: function () { return RATES[read().rate] || RATES.normal; },
-    // First run: the welcome screens show once per device.
-    welcomed: welcomed,
-    markHelperWelcomed: function () { try { localStorage.setItem(HKEY, "1"); } catch (e) { /* storage blocked */ } },
-    markWelcomed: function () { try { localStorage.setItem(WKEY, "1"); } catch (e) { /* storage blocked */ } }
+    // First run: the helper welcome shows once per device.
+    markHelperWelcomed: function () { try { localStorage.setItem(HKEY, "1"); } catch (e) { /* storage blocked */ } }
   };
-
-  function welcomed() {
-    try { return localStorage.getItem(WKEY) === "1"; } catch (e) { return true; } // blocked storage: never trap the user in a loop
-  }
 
   apply(read());
 

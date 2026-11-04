@@ -84,9 +84,6 @@ public sealed class MockGuardianService(MailStore store) : IGuardianService
     private readonly Dictionary<string, string> _failures = [];
     private Timer? _timer;
 
-    /// <summary>The user's saved phone number. No number is collected or stored anywhere in the app yet, so this stays null.</summary>
-    public string? UserPhone { get; set; }
-
     // Seams for tests: the clock, the timer, and a failure while saving.
     internal Func<DateTimeOffset> Now { get; set; } = () => DateTimeOffset.Now;
     internal bool AutoCommit { get; set; } = true;
@@ -177,12 +174,6 @@ public sealed class MockGuardianService(MailStore store) : IGuardianService
             if (_failures.Count >= 200) _failures.Clear(); // nobody read them; keep the table small
             _failures[id] = why;
         }
-    }
-
-    public string? GetRingHref()
-    {
-        var digits = new string((UserPhone ?? "").Where(c => char.IsAsciiDigit(c) || c == '+').ToArray());
-        return digits.Count(char.IsAsciiDigit) >= 7 && digits.LastIndexOf('+') <= 0 ? "tel:" + digits : null;
     }
 
     public void CancelCall(string id)

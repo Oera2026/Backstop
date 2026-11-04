@@ -53,13 +53,12 @@ public interface IBackstopApi
 
     // --- Stories ---
     /// <summary>
-    /// Writes a story about something coming up. Sensitive topics come back <see cref="StoryStatus.Held"/>
-    /// with no pages until the trusted person decides. Fail closed: anything unclear is held.
+    /// Writes a story about something coming up. A sensitive topic still gets its story, and the trusted person is told.
     /// </summary>
     Task<Story> MakeStoryAsync(StoryRequest request, CancellationToken ct = default);
-    /// <summary>Returns null when the story does not exist or was blocked. A held story has no pages.</summary>
+    /// <summary>Returns null when the story does not exist.</summary>
     Task<Story?> GetStoryAsync(string id, CancellationToken ct = default);
-    /// <summary>The user's stories, newest first. Blocked stories are left out.</summary>
+    /// <summary>The user's stories, newest first.</summary>
     Task<IReadOnlyList<Story>> GetStoriesAsync(CancellationToken ct = default);
     Task DeleteStoryAsync(string id, CancellationToken ct = default);
 

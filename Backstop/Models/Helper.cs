@@ -1,7 +1,7 @@
 namespace Backstop.Models;
 
 /// <summary>What kind of thing is waiting. Each has its own word, so the helper always knows what they are looking at.</summary>
-public enum HelperItemKind { Safeguarding, Mail, Outgoing, Check, AskMe, Story, Chat, Help, NewPerson, Checker }
+public enum HelperItemKind { Safeguarding, Mail, Outgoing, Check, AskMe, Chat, Help, NewPerson, Checker }
 
 /// <summary>Urgent first, then things to decide, then calls the helper promised, then things to know.</summary>
 public enum HelperGroup { Urgent, Decide, Calls, Info }

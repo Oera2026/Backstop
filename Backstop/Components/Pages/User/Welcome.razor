@@ -67,11 +67,7 @@ else
     private void Next() => Go(_step + 1);
     private void Back() => Go(_step - 1);
 
-    private Task Finish() => Done("/inbox");
+    private void Finish() => Done("/inbox");
 
-    private async Task Done(string to)
-    {
-        try { await JS.InvokeVoidAsync("backstopSettings.markWelcomed"); } catch (Exception) { }
-        Nav.NavigateTo(to);
-    }
+    private void Done(string to) => Nav.NavigateTo(to);
 }

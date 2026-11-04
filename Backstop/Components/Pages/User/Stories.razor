@@ -30,7 +30,7 @@ else
         {
             <li>
                 <a class="row" href="stories/@s.Id">
-                    <span class="pic @(s.Status == StoryStatus.Held ? "pic--check" : "pic--blue")" aria-hidden="true"><Icon Name="@(s.Status == StoryStatus.Held ? "hourglass" : "story")" /></span>
+                    <span class="pic pic--blue" aria-hidden="true"><Icon Name="story" /></span>
                     <span class="row__main">
                         <span class="row__from">@s.Title</span>
                         @if (s.When is not null)
@@ -39,10 +39,6 @@ else
                         }
                     </span>
                     <span class="row__side">
-                        @if (s.Status == StoryStatus.Held)
-                        {
-                            <StatusBadge State="MessageState.Held" />
-                        }
                         <span class="row__time">@Clock.When(s.MadeAt)</span>
                     </span>
                 </a>

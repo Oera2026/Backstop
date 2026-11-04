@@ -3,8 +3,6 @@ namespace Backstop.Models;
 // Request and response shapes for Stories and "Make sense of it". See API_CONTRACT.md for the endpoints.
 
 /// <summary>Ready can be read. Held waits for the trusted person; the user sees no words until it is released.</summary>
-public enum StoryStatus { Ready, Held, Blocked }
-
 public sealed record StoryRequest(string Situation, string? When);
 
 /// <summary>One page of a story: a short heading, a few short sentences and a picture key.</summary>
@@ -28,8 +26,6 @@ public sealed record Story(
     string Id,
     string Title,
     string? When,
-    // Empty while the story is held: the user sees no words until the trusted person releases it.
     IReadOnlyList<StoryPage> Pages,
-    StoryStatus Status,
     DateTimeOffset MadeAt);
 

@@ -51,7 +51,7 @@ public interface IMailService
 
     /// <summary>
     /// The public Try it page: runs the same checks as real mail on one pasted email (incoming) or draft (outgoing) and says
-    /// what Backstop would do. Keeps nothing and opens no link. No Meta answer is always Held, never Safe.
+    /// what Backstop would do. Keeps nothing. Pasted links are opened here only. No Meta answer is always Held, never Safe.
     /// </summary>
     Task<TryResult> TryCheckAsync(InboundMail mail, bool outgoing, CancellationToken ct = default);
 
@@ -138,9 +138,6 @@ public interface IGuardianService
 
     /// <summary>Plain words when the last decision on this message could not be saved (it stays held). Returned once.</summary>
     string? TakeFailure(string id);
-
-    /// <summary>A tel: link to the user's saved phone number, or null when there is none (the Ring them button is then hidden).</summary>
-    string? GetRingHref();
 
     /// <summary>FYI notices the helper has not dismissed (for example: the user wrote to someone new).</summary>
     IReadOnlyList<HelperNotice> GetNotices();

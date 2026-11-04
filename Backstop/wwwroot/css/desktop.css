@@ -1,7 +1,7 @@
 /* Big screens. Loaded last, so it only has to say what changes.
    1. Everything is sized in rem, so a larger root size scales the text, buttons and spacing together.
    2. The reading columns are widened a little so a wide monitor is not mostly empty margin.
-   The sign-in column stays narrow on purpose, and the demo panel frames get their own (smaller) window, so they scale by their own width. */
+   The start page column stays narrow on purpose, and the demo panel frames get their own (smaller) window, so they scale by their own width. */
 
 /* Root font size now lives in fit.css (width tiers capped by height). */
 

@@ -7,9 +7,7 @@ namespace Backstop.Services.Api;
 // Without the writer there is no story: nothing canned is ever passed off as its work.
 public sealed partial class MockBackstopApi
 {
-    private sealed record StoredStory(Story Story, string Situation);
-
-    private readonly Dictionary<string, StoredStory> _stories = [];
+    private readonly Dictionary<string, Story> _stories = [];
 
     public async Task<Story> MakeStoryAsync(StoryRequest request, CancellationToken ct = default)
     {
@@ -29,28 +27,28 @@ public sealed partial class MockBackstopApi
         // The word list is a floor: the AI cannot lower it.
         var notify = draft.Sensitive || StoryFixtures.IsSensitive(text);
 
-        var story = new Story(NewId("s"), title, when, pages, StoryStatus.Ready, DateTimeOffset.Now);
+        var story = new Story(NewId("s"), title, when, pages, DateTimeOffset.Now);
         lock (_gate)
         {
-            _stories[story.Id] = new(story, text);
+            _stories[story.Id] = story;
             MarkVisitorItem(story.Id);
             if (notify) Log("story", $"{User} made a story about \"{Shorten(text)}\". It may be a sensitive topic, so you may want to ask how they are.");
         }
         Changed?.Invoke();
-        return ForUser(story);
+        return story;
     }
 
     public async Task<Story?> GetStoryAsync(string id, CancellationToken ct = default)
     {
         await Wait(300, ct);
-        lock (_gate) return _stories.TryGetValue(id, out var s) ? ForUserOrNull(s.Story) : null;
+        lock (_gate) return _stories.GetValueOrDefault(id);
     }
 
     public async Task<IReadOnlyList<Story>> GetStoriesAsync(CancellationToken ct = default)
     {
         await Wait(400, ct);
         lock (_gate)
-            return _stories.Values.Select(s => ForUserOrNull(s.Story)).OfType<Story>().OrderByDescending(s => s.MadeAt).ToList();
+            return _stories.Values.OrderByDescending(s => s.MadeAt).ToList();
     }
 
     public async Task DeleteStoryAsync(string id, CancellationToken ct = default)
@@ -60,20 +58,5 @@ public sealed partial class MockBackstopApi
         Changed?.Invoke();
     }
 
-
-    // A held story shows the user no words (the same rule as held mail). A blocked story is invisible.
-    private static Story ForUser(Story s) => s.Status == StoryStatus.Held ? s with { Title = "Your story", When = null, Pages = [] } : s;
-    private static Story? ForUserOrNull(Story s) => s.Status == StoryStatus.Blocked ? null : ForUser(s);
-
     private string Fill(string s) => s.Replace("{helper}", Helper);
-
-    private ReviewItem FromStory(StoredStory s)
-    {
-        var story = s.Story;
-        var preview = string.Join("\n\n", story.Pages.Select(p => $"{p.Heading}\n{p.Text}"));
-        return new ReviewItem(story.Id, ReviewSource.Story, $"A story: {story.Title}", preview, Verdict.BeCareful,
-            [new RiskFlag("sensitive", "alert", "Sensitive topic", "The story is about something that may need a person to check it first.")],
-            $"{User} asked for a story about \"{Shorten(s.Situation)}\". It touches on a sensitive topic, so it is held until you have read it.",
-            false, story.MadeAt);
-    }
 }

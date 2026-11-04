@@ -9,7 +9,7 @@ public sealed record DemoResetResult(bool Done, string? Problem);
 /// <summary>Controls on the /demo page that change shared state. Each one needs the secret.</summary>
 public interface IDemoControl
 {
-    /// <summary>Wipes the demo household and puts the 7 scenarios back. Needs the secret.</summary>
+    /// <summary>Wipes the demo household and puts the scenarios back. Needs the secret.</summary>
     DemoResetResult Reset(string? secret);
 
     /// <summary>Empties Remember for everyone. Needs the same secret, because the demo household is shared by every visitor.</summary>

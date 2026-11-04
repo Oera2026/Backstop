@@ -22,7 +22,7 @@ window.backstop = {
   canSpeak() {
     return 'speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined';
   },
-  // Like speak, but tells the page when the voice ends (done, stopped, or replaced by another). Prefers an en-GB voice.
+  // Reads text aloud and tells the page when the voice ends (done, stopped, or replaced by another). Prefers an en-GB voice.
   speakWithEnd(ref, text) {
     if (!window.backstop.canSpeak()) return false;
     const synth = window.speechSynthesis;
@@ -37,15 +37,6 @@ window.backstop = {
     u.onend = done;
     u.onerror = done;
     synth.speak(u);
-    return true;
-  },
-  speak(text) {
-    if (!('speechSynthesis' in window)) return false;
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = document.documentElement.lang || 'en-GB';
-    u.rate = window.backstopSettings ? window.backstopSettings.speechRate() : 0.9;
-    window.speechSynthesis.speak(u);
     return true;
   },
   stop() {
@@ -68,14 +59,6 @@ window.backstop = {
     if (document.title !== want) document.title = want;
   }
 };
-
-// Sign in: "Show my password" turns the password box into a plain text box and back.
-document.addEventListener('change', function (e) {
-  var box = e.target;
-  if (!box || !box.dataset || !box.dataset.showPassword) return;
-  var field = document.getElementById(box.dataset.showPassword);
-  if (field) field.type = box.checked ? 'text' : 'password';
-});
 
 // Enter in a field marked data-enter-next moves to the next field. It never sends the form.
 document.addEventListener('keydown', function (e) {

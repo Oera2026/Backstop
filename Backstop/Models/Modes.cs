@@ -122,7 +122,7 @@ public sealed record MemoryAnswer(string Question, string Answer, IReadOnlyList<
 
 // ---------- Trusted person ----------
 
-public enum ReviewSource { Inbox, Check, Story }
+public enum ReviewSource { Inbox, Check }
 public enum ReviewDecision { Release, Block, CallFirst }
 
 public sealed record ReviewItem(

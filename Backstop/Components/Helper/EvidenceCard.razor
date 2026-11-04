@@ -127,11 +127,7 @@
                         <Icon Name="cross" /> Not safe, block it
                     </button>
                     <div class="actions__links">
-                        @if (Guardian.GetRingHref() is { } tel)
-                        {
-                            <a class="btn btn-text" href="@tel" @onclick="@(() => Guardian.CallFirst(Message.Id))"><Icon Name="phone" /> Ring @UserName</a>
-                        }
-                        else if (!Message.CallRequested)
+                        @if (!Message.CallRequested)
                         {
                             <button type="button" class="btn btn-text" @onclick="@(() => Guardian.CallFirst(Message.Id))"><Icon Name="phone" /> Call @Message.FromName first</button>
                         }

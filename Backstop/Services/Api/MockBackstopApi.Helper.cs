@@ -75,13 +75,6 @@ public sealed partial class MockBackstopApi
                 }
             }
 
-            foreach (var st in _stories.Values.Where(x => x.Story.Status == StoryStatus.Held))
-            {
-                var r = FromStory(st);
-                items.Add(new(r.Id, HelperItemKind.Story, HelperGroup.Decide, "Story", r.Title, "A story to read before they can", r.Preview, r.At,
-                    $"helper/story/{r.Id}", "check", "story", "Read first"));
-            }
-
             foreach (var m in _chat.Where(x => !x.FromMe && x.State == ChatState.Held && FindPerson(x.PersonId) is not null))
             {
                 var who = FindPerson(m.PersonId)!;
@@ -123,8 +116,6 @@ public sealed partial class MockBackstopApi
                 list.Add(new(c.AskedAt ?? c.Result.CheckedAt, blocked ? "cross" : "check", TitleFor(c.Result, c.Original),
                     blocked ? "You blocked it" : "You said it is safe", blocked ? "block" : "safe"));
             }
-            foreach (var st in _stories.Values.Where(x => x.Story.Status == StoryStatus.Blocked))
-                list.Add(new(st.Story.MadeAt, "cross", $"A story about \"{Shorten(st.Situation)}\"", "You blocked it", "block"));
             foreach (var m in _chat.Where(x => !x.FromMe && (x.Reviewed || x.State == ChatState.Blocked)))
             {
                 var blocked = m.State == ChatState.Blocked;

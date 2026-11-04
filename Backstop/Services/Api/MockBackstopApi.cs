@@ -516,13 +516,8 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         await Wait(600, ct);
         var inbox = guardian.GetQueue().Select(FromMail);
         List<ReviewItem> checks;
-        List<ReviewItem> stories;
-        lock (_gate)
-        {
-            checks = _checks.Values.Where(c => c.Result.Status == ReviewStatus.Held && CanSee(c)).Select(FromCheck).ToList();
-            stories = _stories.Values.Where(x => x.Story.Status == StoryStatus.Held).Select(FromStory).ToList();
-        }
-        return inbox.Concat(checks).Concat(stories).OrderByDescending(i => i.At).ToList();
+        lock (_gate) checks = _checks.Values.Where(c => c.Result.Status == ReviewStatus.Held && CanSee(c)).Select(FromCheck).ToList();
+        return inbox.Concat(checks).OrderByDescending(i => i.At).ToList();
     }
 
     public async Task<ReviewItem?> GetReviewItemAsync(string id, CancellationToken ct = default)
@@ -531,7 +526,6 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         lock (_gate)
         {
             if (_checks.TryGetValue(id, out var c)) return c.Result.Status == ReviewStatus.Held && CanSee(c) ? FromCheck(c) : null;
-            if (_stories.TryGetValue(id, out var st)) return st.Story.Status == StoryStatus.Held ? FromStory(st) : null;
         }
         var m = guardian.Get(id);
         return m is { State: MessageState.Held } ? FromMail(m) : null;
@@ -557,21 +551,6 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
                 };
                 _checks[id] = c with { Result = r };
                 title = TitleFor(c.Result, c.Original);
-            }
-            else if (_stories.TryGetValue(id, out var st))
-            {
-                if (st.Story.Status != StoryStatus.Held) throw new BackstopApiException("This has already been decided.");
-                title = $"the story about \"{Shorten(st.Situation)}\"";
-                // Only Release lets the user read it. Block is final. Call first leaves it held.
-                _stories[id] = st with
-                {
-                    Story = decision switch
-                    {
-                        ReviewDecision.Release => st.Story with { Status = StoryStatus.Ready },
-                        ReviewDecision.Block => st.Story with { Status = StoryStatus.Blocked },
-                        _ => st.Story,
-                    },
-                };
             }
             else
             {

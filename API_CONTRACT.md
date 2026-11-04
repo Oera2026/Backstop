@@ -176,7 +176,5 @@ Changing the level or format calls `POST /explanations` again with the same `ori
 | `GetStoriesAsync` | GET | `/stories` | – | `Story[]`, newest first |
 | `DeleteStoryAsync` | DELETE | `/stories/{id}` | – | 204 |
 
-`Story { id, title, when?, pages: [ { heading, text, picture } ], status: Ready|Held|Blocked, madeAt }`.
-A sensitive topic comes back `Held` with no `pages` (and a generic title) until the trusted person decides. Held and
-unclear results fail closed. `Blocked` is final and the user's endpoints return 404 for it. Held stories appear in the
-trusted person's review queue as `source: Story`, and are decided with the same `Release` / `Block` / `CallFirst` call.
+`Story { id, title, when?, pages: [ { heading, text, picture } ], madeAt }`.
+A sensitive topic still gets its story straight away, and the trusted person is told in the activity log.

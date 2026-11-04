@@ -21,15 +21,6 @@ else if (_story is null)
     <h1>We cannot find that story</h1>
     <p class="actions"><a class="btn btn-primary" href="stories"><Icon Name="story" /> My stories</a></p>
 }
-else if (_story.Status == StoryStatus.Held)
-{
-    @* Held: no title and no words, the same as held mail. *@
-    <PageTitle>Your story – Backstop</PageTitle>
-    <h1>Your story</h1>
-    <p><StatusBadge State="MessageState.Held" /></p>
-    <p class="lead">@Helper is checking this for you.</p>
-    <p class="actions"><a class="btn btn-quiet" href="stories"><Icon Name="arrow-left" /> My stories</a></p>
-}
 else if (_finished)
 {
     <PageTitle>@_story.Title – Backstop</PageTitle>
@@ -84,15 +75,9 @@ else
 
     protected override Task OnParametersSetAsync() => Load();
 
-    // When the trusted person releases a held story, this reloads and the pages appear.
-    protected override async Task OnApiChangedAsync()
+    private async Task Load()
     {
-        if (_story?.Status == StoryStatus.Held) await Load(quiet: true);
-    }
-
-    private async Task Load(bool quiet = false)
-    {
-        if (!quiet) _loading = true;
+        _loading = true;
         _problem = null;
         try { _story = await Api.GetStoryAsync(Id); }
         catch (BackstopApiException ex) { _problem = ex.Message; }

@@ -567,7 +567,7 @@ section.chat .chat__log { max-height: min(24rem, calc(100vh - 22rem)); max-heigh
   .profile__txt { display: block; min-width: 0; }
 }
 
-/* Sign in */
+/* The start page */
 .page--login { max-width: 32rem; margin-inline: auto; }
 
 /* Demo guide: User / Helper switch and the walk-around. One compact row; the step words fold away. */
@@ -680,7 +680,6 @@ section.chat .chat__log { max-height: min(24rem, calc(100vh - 22rem)); max-heigh
 @media (max-width: 959px) {
   .brand__word { display: none; }
   .brand__home { display: inline; padding-inline-end: .5rem; }
-  .nav-signout { display: none !important; }
   .site-header { flex-wrap: nowrap; padding-right: 4.5rem; }
   .guide-toggle { padding: 0 .6rem; }
 }
@@ -871,5 +870,5 @@ section.chat .chat__log { max-height: min(24rem, calc(100vh - 22rem)); max-heigh
   .demo-row { margin-bottom: .4rem; }
 }
 
-/* Landing page: the two demo sides first, the account sign-in folded away underneath. */
+/* Start page: the two demo sides. */
 .page--login .sidecards { margin-top: 1.25rem; }

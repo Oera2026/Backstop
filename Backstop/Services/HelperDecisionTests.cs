@@ -138,22 +138,6 @@ public static class HelperDecisionTests
         cc.Guardian.CancelCall("nope");
         Assert(cc.Guardian.GetMailActivity().Any(a => a.Text.Contains("will not call")), "Taking the call back is written to the activity log");
 
-        // Ring them: a tel: link only when a number is saved. None is collected, so the button is hidden.
-        var g = new MockGuardianService(new MailStore());
-        Assert(g.GetRingHref() is null, "No saved number: no Ring them button");
-        g.UserPhone = "";
-        Assert(g.GetRingHref() is null, "An empty number: hidden");
-        g.UserPhone = "not a number";
-        Assert(g.GetRingHref() is null, "Not a number: hidden");
-        g.UserPhone = "12345";
-        Assert(g.GetRingHref() is null, "Too short to be a number: hidden");
-        g.UserPhone = "07700 900123";
-        Assert(g.GetRingHref() == "tel:07700900123", "A saved number gives a tel: link");
-        g.UserPhone = "+44 7700 900123";
-        Assert(g.GetRingHref() == "tel:+447700900123", "A number with a country code keeps the plus");
-        g.UserPhone = "0770\"><script>0 900123";
-        Assert(g.GetRingHref() == "tel:07700900123", "Anything that is not a digit is dropped from the link");
-
         // The helper's tier does not change: no SendAsUser, no SeeChats, and the refusals stay.
         var tier = new Rig();
         var held = await tier.Held();

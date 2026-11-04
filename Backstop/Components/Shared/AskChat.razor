@@ -265,9 +265,7 @@
     private async Task<AskLine> MakeStory(string text)
     {
         var made = await Api.MakeStoryAsync(new StoryRequest(text, null));
-        return made.Status == StoryStatus.Held
-            ? new AskLine(false, $"{Helper} is checking your story.")
-            : new AskLine(false, made.Title, Href: $"stories/{made.Id}", LinkText: "Open in My stories", Story: made);
+        return new AskLine(false, made.Title, Href: $"stories/{made.Id}", LinkText: "Open in My stories", Story: made);
     }
 
     private async Task<AskLine> Answer(string text, PicturePicker.PickedFile? picture)
