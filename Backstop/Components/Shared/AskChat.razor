@@ -81,7 +81,9 @@
                     }
                     @if (t.Story is { Pages.Count: > 0 } story)
                     {
-                        <StoryPlayer Story="story" />
+                        <button type="button" class="btn btn-primary storyplay" @onclick="() => _playing = story">
+                            <Icon Name="arrow-right" /> Play
+                        </button>
                     }
                     @if (t.Href is not null)
                     {
@@ -125,6 +127,21 @@
         </div>
         <p class="form-error" role="alert">@_error</p>
     </form>
+
+    @if (_playing is { } playing)
+    {
+        <div class="storytheatre" role="dialog" aria-modal="true" aria-label="@playing.Title">
+            <div class="storytheatre__bar">
+                <h2 class="storytheatre__title">@playing.Title</h2>
+                <button type="button" class="btn btn-quiet storytheatre__exit" @onclick="() => _playing = null">
+                    <Icon Name="cross" /> Exit
+                </button>
+            </div>
+            <div class="storytheatre__body">
+                <StoryPlayer Story="playing" />
+            </div>
+        </div>
+    }
 </div>
 
 @code {
@@ -150,6 +167,7 @@
     private string _text = "";
     private string? _error;
     private bool _busy, _storyMode;
+    private Story? _playing;
     private PicturePicker.PickedFile? _picture;
     private ElementReference _end;
 

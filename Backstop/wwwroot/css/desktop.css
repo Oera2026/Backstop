@@ -19,3 +19,18 @@
 .chat--page { border: 0; border-radius: 0; padding: 0; margin: 0; }
 @media (min-width: 960px) { .shell > .page:has(> .chat--page):not(.page--login):not(.page--demo) { max-width: none; flex: 1 1 0; margin-inline: 0; } }
 .chat--page .bubble { max-width: min(85%, 48rem); }
+
+/* Story theatre: Play opens the story over the whole chat. Big picture, big words, Exit top right. */
+.chat { position: relative; }
+.storyplay { margin-top: .75rem; }
+.storytheatre { position: absolute; inset: 0; z-index: 5; display: flex; flex-direction: column; background: var(--bg); }
+.storytheatre__bar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .5rem 0 .75rem; border-bottom: 1px solid var(--rule); }
+.storytheatre__title { margin: 0; font-size: calc(1.4rem * var(--tx)); }
+.storytheatre__exit { flex: none; }
+.storytheatre__body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; justify-content: center; padding: 1rem 0; }
+.storytheatre .stepview { border: 0; padding: 0; margin: 0; text-align: center; }
+.storytheatre .storyfig .figure__frame { max-width: min(100%, 60rem, calc(62vh * 1.5)); }
+.storytheatre .storyfig .figure__frame > * { width: 100%; height: auto; }
+.storytheatre .stepview__text { font-size: calc(2rem * var(--tx)); }
+.storytheatre .storypage__h { font-size: calc(1.6rem * var(--tx)); }
+.storytheatre .actions { justify-content: center; margin-top: 1rem; }
