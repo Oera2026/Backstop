@@ -84,7 +84,7 @@ public sealed partial class MockBackstopApi
     private void NoteSensitiveStory(string text)
     {
         lock (_gate) LogSensitiveStory(text);
-        Changed?.Invoke();
+        RaiseChanged();
     }
 
     private string Fill(string s) => s.Replace("{helper}", Helper);

@@ -302,7 +302,7 @@ public static class PageBehaviourTests
         await app.Host.Submit(page);
         await app.Host.Click(page, "Ask my helper");
         var text = app.Host.Text(page);
-        Assert(text.Contains("could not be sent") && !text.Contains("no-reply"), "Compose: a refused hold gives the real reason, not no-reply");
+        Assert(text.Contains("The subject must be one short line") && !text.Contains("no-reply"), "Compose: a refused hold gives the real reason, not no-reply");
     }
 
     private static async Task StoryChangeStartsAtItsFirstPage()

@@ -239,7 +239,7 @@ public sealed partial class MockBackstopApi
             MarkVisitorItem(help.Id);
             Log("hand", $"{User} would like your help with \"{title}\".");
         }
-        Changed?.Invoke();
+        RaiseChanged();
     }
 
     private const int MaxEscalatedChars = 2000;
