@@ -38,9 +38,18 @@
 </div>
 
 <div class="settings-foot">
-    <a class="btn btn-primary" href="@DoneHref"><Icon Name="check" /> Done</a>
-    <button type="button" class="btn btn-quiet" @onclick="Reset"><Icon Name="refresh" /> Put everything back</button>
-    @if (ShowWelcome)
+    @if (_confirmReset)
+    {
+        <p class="settings-foot__ask" role="alert">Put everything back?</p>
+        <button type="button" class="btn btn-primary" @onclick="Reset"><Icon Name="refresh" /> Yes, put it back</button>
+        <button type="button" class="btn btn-quiet" @onclick="() => _confirmReset = false"><Icon Name="arrow-left" /> No, keep it</button>
+    }
+    else
+    {
+        <a class="btn btn-primary" href="@DoneHref"><Icon Name="check" /> Done</a>
+        <button type="button" class="btn btn-quiet" @onclick="() => _confirmReset = true"><Icon Name="refresh" /> Put everything back</button>
+    }
+    @if (ShowWelcome && !_confirmReset)
     {
         <a class="btn btn-text" href="welcome">Show the welcome again</a>
     }
@@ -51,6 +60,8 @@
 
     /// <summary>The welcome screens are for the user only.</summary>
     [Parameter] public bool ShowWelcome { get; set; }
+
+    private bool _confirmReset;
 
     private Dictionary<string, string> _s = new()
     {
@@ -76,6 +87,7 @@
 
     private async Task Reset()
     {
+        _confirmReset = false;
         try { _s = await JS.InvokeAsync<Dictionary<string, string>>("backstopSettings.reset"); } catch (Exception) { }
     }
 }

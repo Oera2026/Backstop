@@ -1,7 +1,8 @@
+@implements IAsyncDisposable
 @inject IJSRuntime JS
 
-<button type="button" class="btn @(Primary ? "btn-primary" : "btn-text")" @onclick="Speak">
-    <Icon Name="speaker" /> Read this to me
+<button type="button" class="btn @(Primary ? "btn-primary" : "btn-text") readaloud" aria-pressed="@(_speaking ? "true" : "false")" @onclick="Toggle">
+    <Icon Name="@(_speaking ? "cross" : "speaker")" /> @(_speaking ? "Stop" : "Read this to me")
 </button>
 <p class="sr-note" role="status">@_note</p>
 
@@ -10,19 +11,45 @@
     [Parameter] public bool Primary { get; set; }
 
     private string _note = "";
+    private bool _speaking;
+    private DotNetObjectReference<ReadAloudButton>? _self;
 
-    private async Task Speak()
+    private async Task Toggle()
     {
+        if (_speaking) { await StopAsync(); return; }
         _note = "";
         try
         {
             // backstop.js wraps the browser's speechSynthesis. Returns false when not supported.
-            var ok = await JS.InvokeAsync<bool>("backstop.speak", Text);
-            if (!ok) _note = "Sorry, this device cannot read out loud.";
+            _self ??= DotNetObjectReference.Create(this);
+            _speaking = await JS.InvokeAsync<bool>("backstop.speakWithEnd", _self, Text);
+            if (!_speaking) _note = "Sorry, this device cannot read out loud.";
         }
         catch (Exception)
         {
+            _speaking = false;
             _note = "Sorry, this device cannot read out loud.";
         }
+    }
+
+    /// <summary>Called by backstop.js when the speech finishes or is cut off.</summary>
+    [JSInvokable]
+    public void Ended()
+    {
+        _speaking = false;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task StopAsync()
+    {
+        _speaking = false;
+        try { await JS.InvokeVoidAsync("backstop.stop"); } catch (Exception) { }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        // Leaving the page stops the voice.
+        if (_speaking) await StopAsync();
+        _self?.Dispose();
     }
 }

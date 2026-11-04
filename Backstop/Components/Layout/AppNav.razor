@@ -1,5 +1,7 @@
 @implements IDisposable
 @inject NavigationManager Nav
+@inject PageHistory History
+@* PageHistory is created here so it sees every page before Settings opens. *@
 
 @* One list of places. On phones it is a tab bar at the bottom; on wide screens a side bar (see modes.css). *@
 <nav class="appnav" aria-label="Main">
