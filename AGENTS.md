@@ -77,7 +77,11 @@ New code uses Meta names (IMetaScamChecker, MetaScamAnalysis, MetaAiOptions). Th
 
 Working rules
 Commit in small, meaningful commits. Never commit .env, keys or bin-preview/.
-Finish every task the same way (standing instruction from the owner, 2 Nov 2026): when the work is done and checked, update the graphify map (/graphify update .), commit, then push to origin main without asking. Do this after each completed task, not only at the end of a session. Still never push .env, keys or bin-preview/, and do not push if the build or the checks fail.
+Finish every task the same way (standing instruction from the owner, 2 Nov 2026, restated 4 Nov 2026). This is mandatory, not optional. When a task is completed and checked, in this order:
+1. Update the graph: run `graphify update .` from the repo root (the CLI works even when no /graphify skill is loaded).
+2. Commit the task's changes with a clear message. Stage only the files you changed, never `git add -A`.
+3. Push to origin main without asking.
+Do this after EACH completed task, not at the end of a session and not only when the owner reminds you. Never leave finished work uncommitted. Still never push .env, keys or bin-preview/, and do not commit or push if the build or the checks fail.
 After changes, run the app and check /, /helper and /demo with all 7 scenarios. Also check behaviour with no META_AI_KEY set (everything must hold, nothing may crash or clear).
 Keep README.md truthful: it describes the live Meta AI and Supabase use, how to run locally, the env var names (not values), and the demo URL.
 Do not change a hard rule to make a task easier. If a rule blocks the work, stop and ask.
