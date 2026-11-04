@@ -27,8 +27,8 @@ else
                             <span class="row__preview">@c.Address</span>
                         </span>
                     </a>
-                    <a class="btn btn-quiet" href="contacts/@c.Id" aria-label="@(c.PhotoUrl is null ? "Add a photo of" : "Change the photo of") @c.Name">
-                        <Icon Name="pen" /> @(c.PhotoUrl is null ? "Add photo" : "Change photo")
+                    <a class="btn btn-text" href="contacts/@c.Id" aria-label="@(c.PhotoUrl is null ? "Add a photo of" : "Change the photo of") @c.Name">
+                        <Icon Name="camera" /> Photo
                     </a>
                 </div>
             </li>

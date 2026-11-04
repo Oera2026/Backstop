@@ -2,7 +2,7 @@
 @inject AskSession Session
 @inject NavigationManager Nav
 
-@* The Ask Me page is the same chat at full size, so the dock stays out of its way there. *@
+@* The Ask Me page is the same chat at full size, so the dock stays out of its way there. Home already has an Ask Me card. *@
 @if (!OnAskPage)
 {
     @if (Session.DockOpen)
@@ -18,7 +18,7 @@
             <AskChat Compact="true" />
         </aside>
     }
-    else
+    else if (!OnHome)
     {
         <button type="button" class="dock-tab" aria-expanded="false" aria-controls="ask-dock" @onclick="() => Session.SetDock(true)">
             <Icon Name="chat" /> <span>Ask Me</span>
@@ -29,6 +29,9 @@
 @code {
     private bool OnAskPage =>
         Nav.ToBaseRelativePath(Nav.Uri).Split('?', '#')[0].Equals("ask-me", StringComparison.OrdinalIgnoreCase);
+
+    private bool OnHome =>
+        Nav.ToBaseRelativePath(Nav.Uri).Split('?', '#')[0].Equals("home", StringComparison.OrdinalIgnoreCase);
 
     protected override void OnInitialized()
     {

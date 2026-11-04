@@ -153,6 +153,7 @@ builder.Services.AddRateLimiter(o =>
 
 // MOCK: swap these registrations for real implementations later. No other code needs to change.
 builder.Services.AddScoped<AskSession>();
+builder.Services.AddScoped<PageHistory>();
 builder.Services.AddSingleton<MailStore>();
 builder.Services.AddSingleton<ISenderCheck, SenderCheck>();
 builder.Services.AddSingleton<IMailService, MockMailService>();

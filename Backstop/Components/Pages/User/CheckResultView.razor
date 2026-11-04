@@ -29,6 +29,10 @@ else if (_r.Status == ReviewStatus.Held)
     <p><StatusBadge State="MessageState.Held" /></p>
     <h1>We've asked @Helper to check this.</h1>
     <p class="lead">You'll see it once it's cleared.</p>
+    @if (_r.Verdict == Verdict.DontReply || (_r.Verdict == Verdict.BeCareful && _r.Flags.Any(f => f.Id != "review-needed")))
+    {
+        <p class="call-note"><Icon Name="hand" /> <span>Don't reply or send anything until @Helper has looked.</span></p>
+    }
     @if (_r.Failure is { } failure)
     {
         <FailureNotice Failure="failure" />
@@ -55,9 +59,20 @@ else if (_r.Status == ReviewStatus.Blocked)
     <p><StatusBadge State="MessageState.Blocked" /></p>
     <h1>@Helper says please don't reply to this.</h1>
     <WatchForTip Tip="@(_r.WatchFor ?? WatchFor.Fallback(_r.Flags.Select(f => f.Id)))" />
-    <div class="actions">
-        <button type="button" class="btn btn-primary" @onclick="Delete" disabled="@_working"><Icon Name="trash" /> Delete it</button>
-    </div>
+    @if (_confirmDelete)
+    {
+        <h2>Delete this check?</h2>
+        <div class="actions">
+            <button type="button" class="btn btn-primary" @onclick="() => _confirmDelete = false"><Icon Name="arrow-left" /> No, keep it</button>
+            <button type="button" class="btn btn-quiet btn-danger" @onclick="Delete" disabled="@_working"><Icon Name="trash" /> Yes, delete it</button>
+        </div>
+    }
+    else
+    {
+        <div class="actions">
+            <button type="button" class="btn btn-primary" @onclick="() => _confirmDelete = true"><Icon Name="trash" /> Delete it</button>
+        </div>
+    }
 }
 else
 {
@@ -86,20 +101,40 @@ else
     {
         <ErrorState Message="@_actionProblem" />
     }
-    <div class="actions">
-        <button type="button" class="btn btn-primary" @onclick="Ask" disabled="@_working"><Icon Name="user" /> @(_working ? "Asking…" : $"Ask {Helper} to look")</button>
-        <a class="btn btn-quiet" href="explain?check=@_r.Id"><Icon Name="book" /> Explain this to me</a>
-    </div>
-    <div class="actions actions--quiet">
-        <button type="button" class="btn btn-text" @onclick="Delete" disabled="@_working"><Icon Name="trash" /> Delete it</button>
-    </div>
+    @if (_confirmDelete)
+    {
+        <h2>Delete this check?</h2>
+        <div class="actions">
+            <button type="button" class="btn btn-primary" @onclick="() => _confirmDelete = false"><Icon Name="arrow-left" /> No, keep it</button>
+            <button type="button" class="btn btn-quiet btn-danger" @onclick="Delete" disabled="@_working"><Icon Name="trash" /> Yes, delete it</button>
+        </div>
+    }
+    else
+    {
+        var askWords = _working ? "Asking…" : $"Ask {Helper} to look";
+        <div class="actions">
+            @if (_r.Verdict == Verdict.LooksSafe)
+            {
+                <a class="btn btn-primary" href="explain?check=@_r.Id"><Icon Name="book" /> Explain this to me</a>
+                <button type="button" class="btn btn-quiet" @onclick="Ask" disabled="@_working"><Icon Name="user" /> @askWords</button>
+            }
+            else
+            {
+                <button type="button" class="btn btn-primary" @onclick="Ask" disabled="@_working"><Icon Name="user" /> @askWords</button>
+                <a class="btn btn-quiet" href="explain?check=@_r.Id"><Icon Name="book" /> Explain this to me</a>
+            }
+        </div>
+        <div class="actions actions--quiet">
+            <button type="button" class="btn btn-text" @onclick="() => _confirmDelete = true" disabled="@_working"><Icon Name="trash" /> Delete it</button>
+        </div>
+    }
 }
 
 @code {
     [Parameter] public string Id { get; set; } = "";
 
     private CheckResult? _r;
-    private bool _loading = true, _working;
+    private bool _loading = true, _working, _confirmDelete;
     private string? _problem, _actionProblem;
 
     protected override Task OnParametersSetAsync() => Load();

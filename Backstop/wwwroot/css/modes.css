@@ -17,6 +17,7 @@
   color: var(--navy); text-decoration: none; font-weight: 800; font-size: calc(.85rem * var(--tx)); line-height: 1.1; text-align: center;
   border-top: 4px solid transparent;
 }
+.appnav__list > li { min-width: 0; }
 .appnav__item .icon { width: 1.6rem; height: 1.6rem; display: block; }
 .appnav__item span { line-height: 1.2; }
 .appnav__item--on { background: var(--band); border-top-color: var(--navy); }
@@ -30,7 +31,8 @@
    A page that needs a different width only sets --col. */
 @media (min-width: 960px) {
   .shell { flex-direction: row; align-items: flex-start; }
-  .shell > .page { margin-inline: auto; max-width: var(--col, 52rem); padding: 2.25rem 2.5rem 3rem; --tabbar: 0px; }
+  /* Bottom room so the floating Ask Me button never covers the last row */
+  .shell > .page { margin-inline: auto; max-width: var(--col, 52rem); padding: 2.25rem 2.5rem 7rem; --tabbar: 0px; }
   .page:has(.chat), .page:has(.convo) { padding-bottom: 0; }
   .appnav {
     position: sticky; top: 4.5rem; bottom: auto; flex: 0 0 15rem; align-self: flex-start;
@@ -291,7 +293,7 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 .settings__list { border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg); }
 .settings .choice { display: block; margin: 0; padding: 1.25rem 1.5rem 1.5rem; }
 .settings .choice + .choice { border-top: 1px solid var(--rule); }
-.settings .choice__q { margin: 0 0 .9rem; font-size: calc(1.3rem * var(--tx)); line-height: 1.25; }
+.settings .choice__q { flex-wrap: wrap; margin: 0 0 .9rem; font-size: calc(1.3rem * var(--tx)); line-height: 1.25; }
 .settings .choice__q .pic { width: 2.75rem; height: 2.75rem; border-radius: var(--radius); }
 .settings .choice__q .pic .icon { width: 1.5rem; height: 1.5rem; }
 /* One equal column per option, so a choice never leaves one button alone on a second row */
@@ -307,6 +309,7 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
   margin: 1rem 0 0; padding: .75rem 0; background: var(--bg); border-top: 1px solid var(--rule);
 }
 .settings-foot .btn { min-height: 56px; }
+.settings-foot__ask { flex: 1 0 100%; margin: 0; font-weight: 800; font-size: calc(1.2rem * var(--tx)); }
 
 /* Settings on a wide screen: groups side by side */
 @media (min-width: 1200px) {
@@ -356,9 +359,9 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 /* On a phone the two buttons share one row, so the sticky composer stays short and the chat above it stays visible */
 @media (max-width: 480px) {
   .composer__row { flex-wrap: nowrap; }
-  .composer__attach { flex: none; min-width: 56px; padding-inline: 0; }
-  .composer__attach .composer__label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-  .composer__row .btn-primary { flex: 1; padding-inline: 1rem; }
+  .composer__row > .btn:not(.btn-primary) { flex: none; min-width: 56px; padding-inline: 0; }
+  .composer__row .composer__label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .composer__row .btn-primary { flex: 1; min-width: 0; padding-inline: 1rem; }
 }
 
 /* ---------- Messages ---------- */
@@ -380,8 +383,9 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 .msg--mine .msg__text { background: var(--navy); color: var(--on-navy); }
 .msg--theirs .msg__text { background: var(--accent-soft); color: var(--text); border: 1px solid var(--rule); }
 .msg__time { font-size: .9rem; font-weight: 600; padding-inline: .4rem; }
-.composer--inline { grid-template-columns: 1fr auto; align-items: end; }
-.composer--inline textarea { min-height: 3.5rem; resize: none; }
+.composer--inline { grid-template-columns: minmax(0, 1fr) auto; align-items: end; }
+.composer--inline textarea { min-height: 3.5rem; width: 100%; min-width: 0; resize: none; }
+.composer--inline .btn-primary { padding-inline: 1rem; }
 .composer--inline .form-error { grid-column: 1 / -1; }
 
 /* Helper: people on the left, the open chat on the right */

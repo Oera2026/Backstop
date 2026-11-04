@@ -4,18 +4,18 @@
 @* What went wrong in plain words, then a closed box with the technical detail for someone investigating. *@
 <div class="failure" role="alert">
     <p class="failure__message"><Icon Name="alert" /> <span>@(Message ?? Failure.Message)</span></p>
-    <details class="failure__tech">
-        <summary>Technical details</summary>
-        <pre>@Failure.Technical</pre>
-        @if (_canTest)
-        {
+    @if (_canTest)
+    {
+        <details class="failure__tech">
+            <summary>Technical details</summary>
+            <pre>@Failure.Technical</pre>
             <button type="button" class="btn btn-quiet" @onclick="RunTest" disabled="@_running">@(_running ? "Testing..." : "Test the connection")</button>
             @if (_result is not null)
             {
                 <pre aria-live="polite">@_result</pre>
             }
-        }
-    </details>
+        </details>
+    }
 </div>
 
 @code {

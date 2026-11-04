@@ -1,5 +1,6 @@
 @page "/settings"
+@inject PageHistory History
 
 <PageTitle>Settings – Backstop</PageTitle>
 
-<SettingsPanel DoneHref="/" ShowWelcome="true" />
+<SettingsPanel DoneHref="@History.Back" ShowWelcome="true" />
