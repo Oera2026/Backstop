@@ -147,3 +147,11 @@ input, select, textarea { font-size: max(16px, 1rem); }
 }
 /* Headers with only the Welcome link: it sits at the right edge, not in the room kept for the guide button. */
 @media (max-width: 959px) { .site-header:has(.site-nav > .welcome-link:only-child) { padding-right: max(1rem, env(safe-area-inset-right)); } }
+
+/* Try page on a wide screen: use the width (the generic wide-screen column rule was keeping it narrow), and give every example room for its words. */
+@media (min-width: 64rem) {
+  .page.page--try:not(.page--login):not(.page--demo) { max-width: 96rem; padding-inline: 2rem; }
+  .try-grid { grid-template-columns: minmax(0, 1.7fr) minmax(20rem, 28rem); }
+  .page--try .try-samples { grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr)); }
+  .page--try .try-sample { padding-inline: .6rem; overflow-wrap: anywhere; hyphens: auto; }
+}
