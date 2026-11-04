@@ -79,15 +79,20 @@
                             }
                         </ul>
                     }
-                    @if (t.Story is { Pages.Count: > 0 } story)
+                    @if (t.Story is { Pages.Count: > 0 } || t.Href is not null)
                     {
-                        <button type="button" class="btn btn-primary storyplay" @onclick="() => _playing = story">
-                            <Icon Name="arrow-right" /> Play
-                        </button>
-                    }
-                    @if (t.Href is not null)
-                    {
-                        <a class="btn btn-quiet bubble__link" href="@t.Href">@t.LinkText <Icon Name="arrow-right" /></a>
+                        <div class="bubble__actions">
+                            @if (t.Story is { Pages.Count: > 0 } story)
+                            {
+                                <button type="button" class="btn btn-primary storyplay" @onclick="() => _playing = story">
+                                    <Icon Name="arrow-right" /> Play
+                                </button>
+                            }
+                            @if (t.Href is not null)
+                            {
+                                <a class="btn btn-quiet bubble__link" href="@t.Href">@t.LinkText <Icon Name="arrow-right" /></a>
+                            }
+                        </div>
                     }
                 </li>
             }
