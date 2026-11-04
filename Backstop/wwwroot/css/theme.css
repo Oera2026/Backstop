@@ -1,5 +1,5 @@
 /* "Inclusive Design" theme. Change colours here only.
-   Navy and green carry the brand, amber and red carry warnings. None of them is ever alone:
+   Teal carries the brand. Amber only ever means being checked, red means blocked, green means safe. None of them is ever alone:
    state colours travel with an icon and a word.
    Brights (#166534 green, #F59E0B amber, #DC2626 red) fill backgrounds and borders.
    Text on a tint uses the darker text colour, so every text pair meets WCAG AA (4.5:1) and most reach 7:1.
@@ -49,7 +49,11 @@
   --radius-lg: 12px;
 
   --focus: #0F4C5C;
-  --focus-halo: #F59E0B;
+  --focus-halo: #A7D3DA;
+
+  /* Presence (Online) is neutral teal, never the green of Safe or the amber of being checked. */
+  --presence: #0F4C5C;
+  --presence-soft: #E1F1F2;
 
   --font: "Atkinson Hyperlegible Next", "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
@@ -71,7 +75,7 @@
   --line: 4px;
 }
 
-/* Settings: Dark. Ink and fills turn pale blue, the page turns deep navy, amber stays amber.
+/* Settings: Dark. Ink and fills turn pale blue, the page turns deep navy, amber stays amber for the checking state only.
    js/settings.js sets data-scheme to "dark" for Dark, and for Match my device when the device is dark. */
 :root[data-scheme="dark"] {
   color-scheme: dark;
@@ -107,7 +111,10 @@
   --block-soft: #4A1319;
 
   --focus: #FFFFFF;
-  --focus-halo: #F59E0B;
+  --focus-halo: #5A6FB8;
+
+  --presence: #B7C8FF;
+  --presence-soft: #1B2757;
 }
 
 :root[data-scheme="dark"][data-contrast="high"] {

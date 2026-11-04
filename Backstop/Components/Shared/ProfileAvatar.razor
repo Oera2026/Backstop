@@ -10,7 +10,7 @@
     }
     @if (ShowStatus)
     {
-        <span class="presence-dot presence-dot--@Kind"><Icon Name="@(Kind == "online" ? "check" : "minus")" /></span>
+        <span class="presence-dot presence-dot--@Kind">@if (Kind != "online") {<Icon Name="minus" />}</span>
     }
 </span>
 

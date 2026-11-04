@@ -14,10 +14,12 @@
 .appnav__wide-only { display: none; }
 .appnav__item {
   display: grid; justify-items: center; align-items: center; align-content: center; gap: .15rem; min-height: 64px; padding: .35rem .1rem;
-  color: var(--navy); text-decoration: none; font-weight: 800; font-size: calc(.85rem * var(--tx)); line-height: 1.1; text-align: center;
+  color: var(--navy); text-decoration: none; font-weight: 800; font-size: .9rem; letter-spacing: -.01em; line-height: 1.1; text-align: center; min-width: 0;
   border-top: 4px solid transparent;
 }
 .appnav__list > li { min-width: 0; }
+/* 18px on a phone so four labels fit at any text size; wider screens let them grow a little. */
+@media (min-width: 420px) { .appnav__item { font-size: clamp(.9rem, calc(.85rem * var(--tx)), 1rem); } }
 .appnav__item .icon { width: 1.6rem; height: 1.6rem; display: block; }
 .appnav__item span { line-height: 1.2; }
 .appnav__item--on { background: var(--band); border-top-color: var(--navy); }
@@ -117,7 +119,7 @@ h1 { text-decoration: none; }
 }
 @media (hover: hover) { .chip:hover { background: var(--band); } }
 .chips { display: flex; flex-wrap: wrap; gap: .5rem; margin: .5rem 0 1rem; padding: 0; list-style: none; }
-.tag { display: inline-block; padding: .05rem .6rem; border-radius: 999px; background: var(--band); color: var(--navy); font-size: calc(.85rem * var(--tx)); font-weight: 700; }
+.tag { display: inline-block; padding: .05rem .6rem; border-radius: 999px; background: var(--band); color: var(--navy); font-size: calc(.9rem * var(--tx)); font-weight: 700; }
 .done-note { display: flex; gap: .6rem; align-items: center; color: var(--safe); font-weight: 800; min-height: 1.6rem; margin: .5rem 0; }
 .done-note:empty { display: none; }
 
@@ -347,7 +349,7 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 .bubble__link { margin-top: .8rem; }
 .composer {
   position: sticky; bottom: 0; background: var(--bg); border-top: 1px solid var(--rule);
-  padding: .9rem 0 1rem; display: grid; gap: .6rem;
+  padding: .9rem 0 1rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: .6rem;
 }
 @media (max-width: 959px) { .composer { bottom: calc(4rem + env(safe-area-inset-bottom)); } }
 .composer textarea { min-height: 4.5rem; margin: 0; font-size: calc(1.1rem * var(--tx)); }
@@ -474,12 +476,12 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 
 /* Helper side bar: the waiting count sits on the item */
 .appnav__item { position: relative; }
-.nav-count { min-width: 1.6em; padding: 0 .45em; border-radius: 999px; background: var(--marker); color: var(--on-marker); font-weight: 800; text-align: center; font-size: .85rem; line-height: 1.5; }
+.nav-count { min-width: 1.6em; padding: 0 .45em; border-radius: 999px; background: var(--navy); color: var(--on-navy); font-weight: 800; text-align: center; font-size: .9rem; line-height: 1.5; }
 @media (max-width: 959px) { .appnav__item .nav-count { position: absolute; top: .2rem; left: calc(50% + .5rem); } }
 @media (min-width: 960px) { .appnav__item .nav-count { margin-inline-start: auto; } }
 
 /* Helper queue rows: risk is a word, an icon and a colour */
-.row__side .badge { white-space: nowrap; }
+.row__side .badge { white-space: nowrap; max-width: 100%; }
 .evidence__who { margin: 0 0 1rem; }
 .evidence__who strong { font-size: calc(1.2rem * var(--tx)); }
 .evidence__who code { overflow-wrap: anywhere; }
@@ -490,7 +492,7 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 .group-h { display: flex; align-items: center; gap: .6rem; margin: 2rem 0 .75rem; }
 .group-h .icon { width: 1.5rem; height: 1.5rem; color: var(--navy); }
 .group-count { min-width: 1.8em; padding: 0 .5em; border-radius: 999px; background: var(--band); color: var(--navy); font-size: .9rem; font-weight: 800; text-align: center; line-height: 1.7; }
-.row__kind { font-size: calc(.85rem * var(--tx)); font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--text-2); }
+.row__kind { font-size: calc(.9rem * var(--tx)); font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--text-2); }
 .row__call { display: flex; align-items: center; gap: .4rem; color: var(--check); font-weight: 800; font-size: calc(.9rem * var(--tx)); }
 .row__call .icon { width: 1.1rem; height: 1.1rem; }
 .row--static .row__preview { white-space: normal; }
@@ -503,7 +505,9 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 .presence-dot { display: inline-grid; place-items: center; flex: none; box-sizing: border-box; width: 1.5rem; height: 1.5rem; border-radius: 50%; border: 2px solid var(--bg); }
 /* Beats the size rules for icons inside rows and picture tiles. */
 .presence-dot .icon { width: .9rem !important; height: .9rem !important; stroke-width: 3; }
-.presence-dot--online { background: var(--safe); color: var(--bg); }
+.presence-dot--online { background: var(--presence); color: var(--bg); }
+.badge--presence { background: var(--presence-soft); color: var(--presence); }
+.badge__dot { width: .7rem; height: .7rem; border-radius: 50%; background: currentColor; flex: none; }
 .presence-dot--hidden { background: var(--text-2); color: var(--bg); }
 .profile-pic > .presence-dot { position: absolute; right: -.4rem; bottom: -.4rem; }
 
@@ -513,7 +517,7 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 .profile__btn .pic .icon { width: 1.7rem; height: 1.7rem; }
 .profile__txt { display: none; text-align: left; line-height: 1.2; padding-inline-end: .5rem; }
 .profile__name { display: block; font-weight: 800; }
-.profile__status { display: block; font-size: calc(.85rem * var(--tx)); font-weight: 700; color: var(--text-2); }
+.profile__status { display: block; font-size: calc(.9rem * var(--tx)); font-weight: 700; color: var(--text-2); }
 .profile__scrim { position: fixed; inset: 0; z-index: -1; background: transparent; border: 0; cursor: default; }
 .profile__panel { position: absolute; left: 0; bottom: calc(100% + .6rem); width: min(21rem, calc(100vw - 1.5rem)); display: grid; gap: 1rem; padding: 1.1rem; background: var(--bg); border: var(--line) solid var(--border); border-radius: var(--radius-lg); }
 .profile__head { display: flex; align-items: center; gap: 1rem; }
@@ -579,7 +583,7 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 .settings__group--helper > h2 { background: var(--safe-soft); }
 .settings__list { border-radius: 0 0 var(--radius-lg) var(--radius-lg); }
 .pic--navy { background: var(--navy); color: var(--on-navy); border-color: var(--navy); }
-.settings__group--look .choice__q .pic { background: var(--check-soft); color: var(--check); border-color: var(--check-edge); }
+.settings__group--look .choice__q .pic { background: var(--accent-soft); color: var(--navy); }
 .choice__now { margin-inline-start: auto; padding: .15rem .75rem; border-radius: 999px; background: var(--accent-soft); color: var(--navy); font-size: .95rem; font-weight: 800; white-space: nowrap; }
 .settings .choice label { background: var(--surface); }
 .settings .choice input:checked + label { background: var(--navy); }
@@ -705,7 +709,7 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
   .page .home .tiles { grid-template-columns: repeat(4, 1fr); gap: .5rem; margin: 0 0 1rem; }
   .page .home .tile {
     grid-auto-flow: row; justify-items: center; align-content: center; gap: .25rem;
-    min-height: 80px; padding: .5rem .1rem; text-align: center; font-size: calc(.8rem * var(--tx));
+    min-height: 80px; padding: .5rem .1rem; text-align: center; font-size: .9rem; min-width: 0; overflow-wrap: anywhere;
   }
   .page .home .tile .pic { width: 2.25rem; height: 2.25rem; }
   .page .home .tile .pic .icon { width: 1.4rem; height: 1.4rem; }
@@ -804,7 +808,7 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 .try-mode__opt input { width: 1.6rem; height: 1.6rem; accent-color: var(--navy); }
 .try-result h3 { font-size: calc(1.05rem * var(--tx)); margin: 1.25rem 0 .3rem; }
 .try-signals { display: block; overflow-wrap: anywhere; }
-@media (max-width: 480px) { .try-samples { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 480px) { .try-samples { grid-template-columns: 1fr; } }
 .login-try { margin: .75rem 0 0; } .login-try .btn { width: 100%; justify-content: center; }
 .try-link { border-top: var(--line) solid var(--border); padding-top: .75rem; margin-top: .75rem; }
 .try-chain { margin: .25rem 0 .5rem; padding-left: 1.4rem; overflow-wrap: anywhere; }
