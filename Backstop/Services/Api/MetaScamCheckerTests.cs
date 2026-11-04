@@ -1158,6 +1158,9 @@ public class MetaScamCheckerTests
         // 37c. Page flows: real pages rendered with real services and no AI key.
         await PageFlowTests.RunAsync();
 
+        // 37d. Accessibility: links in subjects and senders, skip link, error bar, read aloud, dialog focus.
+        await AccessibilityTests.RunAsync();
+
         // 38. Show me: the AI writes the guide; unsafe goals are refused; failures give a plain error, never a canned guide.
         {
             static HttpResponseMessage Say(string json)
