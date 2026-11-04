@@ -49,16 +49,17 @@ static SocketsHttpHandler NoRedirectHandler() => new()
     MaxResponseHeadersLength = 16,
     ConnectTimeout = TimeSpan.FromSeconds(10),
 };
-// Meta can rate-limit us (429), fail (5xx) or go quiet. Retry twice with backoff (Retry-After is honoured), pause calls
+// Meta can rate-limit us (429), fail (5xx) or go quiet. Retry once with backoff (Retry-After is honoured), pause calls
 // when most of them are failing, and cap each try. When all of that fails, callers fail closed: held, never cleared.
 static void Resilience(Microsoft.Extensions.Http.Resilience.HttpStandardResilienceOptions o)
 {
-    o.Retry.MaxRetryAttempts = 2;
-    o.Retry.Delay = TimeSpan.FromSeconds(2);
+    // Muse models reason before they answer, so one reply takes 6 to 30 seconds. An attempt gets 50 seconds, and a failed one is tried once more.
+    o.Retry.MaxRetryAttempts = 1;
+    o.Retry.Delay = TimeSpan.FromSeconds(1);
     o.Retry.UseJitter = true;
-    o.AttemptTimeout.Timeout = TimeSpan.FromSeconds(15);
-    o.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(40);
-    o.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(60);
+    o.AttemptTimeout.Timeout = TimeSpan.FromSeconds(50);
+    o.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(110);
+    o.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(120);
     o.CircuitBreaker.MinimumThroughput = 5;
     o.CircuitBreaker.FailureRatio = 0.6;
     o.CircuitBreaker.BreakDuration = TimeSpan.FromSeconds(20);

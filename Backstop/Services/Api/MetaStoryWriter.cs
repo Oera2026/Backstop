@@ -50,8 +50,7 @@ public sealed class MetaStoryWriter : IStoryWriter
         "- Each page has a heading of 2 to 5 words that names the step (for example \"Getting there\", \"Saying hello\", \"Waiting my turn\", \"Going home\") and 2 to 3 short sentences a nine-year-old could read. Put what happens first and what I can do after it.\n" +
         "- Write as I: \"I\", \"my\". Never \"you\". Talk about other people as \"the dentist\", \"the nurse\", \"the driver\", never as \"they\" with no name.\n" +
         "- Be specific and ordinary: use the real places, people and things from the situation and the little details that make it clear (a waiting room, a card to tap, a chair). Do not use grand, poetic or cheerful filler such as \"it is a lovely day\" or \"what an adventure\".\n" +
-        "- Do not invent facts the person did not give: no distances, times, prices, names, how long it takes or how it will feel. If a detail is not known, leave it out or keep it general.
-" +
+        "- Do not invent facts the person did not give: no distances, times, prices, names, how long it takes or how it will feel. If a detail is not known, leave it out or keep it general.\n" +
         "- Be honest and gentle. Say \"usually\", \"often\", \"may\" and \"might\" about what others do, because things do not always happen the same way. Never promise that things will go well or that nothing will hurt or go wrong.\n" +
         "- Say what I can do in positive words (\"I can ask\", \"I can wait\", \"I can tell someone\"). Never \"I must\", \"I should\", \"I have to\" or \"I must not\".\n" +
         "- If the situation is unclear, write the most ordinary version of it, and stay calm. Never scary.\n" +

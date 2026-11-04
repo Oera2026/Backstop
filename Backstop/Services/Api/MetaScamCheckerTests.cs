@@ -973,12 +973,12 @@ public class MetaScamCheckerTests
         {
             static MetaAiOptions Load(Dictionary<string, string?> v) => MetaAiOptions.Load(new ConfigurationBuilder().AddInMemoryCollection(v).Build());
             var none = Load(new());
-            Assert(none.TimeoutSeconds == 30, "No timeout set: default 30");
+            Assert(none.TimeoutSeconds == 45, "No timeout set: default 45");
             var env = Load(new() { ["META_AI_TIMEOUT_SECONDS"] = "45" });
             Assert(env.TimeoutSeconds == 45, "META_AI_TIMEOUT_SECONDS is read");
             var both = Load(new() { ["META_AI_TIMEOUT_SECONDS"] = "45", ["MetaAI:TimeoutSeconds"] = "7" });
             Assert(both.TimeoutSeconds == 7, "The nested setting wins");
-            Assert(Load(new() { ["META_AI_TIMEOUT_SECONDS"] = "99999" }).TimeoutSeconds == 300 && Load(new() { ["META_AI_TIMEOUT_SECONDS"] = "abc" }).TimeoutSeconds == 30 && Load(new() { ["META_AI_TIMEOUT_SECONDS"] = "" }).TimeoutSeconds == 30,
+            Assert(Load(new() { ["META_AI_TIMEOUT_SECONDS"] = "99999" }).TimeoutSeconds == 300 && Load(new() { ["META_AI_TIMEOUT_SECONDS"] = "abc" }).TimeoutSeconds == 45 && Load(new() { ["META_AI_TIMEOUT_SECONDS"] = "" }).TimeoutSeconds == 45 && Load(new() { ["META_AI_TIMEOUT_SECONDS"] = "10" }).TimeoutSeconds == 30,
                 "A huge value is capped; junk or empty keeps the default");
             Console.WriteLine("PASS: META_AI_TIMEOUT_SECONDS is read and bounded.");
         }

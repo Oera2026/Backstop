@@ -11,6 +11,9 @@ public sealed class MetaAiOptions
 {
     public const string SectionName = "MetaAI";
 
+    /// <summary>The lowest META_AI_TIMEOUT_SECONDS that is honoured. A reply from Meta takes 6 to 10 seconds even for a tiny question.</summary>
+    public const int MinEnvTimeoutSeconds = 30;
+
     /// <summary>API key for Meta AI Dev API (META_AI_KEY).</summary>
     public string? ApiKey { get; set; }
 
@@ -43,8 +46,8 @@ public sealed class MetaAiOptions
     /// <summary>Model identifier (e.g. muse-spark-1.3, muse-wonder-1.0).</summary>
     public string Model { get; set; } = "muse-spark-1.3";
 
-    /// <summary>Timeout in seconds. If exceeded, fail-closed kicks in.</summary>
-    public int TimeoutSeconds { get; set; } = 30;
+    /// <summary>Timeout in seconds. If exceeded, fail-closed kicks in. Muse models reason before they answer and often take 10 to 30 seconds, so the default is generous.</summary>
+    public int TimeoutSeconds { get; set; } = 45;
 
     /// <summary>Reads the options from configuration, including the alternate environment variable names.</summary>
     public static MetaAiOptions Load(IConfiguration config)
@@ -62,7 +65,7 @@ public sealed class MetaAiOptions
 
         // The documented setting. The nested MetaAI:TimeoutSeconds form still works and wins if both are set.
         if (string.IsNullOrWhiteSpace(config[$"{SectionName}:TimeoutSeconds"]) && int.TryParse(config["META_AI_TIMEOUT_SECONDS"]?.Trim(), out var secs) && secs > 0)
-            options.TimeoutSeconds = Math.Clamp(secs, 2, 300);
+            options.TimeoutSeconds = Math.Clamp(secs, MinEnvTimeoutSeconds, 300); // a value below what Muse needs would make every call fail, so it is raised
 
         var model = config["META_AI_MODEL"];
         if (!string.IsNullOrWhiteSpace(model)) options.Model = model.Trim();

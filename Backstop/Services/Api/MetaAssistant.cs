@@ -72,6 +72,19 @@ public sealed class MetaAssistant : IAssistant
 
     public async Task<AssistantReply> ReplyAsync(IReadOnlyList<AssistantTurn> history, string message, AssistantMaterial? material = null, CancellationToken ct = default)
     {
+        var reply = await ReplyOnceAsync(history, message, material, ct);
+        if (reply.Success || !IsUnreadable(reply)) return reply;
+
+        // Meta sometimes sends nothing, or something that is not the answer. One more try nearly always works. A helper flag from the first reply is kept.
+        _logger.LogWarning("Ask Me reply could not be used ({Note}). Trying once more.", reply.FailureNote);
+        var again = await ReplyOnceAsync(history, message, material, ct);
+        return again.Success ? again with { NeedsHuman = again.NeedsHuman || reply.NeedsHuman, AtRisk = again.AtRisk || reply.AtRisk } : reply;
+    }
+
+    private static bool IsUnreadable(AssistantReply r) => r.FailureNote is "Empty response" or "Could not read the reply" or "Reply missing or not safe to show";
+
+    private async Task<AssistantReply> ReplyOnceAsync(IReadOnlyList<AssistantTurn> history, string message, AssistantMaterial? material, CancellationToken ct)
+    {
         if (string.IsNullOrWhiteSpace(_options.ApiKey))
         {
             _logger.LogWarning("No Meta AI API key configured. Ask Me cannot answer.");
@@ -135,7 +148,7 @@ public sealed class MetaAssistant : IAssistant
                 },
                 // A little warmth so different questions do not all get the same words. Safety does not depend on it.
                 temperature = 0.5,
-                max_tokens = 2000, // Muse spends tokens on reasoning first; a low cap returns empty content
+                max_tokens = 4000, // Muse spends tokens on reasoning first; a low cap returns empty content
             };
 
             using var req = new HttpRequestMessage(HttpMethod.Post, _options.ChatUrl);
@@ -159,7 +172,10 @@ public sealed class MetaAssistant : IAssistant
                 if (ms.Length + n > MaxResponseBytes) return Fail("Response too large");
                 ms.Write(buffer, 0, n);
             }
-            return Parse(Encoding.UTF8.GetString(ms.ToArray()));
+            var bodyText = Encoding.UTF8.GetString(ms.ToArray());
+            var parsed = Parse(bodyText);
+            if (!parsed.Success) _logger.LogWarning("Ask Me reply was not usable: {Why}. {Shape}", parsed.FailureNote, Shape(bodyText));
+            return parsed;
         }
         catch (Polly.CircuitBreaker.BrokenCircuitException)
         {
@@ -186,6 +202,21 @@ public sealed class MetaAssistant : IAssistant
             _logger.LogError("Unexpected error calling Meta AI for Ask Me ({Type}).", ex.GetType().Name);
             return Fail("Unexpected error", MetaFailures.Unexpected(ex, _options));
         }
+    }
+
+    /// <summary>Sizes and the stop reason of a reply, for the log. Never any of the text.</summary>
+    private static string Shape(string body)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            var choice = doc.RootElement.GetProperty("choices")[0];
+            var finish = choice.TryGetProperty("finish_reason", out var fr) ? fr.GetString() : null;
+            var len = choice.GetProperty("message").TryGetProperty("content", out var c) && c.ValueKind == JsonValueKind.String ? c.GetString()!.Length : -1;
+            var tokens = doc.RootElement.TryGetProperty("usage", out var u) && u.TryGetProperty("completion_tokens", out var ct) ? ct.GetInt32() : -1;
+            return $"finish_reason={finish}, content_chars={len}, completion_tokens={tokens}";
+        }
+        catch (Exception) { return "reply shape unreadable"; }
     }
 
     private static AssistantReply Fail(string note, FailureInfo? info = null) => new("", false, FailureNote: note, Failure: info ?? MetaFailures.BadReply(note, null));
