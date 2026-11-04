@@ -65,15 +65,28 @@ public sealed partial class LinkInspector : ILinkInspector
             if (ctx.DnsEndPoint.Port is not (80 or 443)) throw new HttpRequestException("Blocked port");
             var addresses = IPAddress.TryParse(host, out var literal) ? new[] { literal } : await Dns.GetHostAddressesAsync(host, ct);
             if (addresses.Length == 0 || addresses.Any(a => !IpGuard.IsPublic(a))) throw new HttpRequestException("Blocked address");
-            var socket = new Socket(addresses[0].AddressFamily, SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
-            try
-            {
-                await socket.ConnectAsync(new IPEndPoint(addresses[0], ctx.DnsEndPoint.Port), ct);
-                return new NetworkStream(socket, ownsSocket: true);
-            }
-            catch { socket.Dispose(); throw; }
+            return await ConnectAnyAsync(addresses, ctx.DnsEndPoint.Port, (s, end, c) => s.ConnectAsync(end, c), ct);
         },
     });
+
+    /// <summary>Tries each address in turn, so one dead address does not make a working site look unsafe. Every address was already found public.</summary>
+    internal static async Task<Stream> ConnectAnyAsync(IPAddress[] addresses, int port, Func<Socket, IPEndPoint, CancellationToken, ValueTask> connect, CancellationToken ct)
+    {
+        Exception? last = null;
+        foreach (var address in addresses)
+        {
+            ct.ThrowIfCancellationRequested();
+            var socket = new Socket(address.AddressFamily, SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
+            try
+            {
+                await connect(socket, new IPEndPoint(address, port), ct);
+                return new NetworkStream(socket, ownsSocket: true);
+            }
+            catch (Exception ex) when (ex is SocketException or IOException) { socket.Dispose(); last = ex; }
+            catch { socket.Dispose(); throw; }
+        }
+        throw new HttpRequestException("No address answered.", last);
+    }
 
     /// <summary>
     /// What a link check found, in three tiers. Info is harmless and never raises the verdict (a shortener, a redirect, a hop count).
@@ -160,7 +173,7 @@ public sealed partial class LinkInspector : ILinkInspector
 
                 chain.Add(new LinkHop(Shown(current.AbsoluteUri), "final page"));
                 var finalHost = current.IdnHost.ToLowerInvariant();
-                var trusted = TrustedDomains.Match(finalHost);
+                var trusted = TrustedDomains.Match(finalHost, current.AbsolutePath);
 
                 var contentType = response.Content.Headers.ContentType?.MediaType?.ToLowerInvariant() ?? "";
                 var disposition = response.Content.Headers.ContentDisposition?.DispositionType?.ToLowerInvariant();
@@ -173,7 +186,7 @@ public sealed partial class LinkInspector : ILinkInspector
                     // Read as text and looked through. Never run, never drawn.
                     var text = await ReadCappedAsync(response.Content, hop.Token);
                     // A sign-in box is expected on a well-known site. On any other site it is a warning.
-                    if (PasswordBox().IsMatch(text) && trusted is null) found.High.Add("The page asks for a password.");
+                    if (trusted is null && PasswordBox().IsMatch(text)) found.High.Add("The page asks for a password.");
                 }
 
                 // The words shown for the link against the website it really reaches. The only "different website" warning there is.
@@ -203,6 +216,10 @@ public sealed partial class LinkInspector : ILinkInspector
             {
                 chain.Add(new LinkHop(Shown(current.AbsoluteUri), "no answer"));
                 return Bail("It took too long to answer.");
+            }
+            catch (RegexMatchTimeoutException)
+            {
+                return Bail("The page took too long to read.");
             }
             catch (Exception ex) when (ex is HttpRequestException or IOException or UriFormatException or SocketException or InvalidOperationException)
             {
@@ -332,18 +349,19 @@ public sealed partial class LinkInspector : ILinkInspector
         ".apk", ".dmg", ".pkg", ".iso", ".img", ".zip", ".rar", ".7z", ".tar", ".gz", ".cab", ".docm", ".xlsm",
     ];
 
-    [GeneratedRegex("<input\\b[^>]*\\btype\\s*=\\s*[\"']?password", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    // Reads up to a megabyte a hostile page chose, so it has no open-ended run and a time limit. It looks for the attribute alone, so a long tag cannot hide it.
+    [GeneratedRegex("\\btype\\s{0,20}=\\s{0,20}[\"']?password\\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 500)]
     private static partial Regex PasswordBox();
 
     // ---- Finding the links in a message, with the words shown for each one ----
 
-    [GeneratedRegex("<a\\s[^>]*\\bhref\\s*=\\s*[\"']([^\"']+)[\"'][^>]*>(.*?)</a>", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.CultureInvariant)]
+    [GeneratedRegex("<a\\s[^>]{0,2000}?\\bhref\\s{0,20}=\\s{0,20}[\"']([^\"']{1,2000})[\"'][^>]{0,2000}>(.{0,2000}?)</a>", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 250)]
     private static partial Regex Anchor();
 
-    [GeneratedRegex("\\[([^\\]\\r\\n]{1,200})\\]\\((https?://[^)\\s]+)\\)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex("\\[([^\\]\\r\\n]{1,200})\\]\\((https?://[^)\\s]{1,2000})\\)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 250)]
     private static partial Regex Markdown();
 
-    [GeneratedRegex("<[^>]+>")]
+    [GeneratedRegex("<[^>]{1,2000}>", RegexOptions.None, matchTimeoutMilliseconds: 250)]
     private static partial Regex Tags();
 
     /// <summary>Every distinct link in the text, with the words shown for it when the message wrote it as a named link.</summary>
@@ -353,15 +371,30 @@ public sealed partial class LinkInspector : ILinkInspector
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         void Add(string url, string? shown)
         {
-            url = url.Trim().TrimEnd('.', ',', ';', ':', '!', '?');
+            // A web address has no spaces. Anything after one is the sender's own words, and it must never travel on as if it were part of the link.
+            url = url.Trim();
+            var gap = url.IndexOfAny([' ', '\t', '\r', '\n', '\u00A0']);
+            if (gap >= 0) url = url[..gap];
+            url = new string(url.Where(c => !char.IsWhiteSpace(c)).ToArray()).TrimEnd('.', ',', ';', ':', '!', '?');
             if (url.Length > 0 && seen.Add(url)) list.Add((url, shown));
         }
         text ??= "";
-        foreach (Match m in Anchor().Matches(text)) Add(m.Groups[1].Value, Tags().Replace(m.Groups[2].Value, "").Trim());
-        foreach (Match m in Markdown().Matches(text)) Add(m.Groups[2].Value, m.Groups[1].Value);
-        // Named links are taken out first, so the words shown for them are not mistaken for links of their own.
-        var rest = Markdown().Replace(Anchor().Replace(text, " "), " ");
-        foreach (Match m in LinkFinder.Pattern.Matches(rest)) Add(m.Value, null);
+        try
+        {
+            foreach (Match m in Anchor().Matches(text)) Add(m.Groups[1].Value, Tags().Replace(m.Groups[2].Value, "").Trim());
+            foreach (Match m in Markdown().Matches(text)) Add(m.Groups[2].Value, m.Groups[1].Value);
+            // Named links are taken out first, so the words shown for them are not mistaken for links of their own.
+            var rest = Markdown().Replace(Anchor().Replace(text, " "), " ");
+            foreach (Match m in LinkFinder.Pattern.Matches(rest)) Add(m.Value, null);
+            // Then the folded copy, so hidden characters cannot keep a link from being opened. As written comes first, because look-alike letters matter.
+            foreach (Match m in LinkFinder.Pattern.Matches(InputGuard.Fold(rest))) Add(m.Value, null);
+        }
+        catch (RegexMatchTimeoutException)
+        {
+            // Could not finish reading the named links. Any plain link still counts. The address check on the same text has already failed closed.
+            try { foreach (Match m in LinkFinder.Pattern.Matches(text)) Add(m.Value, null); }
+            catch (RegexMatchTimeoutException) { /* the address check holds the message */ }
+        }
         return list;
     }
 }

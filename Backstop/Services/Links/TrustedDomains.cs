@@ -16,10 +16,10 @@ public static class TrustedDomains
         "gov.uk", "nhs.uk", "hmrc.gov.uk", "dvla.gov.uk",
         // Banks and payments
         "barclays.co.uk", "lloydsbank.com", "hsbc.co.uk", "natwest.com", "santander.co.uk", "nationwide.co.uk", "halifax.co.uk",
-        "tsb.co.uk", "monzo.com", "starlingbank.com", "paypal.com", "paypal.me", "visa.com", "mastercard.com",
+        "tsb.co.uk", "monzo.com", "starlingbank.com", "paypal.com", "visa.com", "mastercard.com",
         // Technology
         "microsoft.com", "live.com", "office.com", "apple.com", "icloud.com", "google.com", "youtube.com", "android.com",
-        "dropbox.com", "zoom.us", "whatsapp.com", "facebook.com", "linkedin.com",
+        "zoom.us", "whatsapp.com", "facebook.com", "linkedin.com",
         // Everyday services
         "bbc.co.uk", "bbc.com", "wikipedia.org", "bt.com", "sky.com", "virginmedia.com", "ee.co.uk", "vodafone.co.uk", "o2.co.uk",
     ];
@@ -29,7 +29,24 @@ public static class TrustedDomains
     [
         "sites.google.com", "docs.google.com", "drive.google.com", "forms.google.com", "storage.googleapis.com", "script.google.com",
         "groups.google.com", "sway.office.com", "forms.office.com", "1drv.ms", "onedrive.live.com",
+        "translate.google.com", "photos.google.com", "calendar.google.com", "colab.research.google.com", "chat.whatsapp.com",
     ];
+
+    // Paths on a trusted name where anyone can ask for money, share a file or be sent on somewhere else.
+    private static readonly (string Domain, string Path)[] UserContentPaths =
+    [
+        ("paypal.com", "/paypalme"), ("paypal.com", "/pools"), ("paypal.com", "/invoice"),
+        ("icloud.com", "/iclouddrive"), ("icloud.com", "/photos"), ("icloud.com", "/sharedalbum"),
+        ("google.com", "/url"), ("youtube.com", "/redirect"), ("facebook.com", "/l.php"),
+    ];
+
+    /// <summary>The same check with the path too, for a page that was really reached.</summary>
+    public static string? Match(string? host, string? path)
+    {
+        var d = Match(host);
+        if (d is null || string.IsNullOrEmpty(path)) return d;
+        return UserContentPaths.Any(u => u.Domain == d && (path.Equals(u.Path, StringComparison.OrdinalIgnoreCase) || path.StartsWith(u.Path + "/", StringComparison.OrdinalIgnoreCase))) ? null : d;
+    }
 
     /// <summary>The trusted domain this host is, or sits under. Null when it is not on the list.</summary>
     public static string? Match(string? host)

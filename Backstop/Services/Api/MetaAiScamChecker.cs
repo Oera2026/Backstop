@@ -235,10 +235,22 @@ public sealed class MetaAiScamChecker : IMetaScamChecker, IMetaDiagnostics
 
     // Our own wording, folded, cut short and stripped of anything shaped like an edge line. The names and addresses in it
     // came from the sender, so they get the same treatment as the message text.
+    // This section is the one the model trusts, so a link is cut back to its site: a path or a query is words the sender chose.
     private static IEnumerable<string> Facts(IReadOnlyList<string> findings) =>
         findings
             .Select(f => "- " + InputGuard.Fold(f).Replace("DATA-", "DATA_").Replace('\n', ' ').Replace('\r', ' '))
-            .Select(f => f.Length > 400 ? f[..400] : f);
+            .Select(f => f.Length > 400 ? f[..400] : f)
+            .Select(SitesOnly);
+
+    private static readonly System.Text.RegularExpressions.Regex LinkTail = new(
+        @"(hxxps?://[^\s/?#]+|(?:\w+\[:\]//)?[^\s/?#]*\[\.\][^\s/?#]*)[/?#]\S*",
+        System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(250));
+
+    private static string SitesOnly(string fact)
+    {
+        try { return LinkTail.Replace(fact, "$1"); }
+        catch (System.Text.RegularExpressions.RegexMatchTimeoutException) { return "- A link could not be read, so treat it as unsafe."; }
+    }
 
     private async Task<MetaScamAnalysis> CheckCoreAsync(
         string? text,
