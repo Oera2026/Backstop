@@ -101,7 +101,7 @@ h1:focus, main:focus, h1[tabindex]:focus-visible, main[tabindex]:focus-visible {
 
 /* The picture tile: every statement gets a drawing beside it */
 .pic {
-  display: inline-grid; place-items: center; flex: none; width: 4.25rem; height: 4.25rem;
+  display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; flex: none; width: 4.25rem; height: 4.25rem;
   border: var(--line) solid var(--border); border-radius: var(--radius); background: var(--accent-soft); color: var(--navy);
 }
 .pic .icon { width: 2.4rem; height: 2.4rem; stroke-width: 2.2; }

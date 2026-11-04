@@ -541,7 +541,8 @@ section.chat .chat__log { max-height: min(24rem, calc(100vh - 22rem)); max-heigh
 .badge--presence { background: var(--presence-soft); color: var(--presence); }
 .badge__dot { width: .7rem; height: .7rem; border-radius: 50%; background: currentColor; flex: none; }
 .presence-dot--hidden { background: var(--text-2); color: var(--bg); }
-.profile-pic > .presence-dot { position: absolute; right: -.4rem; bottom: -.4rem; }
+.profile-pic > .presence-dot { position: absolute; right: -.35rem; bottom: -.35rem; width: 1.25rem; height: 1.25rem; }
+.pic--large > .presence-dot { width: 1.5rem; height: 1.5rem; }
 
 .profile { position: fixed; z-index: 40; left: max(.75rem, env(safe-area-inset-left)); bottom: calc(var(--profile-lift, 4rem) + env(safe-area-inset-bottom) + .75rem); }
 .profile__btn { display: flex; align-items: center; gap: .75rem; padding: .4rem .5rem .4rem .4rem; overflow: visible; min-height: 56px; min-width: 56px; border: var(--line) solid var(--border); border-radius: var(--radius-lg); background: var(--bg); color: var(--text); font: inherit; cursor: pointer; }

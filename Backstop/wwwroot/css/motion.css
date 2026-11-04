@@ -9,7 +9,7 @@
 .loading__text { font-weight: 700; }
 
 /* A ring that turns around a magnifier that looks from side to side */
-.working { position: relative; display: grid; place-items: center; flex: none; width: 3.5rem; height: 3.5rem; color: var(--navy); }
+.working { position: relative; display: flex; align-items: center; justify-content: center; flex: none; width: 3.5rem; height: 3.5rem; color: var(--navy); }
 .working::before { content: ""; position: absolute; inset: 0; border-radius: 50%; border: 4px solid var(--band); }
 .working__ring {
   position: absolute; inset: 0; border-radius: 50%;
