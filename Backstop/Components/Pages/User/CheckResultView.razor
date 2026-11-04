@@ -29,6 +29,7 @@ else if (_r.Status == ReviewStatus.Held)
     <p><StatusBadge State="MessageState.Held" /></p>
     <h1>We've asked @Helper to check this.</h1>
     <p class="lead">You'll see it once it's cleared.</p>
+    <div class="actions actions--quiet"><ReadAloudButton Text="@($"We've asked {Helper} to check this. You'll see it once it's cleared.")" /></div>
     @if (_r.Verdict == Verdict.DontReply || (_r.Verdict == Verdict.BeCareful && _r.Flags.Any(f => f.Id != "review-needed")))
     {
         <p class="call-note"><Icon Name="hand" /> <span>Don't reply or send anything until @Helper has looked.</span></p>
@@ -49,6 +50,7 @@ else if (_r.Status == ReviewStatus.Released)
     <p><StatusBadge State="MessageState.Cleared" /></p>
     <h1>@Helper says this is safe.</h1>
     <MarkedText Text="@_r.DisplayText" />
+    <div class="actions actions--quiet"><ReadAloudButton Text="@($"{Helper} says this is safe. {_r.DisplayText}")" /></div>
     <div class="actions actions--stick">
         <a class="btn btn-primary" href="explain?check=@_r.Id"><Icon Name="book" /> Explain this to me</a>
     </div>
@@ -59,6 +61,7 @@ else if (_r.Status == ReviewStatus.Blocked)
     <p><StatusBadge State="MessageState.Blocked" /></p>
     <h1>@Helper says please don't reply to this.</h1>
     <WatchForTip Tip="@(_r.WatchFor ?? WatchFor.Fallback(_r.Flags.Select(f => f.Id)))" />
+    <div class="actions actions--quiet"><ReadAloudButton Text="@($"{Helper} says please don't reply to this. {_r.WatchFor ?? WatchFor.Fallback(_r.Flags.Select(f => f.Id))}")" /></div>
     @if (_confirmDelete)
     {
         <h2>Delete this check?</h2>

@@ -1,10 +1,13 @@
 @implements IAsyncDisposable
 @inject IJSRuntime JS
 
-<button type="button" class="btn @(Primary ? "btn-primary" : "btn-text") readaloud" aria-pressed="@(_speaking ? "true" : "false")" @onclick="Toggle">
-    <Icon Name="@(_speaking ? "cross" : "speaker")" /> @(_speaking ? "Stop" : "Read this to me")
-</button>
-<p class="sr-note" role="status">@_note</p>
+@if (!string.IsNullOrWhiteSpace(Text))
+{
+    <button type="button" class="btn @(Primary ? "btn-primary" : "btn-text") readaloud" aria-pressed="@(_speaking ? "true" : "false")" @onclick="Toggle">
+        <Icon Name="@(_speaking ? "cross" : "speaker")" /> @(_speaking ? "Stop" : "Read this to me")
+    </button>
+    <p class="readaloud-note" role="status">@_note</p>
+}
 
 @code {
     [Parameter, EditorRequired] public string Text { get; set; } = "";
@@ -12,7 +15,14 @@
 
     private string _note = "";
     private bool _speaking;
+    private string? _spoken;
     private DotNetObjectReference<ReadAloudButton>? _self;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // The page moved on (the next step, the next page of a story): stop reading the old words.
+        if (_speaking && Text != _spoken) await StopAsync();
+    }
 
     private async Task Toggle()
     {
@@ -23,6 +33,7 @@
             // backstop.js wraps the browser's speechSynthesis. Returns false when not supported.
             _self ??= DotNetObjectReference.Create(this);
             _speaking = await JS.InvokeAsync<bool>("backstop.speakWithEnd", _self, Text);
+            _spoken = Text;
             if (!_speaking) _note = "Sorry, this device cannot read out loud.";
         }
         catch (Exception)

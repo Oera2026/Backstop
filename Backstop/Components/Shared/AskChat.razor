@@ -94,6 +94,10 @@
                             }
                         </div>
                     }
+                    @if (t.Failure is null)
+                    {
+                        <ReadAloudButton Text="@(string.Join(" ", new[] { t.Verdict is { } said ? VerdictCard.WordFor(said) + "." : "", t.Text }.Concat(t.Lines)).Trim())" />
+                    }
                 </li>
             }
         }

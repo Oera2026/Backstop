@@ -22,24 +22,76 @@ window.backstop = {
   canSpeak() {
     return 'speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined';
   },
-  // Reads text aloud and tells the page when the voice ends (done, stopped, or replaced by another). Prefers an en-GB voice.
+  // Some browsers cut a voice off after about 15 seconds, so long text goes out a sentence or two at a time.
+  _chunks(text) {
+    const MAX = 200, parts = [];
+    for (const line of String(text ?? '').split(/\n+/)) {
+      for (const sentence of line.match(/[^.!?]+[.!?]*\s*/g) || []) {
+        let rest = sentence.trim();
+        while (rest.length > MAX) {
+          const cut = rest.lastIndexOf(' ', MAX);
+          const at = cut > 0 ? cut : MAX;
+          parts.push(rest.slice(0, at));
+          rest = rest.slice(at).trim();
+        }
+        if (rest) parts.push(rest);
+      }
+    }
+    const out = [];
+    for (const part of parts) {
+      if (out.length && out[out.length - 1].length + part.length < MAX) out[out.length - 1] += ' ' + part;
+      else out.push(part);
+    }
+    return out;
+  },
+  // An en-GB voice, one on the device first. The list can be empty until the browser has loaded it (see voiceschanged below).
+  _voice() {
+    const b = window.backstop;
+    if (b._v === undefined || b._v === null) {
+      const gb = window.speechSynthesis.getVoices().filter(v => (v.lang || '').replace('_', '-').toLowerCase() === 'en-gb');
+      b._v = gb.find(v => v.localService) || gb[0] || null;
+    }
+    return b._v;
+  },
+  // Tells whoever is reading that they have stopped, so their button goes back to "Read this to me".
+  _endCurrent() {
+    const b = window.backstop, ref = b._spkRef;
+    b._spkRef = null;
+    if (!ref) return;
+    try { ref.invokeMethodAsync('Ended').catch(() => {}); } catch (e) { /* that page has gone */ }
+  },
+  // Reads text aloud and tells the page when the voice ends (done, stopped, or replaced by another).
   speakWithEnd(ref, text) {
-    if (!window.backstop.canSpeak()) return false;
+    const b = window.backstop;
+    if (!b.canSpeak()) return false;
+    const chunks = b._chunks(text);
+    if (chunks.length === 0) return false;
     const synth = window.speechSynthesis;
-    const id = (window.backstop._spk = (window.backstop._spk || 0) + 1);
+    b._endCurrent();
+    const id = (b._spk = (b._spk || 0) + 1);
     synth.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'en-GB';
-    const voice = synth.getVoices().find(v => (v.lang || '').replace('_', '-').toLowerCase() === 'en-gb');
-    if (voice) u.voice = voice;
-    u.rate = window.backstopSettings ? window.backstopSettings.speechRate() : 0.9;
-    const done = () => { if (window.backstop._spk === id) ref.invokeMethodAsync('Ended').catch(() => {}); };
-    u.onend = done;
-    u.onerror = done;
-    synth.speak(u);
+    b._spkRef = ref;
+    let at = 0;
+    const finish = () => { if (b._spk === id) b._endCurrent(); };
+    const next = () => {
+      if (b._spk !== id) return;
+      if (at >= chunks.length) { finish(); return; }
+      const u = new SpeechSynthesisUtterance(chunks[at++]);
+      u.lang = 'en-GB';
+      const voice = b._voice();
+      if (voice) u.voice = voice;
+      u.rate = window.backstopSettings ? window.backstopSettings.speechRate() : 0.9;
+      u.onend = next;
+      u.onerror = finish;
+      synth.speak(u);
+    };
+    next();
     return true;
   },
   stop() {
+    const b = window.backstop;
+    b._spk = (b._spk || 0) + 1;
+    b._endCurrent();
     if ('speechSynthesis' in window) window.speechSynthesis.cancel();
   },
   // Puts "(3) " in front of the tab title while things wait for the helper. 0 takes it off again.
@@ -59,6 +111,13 @@ window.backstop = {
     if (document.title !== want) document.title = want;
   }
 };
+
+// The voice list can arrive after the page opens, and a voice must not carry on after the page has gone.
+if ('speechSynthesis' in window) {
+  window.speechSynthesis.getVoices();
+  if (window.speechSynthesis.addEventListener) window.speechSynthesis.addEventListener('voiceschanged', function () { window.backstop._v = null; });
+  window.addEventListener('pagehide', function () { window.speechSynthesis.cancel(); });
+}
 
 // Enter in a field marked data-enter-next moves to the next field. It never sends the form.
 document.addEventListener('keydown', function (e) {
