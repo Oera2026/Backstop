@@ -19,6 +19,8 @@ public interface IBackstopApi
     Task<CheckResult> CheckContentAsync(CheckRequest request, CancellationToken ct = default);
     Task<CheckResult> GetConversationAnalysisAsync(string conversation, CancellationToken ct = default);
     Task<CheckResult?> GetCheckAsync(string id, CancellationToken ct = default);
+    /// <summary>The same check for the helper's review page. Null when the helper's access does not cover it.</summary>
+    Task<CheckResult?> GetCheckForHelperAsync(string id, CancellationToken ct = default);
     /// <summary>Checks the user has sent to their trusted person, newest first.</summary>
     Task<IReadOnlyList<CheckResult>> GetAskedChecksAsync(CancellationToken ct = default);
     Task<CheckResult> AskTrustedPersonAsync(string checkId, CancellationToken ct = default);

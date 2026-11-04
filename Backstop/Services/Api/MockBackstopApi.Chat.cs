@@ -46,7 +46,6 @@ public sealed partial class MockBackstopApi
         _chat = SeedChat();
         _people = [.. ChatFixtures.People];
         _chatSent.Clear();
-        guardian.SetAccess(HelperPermissions.Default);
     }
 
     public IReadOnlyList<ChatPerson> ChatPeople { get { lock (_gate) return _people.ToList(); } }
@@ -61,7 +60,7 @@ public sealed partial class MockBackstopApi
     public void SetHelperAccess(HelperPermissions access)
     {
         guardian.SetAccess(access);
-        Changed?.Invoke();
+        RaiseChanged();
     }
 
     // ---------------- User side ----------------
@@ -90,7 +89,8 @@ public sealed partial class MockBackstopApi
     public async Task<int> GetHeldChatCountAsync(CancellationToken ct = default)
     {
         await Wait(150, ct);
-        lock (_gate) return _chat.Count(m => !m.FromMe && m.State == ChatState.Held);
+        // The same filter as the helper's list: nobody can decide a held message from someone no longer on the list.
+        lock (_gate) return _chat.Count(m => !m.FromMe && m.State == ChatState.Held && FindPerson(m.PersonId) is not null);
     }
 
     public async Task<ChatMessage> SendChatAsync(string personId, string text, CancellationToken ct = default)
@@ -105,9 +105,10 @@ public sealed partial class MockBackstopApi
         {
             stored = new(NewId("c"), person.Id, true, clean, DateTimeOffset.Now, ChatState.Delivered);
             _chat.Add(stored);
+            TrimChat();
             count = _chatSent[person.Id] = _chatSent.GetValueOrDefault(person.Id) + 1;
         }
-        Changed?.Invoke();
+        RaiseChanged();
 
         // Priya answers from the real /helper view. The others are made up and answer on their own.
         if (person.Id != ChatFixtures.TrustedId) _ = ScriptedReplyAsync(person, count);
@@ -116,12 +117,13 @@ public sealed partial class MockBackstopApi
 
     private async Task ScriptedReplyAsync(ChatPerson person, int count)
     {
+        var generation = CurrentGeneration;
         try
         {
             await Task.Delay(2500);
             var reply = ChatFixtures.Reply(person.Id, count);
             if (reply.Length == 0) return; // a person the helper added has no made-up replies
-            await ReceiveChatAsync(person, reply, CancellationToken.None);
+            await ReceiveChatAsync(person, reply, CancellationToken.None, generation);
         }
         catch (Exception)
         {
@@ -134,7 +136,7 @@ public sealed partial class MockBackstopApi
     /// same rules as mail: the local checks are the floor, Meta AI can only make the result stricter, and any
     /// failure holds the message for a helper.
     /// </summary>
-    private async Task ReceiveChatAsync(ChatPerson from, string text, CancellationToken ct)
+    private async Task ReceiveChatAsync(ChatPerson from, string text, CancellationToken ct, int generation)
     {
         if (string.IsNullOrWhiteSpace(text)) return;
 
@@ -194,11 +196,13 @@ public sealed partial class MockBackstopApi
 
         lock (_gate)
         {
+            if (generation != _generation) return;
             _chat.Add(stored);
+            TrimChat();
             if (stored.State == ChatState.Held)
                 Log("hourglass", $"A message from {from.Name} is waiting for you to check.");
         }
-        Changed?.Invoke();
+        RaiseChanged();
     }
 
     // ---------------- Helper side ----------------
@@ -237,7 +241,7 @@ public sealed partial class MockBackstopApi
                 // Anything else leaves the message held. It is never delivered by accident.
             }
         }
-        Changed?.Invoke();
+        RaiseChanged();
     }
 
     public async Task<ChatMessage> SendChatAsHelperAsync(string text, CancellationToken ct = default)
@@ -249,8 +253,9 @@ public sealed partial class MockBackstopApi
         {
             stored = new(NewId("c"), ChatFixtures.TrustedId, false, clean, DateTimeOffset.Now, ChatState.Delivered);
             _chat.Add(stored);
+            TrimChat();
         }
-        Changed?.Invoke();
+        RaiseChanged();
         return Shown(stored);
     }
 

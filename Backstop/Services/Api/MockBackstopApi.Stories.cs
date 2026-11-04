@@ -11,6 +11,8 @@ public sealed partial class MockBackstopApi
 
     public async Task<Story> MakeStoryAsync(StoryRequest request, CancellationToken ct = default)
     {
+        await Wait(0, ct);
+        var generation = CurrentGeneration;
         if (string.IsNullOrWhiteSpace(request.Situation)) throw new BackstopApiException("Please say what is coming up.");
 
         var text = request.Situation.Trim();
@@ -30,11 +32,12 @@ public sealed partial class MockBackstopApi
         var story = new Story(NewId("s"), title, when, pages, DateTimeOffset.Now);
         lock (_gate)
         {
+            if (generation != _generation) return story;
             _stories[story.Id] = story;
             MarkVisitorItem(story.Id);
             if (notify) Log("story", $"{User} made a story about \"{Shorten(text)}\". It may be a sensitive topic, so you may want to ask how they are.");
         }
-        Changed?.Invoke();
+        RaiseChanged();
         return story;
     }
 
@@ -55,7 +58,7 @@ public sealed partial class MockBackstopApi
     {
         await Wait(300, ct);
         lock (_gate) _stories.Remove(id);
-        Changed?.Invoke();
+        RaiseChanged();
     }
 
     private string Fill(string s) => s.Replace("{helper}", Helper);

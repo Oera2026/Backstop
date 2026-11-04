@@ -70,6 +70,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
     {
         if (request.Kind == CheckKind.Conversation) return await GetConversationAnalysisAsync(request.Text ?? "", ct);
         await Wait(400, ct);
+        var generation = CurrentGeneration;
 
         string text;
         string? imgType = null;
@@ -118,6 +119,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
             Tip(finalVerdict, reviewStatus, tip0.Value, combinedFlags, finalReason));
         lock (_gate)
         {
+            if (generation != _generation) return result;
             _checks[result.Id] = new(result, text.Trim(), reviewStatus == ReviewStatus.Held ? DateTimeOffset.Now : null);
             MarkVisitorItem(result.Id);
         }
@@ -199,6 +201,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
     public async Task<CheckResult> GetConversationAnalysisAsync(string conversation, CancellationToken ct = default)
     {
         await Wait(600, ct);
+        var generation = CurrentGeneration;
         if (string.IsNullOrWhiteSpace(conversation)) throw new BackstopApiException("Please paste the conversation first.");
         if (conversation.Length > MaxCheckLength) throw new BackstopApiException("That is too long to check. Please paste a shorter part.");
 
@@ -238,6 +241,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
             Tip(finalVerdict, reviewStatus, tip0.Value, combinedFlags, finalReason));
         lock (_gate)
         {
+            if (generation != _generation) return result;
             _checks[result.Id] = new(result, conversation.Trim(), reviewStatus == ReviewStatus.Held ? DateTimeOffset.Now : null);
             MarkVisitorItem(result.Id);
         }
@@ -248,6 +252,12 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
     {
         await Wait(300, ct);
         lock (_gate) return _checks.GetValueOrDefault(id)?.Result;
+    }
+
+    public async Task<CheckResult?> GetCheckForHelperAsync(string id, CancellationToken ct = default)
+    {
+        await Wait(300, ct);
+        lock (_gate) return _checks.TryGetValue(id, out var c) && CanSee(c) ? c.Result : null;
     }
 
     public async Task<IReadOnlyList<CheckResult>> GetAskedChecksAsync(CancellationToken ct = default)
@@ -269,7 +279,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
             _checks[checkId] = stored with { Result = result, AskedAt = stored.AskedAt ?? DateTimeOffset.Now };
             Log("send", $"{User} asked you to look at {LowerFirst(TitleFor(result, stored.Original))}.");
         }
-        Changed?.Invoke();
+        RaiseChanged();
         return result;
     }
 
@@ -277,7 +287,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
     {
         await Wait(300, ct);
         lock (_gate) _checks.Remove(checkId);
-        Changed?.Invoke();
+        RaiseChanged();
     }
 
     // ---------------- Show me ----------------
@@ -285,6 +295,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
     public async Task<Guide?> GenerateGuideAsync(GuideRequest request, CancellationToken ct = default)
     {
         await Wait(1600, ct);
+        var generation = CurrentGeneration;
         if (string.IsNullOrWhiteSpace(request.Goal)) throw new BackstopApiException("Please say what you want to do.");
 
         string? photoType = null;
@@ -307,6 +318,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
             draft.Care, DateTimeOffset.Now);
         lock (_gate)
         {
+            if (generation != _generation) return guide;
             _guides[guide.Id] = new StoredGuide(guide, draft.Tags, draft.PastTense);
             MarkVisitorItem(guide.Id);
         }
@@ -330,13 +342,15 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
             _help.Add(help);
             MarkVisitorItem(help.Id);
         }
-        Changed?.Invoke();
+        RaiseChanged();
     }
 
     // ---------------- Explain ----------------
 
     public async Task<Explanation> ExplainContentAsync(ExplainRequest request, CancellationToken ct = default)
     {
+        await Wait(0, ct);
+        var generation = CurrentGeneration;
         string? typed = null, mime = null;
         if (request.File is not null)
         {
@@ -363,6 +377,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         var explanation = BuildExplanation(reading, typed ?? Defang.ForUser(reading.Text), request.Level, request.Format);
         lock (_gate)
         {
+            if (generation != _generation) return explanation;
             _explanations[explanation.Id] = explanation;
             MarkVisitorItem(explanation.Id);
         }
@@ -377,6 +392,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
 
     public async Task<ChatAnswer> AskAboutAsync(string explanationId, string question, CancellationToken ct = default)
     {
+        await Wait(0, ct);
         if (string.IsNullOrWhiteSpace(question)) throw new BackstopApiException("Please type your question first.");
         if (question.Length > 500) throw new BackstopApiException("That is a bit long. Please make your question shorter.");
         Explanation? e;
@@ -458,7 +474,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
                 MemorySource.ShowMe, false);
             AddMemory(guideId, card);
         }
-        Changed?.Invoke();
+        RaiseChanged();
         return card;
     }
 
@@ -475,7 +491,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
                 $"Last time, the {LowerFirst(e.Title)} said this: {e.Overview}", MemorySource.Explain, false);
             AddMemory(explanationId, card);
         }
-        Changed?.Invoke();
+        RaiseChanged();
         return card;
     }
 
@@ -484,7 +500,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         await Wait(400, ct);
         if (string.IsNullOrWhiteSpace(title)) throw new BackstopApiException("Please type a name.");
         var card = Replace(id, c => c with { Title = title.Trim() });
-        Changed?.Invoke();
+        RaiseChanged();
         return card;
     }
 
@@ -494,7 +510,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         var card = Replace(id, c => c with { Shared = shared });
         lock (_gate)
             Log(shared ? "share" : "minus", shared ? $"{User} shared \"{card.Title}\" with you." : $"{User} stopped sharing \"{card.Title}\".");
-        Changed?.Invoke();
+        RaiseChanged();
         return card;
     }
 
@@ -506,7 +522,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
             _memories.RemoveAll(c => c.Id == id);
             foreach (var key in _savedFrom.Where(kv => kv.Value == id).Select(kv => kv.Key).ToList()) _savedFrom.Remove(key);
         }
-        Changed?.Invoke();
+        RaiseChanged();
     }
 
     // ---------------- Trusted person ----------------
@@ -534,12 +550,12 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
     public async Task ResolveReviewItemAsync(string id, ReviewDecision decision, CancellationToken ct = default)
     {
         await Wait(500, ct);
-        string title;
-        var logged = false; // mail decisions are written to the activity log by the guardian service
+        var isCheck = false;
         lock (_gate)
         {
             if (_checks.TryGetValue(id, out var c))
             {
+                isCheck = true;
                 if (!CanSee(c)) throw new BackstopApiException($"{User} has not allowed you to see their checks.");
                 // Only a held item can be decided, and Blocked is final.
                 if (c.Result.Status != ReviewStatus.Held) throw new BackstopApiException("This has already been decided.");
@@ -550,31 +566,30 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
                     _ => c.Result with { CallRequested = true },
                 };
                 _checks[id] = c with { Result = r };
-                title = TitleFor(c.Result, c.Original);
+                var title = TitleFor(c.Result, c.Original);
+                Log(decision switch { ReviewDecision.Release => "check", ReviewDecision.Block => "cross", _ => "phone" },
+                    decision switch
+                    {
+                        ReviewDecision.Release => $"You said {LowerFirst(title)} is safe.",
+                        ReviewDecision.Block => $"You blocked {LowerFirst(title)}.",
+                        _ => $"You will call {User} about {LowerFirst(title)}.",
+                    });
             }
-            else
-            {
-                var m = guardian.Get(id);
-                if (m is not { State: MessageState.Held }) throw new BackstopApiException("This has already been decided.");
-                if (decision == ReviewDecision.Release && m.AwaitingScan) throw new BackstopApiException("The checker has not finished with this message yet.");
-                title = $"\"{m.Subject}\"";
-                logged = true;
-                switch (decision)
-                {
-                    case ReviewDecision.Release: guardian.Approve(id); break;
-                    case ReviewDecision.Block: guardian.Block(id); break;
-                    default: guardian.CallFirst(id); break;
-                }
-            }
-            if (!logged) Log(decision switch { ReviewDecision.Release => "check", ReviewDecision.Block => "cross", _ => "phone" },
-                decision switch
-                {
-                    ReviewDecision.Release => $"You said {LowerFirst(title)} is safe.",
-                    ReviewDecision.Block => $"You blocked {LowerFirst(title)}.",
-                    _ => $"You will call {User} about {LowerFirst(title)}.",
-                });
         }
-        Changed?.Invoke();
+        // Mail decisions are written to the activity log by the guardian service, and they raise its events, so they run outside the lock.
+        if (!isCheck)
+        {
+            var m = guardian.Get(id);
+            if (m is not { State: MessageState.Held }) throw new BackstopApiException("This has already been decided.");
+            if (decision == ReviewDecision.Release && m.AwaitingScan) throw new BackstopApiException("The checker has not finished with this message yet.");
+            switch (decision)
+            {
+                case ReviewDecision.Release: guardian.Approve(id); break;
+                case ReviewDecision.Block: guardian.Block(id); break;
+                default: guardian.CallFirst(id); break;
+            }
+        }
+        RaiseChanged();
     }
 
     public async Task<IReadOnlyList<ActivityEntry>> GetActivityAsync(CancellationToken ct = default)
@@ -605,6 +620,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
     {
         lock (_gate)
         {
+            _generation++;
             _checks.Clear(); _stories.Clear(); _guides.Clear(); _explanations.Clear(); _photos.Clear(); _savedFrom.Clear();
             _visitorItems.Clear();
             _memories = MemoryFixtures.Seed();
@@ -614,13 +630,14 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
             ResetProfiles();
             ResetChat();
         }
-        Changed?.Invoke();
+        guardian.SetAccess(HelperPermissions.Default); // raises the store's event, so outside the lock
+        RaiseChanged();
     }
 
     public void ClearMemories()
     {
         lock (_gate) { _memories.Clear(); _savedFrom.Clear(); }
-        Changed?.Invoke();
+        RaiseChanged();
     }
 
     // ---------------- Helpers ----------------
@@ -638,7 +655,11 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
     private static string LowerFirst(string s) => s.Length == 0 ? s : char.ToLowerInvariant(s[0]) + s[1..];
 
     // Caller holds the lock.
-    private void Log(string icon, string text) => _activity.Add(new ActivityEntry(DateTimeOffset.Now, icon, text));
+    private void Log(string icon, string text)
+    {
+        _activity.Add(new ActivityEntry(DateTimeOffset.Now, icon, text));
+        TrimActivity();
+    }
 
     private MemoryCard? Existing(string sourceId) =>
         _savedFrom.TryGetValue(sourceId, out var memoryId) ? _memories.FirstOrDefault(c => c.Id == memoryId) : null;
@@ -717,7 +738,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
     }
 
     private static ReviewItem FromMail(MailMessage m) => new(
-        m.Id, ReviewSource.Inbox, m.Subject, Defang.ForHelper(m.Body),
+        m.Id, ReviewSource.Inbox, Defang.ForHelper(m.Subject), Defang.ForHelper(m.Body),
         m.Concern == Concern.Strong ? Verdict.DontReply : Verdict.BeCareful,
         m.Flags.Select(f => new RiskFlag(f.Title, f.Icon, f.Title, f.Explanation)).ToList(),
         m.Summary, m.CallRequested, m.ReceivedAt);

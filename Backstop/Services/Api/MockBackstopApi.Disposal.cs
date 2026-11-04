@@ -12,11 +12,16 @@ public sealed partial class MockBackstopApi
     /// <summary>A seam for tests.</summary>
     internal Func<DateTimeOffset> DisposalClock { get; set; } = () => DateTimeOffset.Now;
 
-    private readonly Dictionary<string, DateTimeOffset> _visitorItems = [];
+    private readonly Dictionary<string, (DateTimeOffset At, long Order)> _visitorItems = [];
+    private long _nextVisitorOrder;
     private DateTimeOffset _seededAt = DateTimeOffset.Now;
 
     // Caller holds the lock.
-    private void MarkVisitorItem(string id) => _visitorItems[id] = DisposalClock();
+    private void MarkVisitorItem(string id)
+    {
+        _visitorItems[id] = (DisposalClock(), _nextVisitorOrder++);
+        TrimVisitorStores(keep: id);
+    }
 
     public int DisposeExpiredVisitorData()
     {
@@ -24,7 +29,7 @@ public sealed partial class MockBackstopApi
         lock (_gate)
         {
             var cutoff = DisposalClock() - VisitorDataLife;
-            var expired = _visitorItems.Where(kv => kv.Value <= cutoff).Select(kv => kv.Key).ToList();
+            var expired = _visitorItems.Where(kv => kv.Value.At <= cutoff).Select(kv => kv.Key).ToList();
             foreach (var id in expired)
             {
                 _visitorItems.Remove(id);
@@ -34,7 +39,7 @@ public sealed partial class MockBackstopApi
             var lines = _activity.RemoveAll(a => a.At >= _seededAt && a.At <= cutoff);
             gone = expired.Count + lines;
         }
-        if (gone > 0) Changed?.Invoke();
+        if (gone > 0) RaiseChanged();
         return gone;
     }
 
