@@ -66,7 +66,7 @@ else
             </details>
         }
         <details class="card fold">
-            <summary>Read it (text only, links made safe)</summary>
+            <summary>The message</summary>
             <pre class="preview">@_item.Preview</pre>
         </details>
 
@@ -80,17 +80,19 @@ else
                 <p class="actionbar__msg" role="alert"><Icon Name="alert" /> <span>We think this is risky. Release it anyway?</span></p>
                 <div class="actions">
                     <button type="button" class="btn btn-primary" @onclick="() => _confirming = false"><Icon Name="arrow-left" /> No, go back</button>
-                    <button type="button" class="btn btn-quiet" @onclick="() => Decide(ReviewDecision.Release)" disabled="@_working"><Icon Name="check" /> Yes, release it</button>
+                    <button type="button" class="btn btn-quiet" @onclick="() => Decide(ReviewDecision.Release)" disabled="@_working"><Icon Name="check" /> Yes, let it through</button>
                 </div>
             }
             else
             {
                 <div class="actions actions--helper">
+                    <button type="button" class="btn @(_item.Verdict == Verdict.DontReply ? "btn-quiet" : "btn-primary")" @onclick="Release" disabled="@_working"><Icon Name="check" /> Safe, let it through</button>
                     <button type="button" class="btn @(_item.Verdict == Verdict.DontReply ? "btn-block" : "btn-quiet btn-danger")" @onclick="() => Decide(ReviewDecision.Block)" disabled="@_working">
-                        <Icon Name="cross" /> Block
+                        <Icon Name="cross" /> Not safe, block it
                     </button>
-                    <button type="button" class="btn btn-quiet" @onclick="Release" disabled="@_working"><Icon Name="check" /> Safe – release</button>
-                    <button type="button" class="btn @(_item.Verdict == Verdict.BeCareful ? "btn-primary" : "btn-text")" @onclick="() => Decide(ReviewDecision.CallFirst)" disabled="@_working"><Icon Name="phone" /> Call them first</button>
+                    <div class="actions__links">
+                        <button type="button" class="btn btn-text" @onclick="() => Decide(ReviewDecision.CallFirst)" disabled="@_working"><Icon Name="phone" /> Call @UserName first</button>
+                    </div>
                 </div>
             }
             <p class="call-note" role="status">

@@ -32,14 +32,16 @@
             <div class="hero__words">
                 <h3 id="hero-title">@hero.Title</h3>
                 <p>@hero.Detail</p>
-                <ReadAloud Text="@($"{hero.Title}. {hero.Detail}")" />
-                @if (hero.Word.Length > 0)
-                {
-                    <span class="badge badge--@hero.Tone"><Icon Name="@hero.Icon" /><span>@hero.Word</span></span>
-                }
             </div>
         </div>
         <a class="btn btn-primary hero__go" href="@hero.Href">Review it <Icon Name="arrow-right" /></a>
+        <div class="hero__extra">
+            <ReadAloud Text="@($"{hero.Title}. {hero.Detail}")" />
+            @if (ShowWord(hero))
+            {
+                <span class="badge badge--@hero.Tone"><Icon Name="@hero.Icon" /><span>@hero.Word</span></span>
+            }
+        </div>
     </section>
 }
 
@@ -48,7 +50,7 @@
 @if (rest > 0 || Guardian.Allows(HelperCapability.SeeSharedMemories) || Guardian.Allows(HelperCapability.SeeActivitySummary))
 {
     <button type="button" class="btn btn-quiet more-toggle" aria-expanded="@(_more ? "true" : "false")" aria-controls="more-block" @onclick="() => _more = !_more">
-        <Icon Name="@(_more ? "arrow-left" : "arrow-right")" /> @(_more ? "Show less" : rest > 0 ? $"Show more ({rest} to know)" : "Show more")
+        @(_more ? "Show less" : rest > 0 ? $"Show more ({rest} to know)" : "Show more")
     </button>
 }
 <div id="more-block">
@@ -119,8 +121,15 @@
                     else
                     {
                         <div class="row row--static @(i.Kind == HelperItemKind.NewPerson ? "row--notice" : "")">
-                            @Body(i, false)
-                            @Actions(i)
+                            @if (_ask is { } a && a.Id == i.Id)
+                            {
+                                @Ask(i, a.Release)
+                            }
+                            else
+                            {
+                                @Body(i, false)
+                                @Actions(i)
+                            }
                         </div>
                     }
                 </li>
@@ -147,7 +156,7 @@
             }
         </span>
         <span class="row__side">
-            @if (i.Word.Length > 0)
+            @if (ShowWord(i))
             {
                 <span class="badge badge--@i.Tone"><Icon Name="@i.Icon" /><span>@i.Word</span></span>
             }
@@ -162,8 +171,8 @@
     {
         HelperItemKind.Outgoing =>
             @<text>
-                <button type="button" class="btn btn-primary" @onclick="@(() => Guardian.ApproveOutgoing(i.Id))"><Icon Name="check" /> Send it</button>
-                <button type="button" class="btn btn-quiet" @onclick="@(() => Guardian.BlockOutgoing(i.Id))"><Icon Name="cross" /> Do not send</button>
+                <button type="button" class="btn btn-primary" @onclick="@(() => _ask = (i.Id, true))"><Icon Name="check" /> Safe, send it</button>
+                <button type="button" class="btn btn-quiet btn-danger" @onclick="@(() => _ask = (i.Id, false))"><Icon Name="cross" /> Not safe, don't send</button>
             </text>,
         HelperItemKind.NewPerson =>
             @<button type="button" class="btn btn-quiet" @onclick="@(() => Guardian.DismissNotice(i.Id))"><Icon Name="check" /> Got it</button>,
@@ -175,4 +184,25 @@
     };
 
     private void Called(string id) => Api.MarkCalled(id);
+
+    // The word badge is left out when the title already says it ("Ask Me needs you").
+    private static bool ShowWord(HelperItem i) => i.Word.Length > 0 && !i.Title.Contains(i.Word, StringComparison.OrdinalIgnoreCase);
+
+    // An outgoing decision cannot be taken back, so the first tap turns the row into a question.
+    private (string Id, bool Release)? _ask;
+
+    private static string AskText(HelperItem i, bool release) => release ? $"Send \"{i.Detail}\"?" : $"Do not send \"{i.Detail}\"?";
+
+    private RenderFragment Ask(HelperItem i, bool release) =>
+    @<div class="ask" role="group" aria-label="@(release ? "Send this message?" : "Do not send this message?")">
+        <p class="ask__q">@AskText(i, release)</p>
+        <button type="button" class="btn @(release ? "btn-primary" : "btn-block")" @onclick="@(() => Confirm(i.Id, release))"><Icon Name="@(release ? "check" : "cross")" /> @(release ? "Yes, send it" : "Yes, don't send")</button>
+        <button type="button" class="btn btn-quiet" @onclick="@(() => _ask = null)">No</button>
+    </div>;
+
+    private void Confirm(string id, bool release)
+    {
+        _ask = null;
+        if (release) Guardian.ApproveOutgoing(id); else Guardian.BlockOutgoing(id);
+    }
 }

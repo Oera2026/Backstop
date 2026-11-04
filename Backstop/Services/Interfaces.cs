@@ -115,11 +115,14 @@ public interface IGuardianService
     void Block(string id);
     void CallFirst(string id);
 
+    /// <summary>Takes back "Call first" while the message is still held.</summary>
+    void CancelCall(string id);
+
     /// <summary>How long a one-tap decision can be undone, in seconds. Nothing changes for the user until it has passed.</summary>
     int DecisionWindowSeconds { get; }
 
     /// <summary>
-    /// One tap: "Safe, let it through" (<paramref name="safe"/>) or "Not safe, keep it blocked". The message stays held and unseen
+    /// One tap: "Safe, let it through" (<paramref name="safe"/>) or "Not safe, block it". The message stays held and unseen
     /// for the undo window, then the decision is saved. Refuses (and starts nothing) for mail that is not held or not checked yet.
     /// </summary>
     DecisionResult Propose(string id, bool safe);

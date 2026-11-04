@@ -4,10 +4,7 @@
 
 <PageTitle>Settings – Backstop Helper</PageTitle>
 
-
-<SettingsPanel DoneHref="/helper" />
-
-<section class="card card--spaced" aria-labelledby="ha-title">
+<section class="card" aria-labelledby="ha-title">
     <h2 id="ha-title">Your access: @TierName</h2>
     <ul class="flags">
         @foreach (var (cap, label) in Labels)
@@ -20,6 +17,8 @@
         }
     </ul>
 </section>
+
+<SettingsPanel DoneHref="/helper" />
 
 @code {
     private string TierName => Guardian.Access.Tier switch
@@ -37,7 +36,6 @@
         (HelperCapability.SeeActivitySummary, "See recent activity"),
         (HelperCapability.SeeClearedMail, "Read mail that was cleared"),
         (HelperCapability.SeeFullActivity, "See all activity"),
-        (HelperCapability.SendAsUser, "Send mail as them"),
         (HelperCapability.SeeChats, "Read their chats"),
     ];
 }

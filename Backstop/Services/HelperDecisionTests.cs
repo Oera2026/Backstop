@@ -56,7 +56,7 @@ public static class HelperDecisionTests
         Assert(r.Guardian.GetPending(m.Id) is null && r.Guardian.TakeFailure(m.Id) is null, "Nothing is left waiting");
         Assert(r.Guardian.GetMailActivity().Any(a => a.Text.Contains("approved")), "It is written to the activity log");
 
-        // Not safe, keep it blocked: it is blocked for good and the user never sees it.
+        // Not safe, block it: it is blocked for good and the user never sees it.
         r = new Rig();
         m = await r.Held();
         var heldBefore = r.Mail.HeldCount;
@@ -128,6 +128,16 @@ public static class HelperDecisionTests
         Assert(!down.Guardian.Propose("nope", true).Ok, "An unknown message is refused");
         var cleared = (await new Rig().Mail.ReceiveAsync("family-photos", false))!;
         Assert(cleared.State == MessageState.Cleared && !new Rig().Guardian.Propose(cleared.Id, false).Ok, "A message that is not held cannot be decided");
+
+        // Call first can be taken back while the message is held, and only then.
+        var cc = new Rig();
+        var callMsg = await cc.Held();
+        cc.Guardian.CallFirst(callMsg.Id);
+        Assert(cc.Fresh(callMsg).CallRequested, "Call first is remembered");
+        cc.Guardian.CancelCall(callMsg.Id);
+        Assert(!cc.Fresh(callMsg).CallRequested && cc.Fresh(callMsg).State == MessageState.Held, "Taking the call back clears it and the message stays held");
+        cc.Guardian.CancelCall("nope");
+        Assert(cc.Guardian.GetMailActivity().Any(a => a.Text.Contains("will not call")), "Taking the call back is written to the activity log");
 
         // Ring them: a tel: link only when a number is saved. None is collected, so the button is hidden.
         var g = new MockGuardianService(new MailStore());
