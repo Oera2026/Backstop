@@ -222,7 +222,8 @@
             return;
         }
 
-        var story = _storyMode && text.Length > 0;
+        // A message that asks for a story always becomes a picture story, with or without the Social story button.
+        var story = text.Length > 0 && _picture is null && (_storyMode || StoryIntent.Wants(text));
         _storyMode = false;
         var picture = _picture;
         Session.Turns.Add(new AskLine(true, text, picture is not null));

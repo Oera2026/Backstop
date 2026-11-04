@@ -501,6 +501,12 @@ public class MetaScamCheckerTests
                 string.Join(",", Enumerable.Range(1, 14).Select(i => $"{{\"heading\":\"Step {i}\",\"text\":\"I do step {i} now. It is calm.\",\"picture\":\"home\"}}")) + "]}";
             Assert(MetaStoryWriter.ParseContent(tooManyJson) is { Success: true, Pages.Count: 12 }, "Stories stop at 12 pages");
 
+            // A message that asks for a story always becomes a picture story. Mentions of the word do not.
+            foreach (var yes in new[] { "Tell me a story about the dentist", "Can you make me a social story for the bus?", "I need a story about going to the shop", "story about my doctor visit", "write a short story about catching a train", "Make a visual story", "I want a social story" })
+                Assert(StoryIntent.Wants(yes), $"Asks for a story: {yes}");
+            foreach (var no in new[] { "I read a good story in the paper", "Show me my stories", "What is the story with this email?", "Is this a scam?", "Hello", "", new string('a', 400) + " make a story" })
+                Assert(!StoryIntent.Wants(no), $"Not a story request: {no}");
+
             // Through the app: a failed writer gives no story; sensitive topics reach the carer but never block the story.
             var failApi = new MockBackstopApi(new MockGuardianService(new MailStore()), new MockApiOptions(), null, null, null, null, new StubWriter(new StoryDraft(false, "", [], false)));
             var threw = false;

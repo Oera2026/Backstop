@@ -189,3 +189,33 @@ input, select, textarea { font-size: max(16px, 1rem); }
   .role-tag__who { display: none; }
 }
 @media (max-width: 359px) { .guide-toggle__text { display: none; } .guide-toggle { min-width: 48px; justify-content: center; } }
+
+/* ---------- Story page: the picture and its words are on screen together ---------- */
+/* The Next button follows the words instead of covering them. */
+.page:has(> .stepview .storyfig) .actions--stick { position: static; border-top: 0; background: transparent; padding: 0; margin: .5rem 0 0; }
+.page:has(> .stepview .storyfig) .demo-row { display: none; }
+.page:has(> .stepview .storyfig) h1 { font-size: calc(1.5rem * var(--tx)); margin-bottom: .4rem; }
+.page > .stepview:has(.storyfig) { padding: .75rem 1rem; margin: .5rem 0; }
+.page > .stepview .stepview__bar { margin-bottom: .6rem; }
+.page > .stepview .storyfig { margin: 0 0 .5rem; }
+.page > .stepview .storyfig .figure__frame > * { width: 100%; height: auto; display: block; }
+.page > .stepview .storypage__h { margin: 0 0 .2rem; }
+.page > .stepview .stepview__text { font-size: calc(1.3rem * var(--tx)); margin-bottom: .25rem; }
+/* Phones and tablets: a modest picture, so the heading, the words and the Next button all show. */
+@media (max-width: 959px) {
+  .page > .stepview .storyfig .figure__frame { max-width: none; width: clamp(14rem, calc((100dvh - 36rem) * 1.5), 100%); margin-inline: auto; }
+}
+/* Wide screens: the picture on the left and the words beside it, as wide as the room allows. */
+@media (min-width: 960px) {
+  .page > .stepview:has(.storyfig) {
+    display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 2rem; align-items: center;
+    grid-template-areas: "count count" "bar bar" "fig head" "fig text";
+    grid-template-rows: auto auto auto 1fr;
+  }
+  .page > .stepview .stepview__count { grid-area: count; }
+  .page > .stepview .stepview__bar { grid-area: bar; }
+  .page > .stepview .storyfig { grid-area: fig; margin: 0; }
+  .page > .stepview .storypage__h { grid-area: head; align-self: end; font-size: calc(1.4rem * var(--tx)); }
+  .page > .stepview .stepview__text { grid-area: text; align-self: start; font-size: calc(1.6rem * var(--tx)); }
+  .page > .stepview .storyfig .figure__frame { max-width: none; width: clamp(18rem, calc((100dvh - 24rem) * 1.5), 34rem); margin: 0; }
+}
