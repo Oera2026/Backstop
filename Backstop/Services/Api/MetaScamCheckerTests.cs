@@ -494,6 +494,12 @@ public class MetaScamCheckerTests
             Assert(!MetaStoryWriter.ParseContent("{\"title\":\"x\",\"pages\":[{\"heading\":\"Go to http://example.com\",\"text\":\"Hi\",\"picture\":\"door\"}]}").Success, "A page with a link is refused");
             Assert(!MetaStoryWriter.ParseContent("not json").Success, "Rubbish is refused");
             Assert(MetaStoryWriter.ParseContent("{\"title\":\"A\",\"pages\":[{\"heading\":\"B\",\"text\":\"C.\",\"picture\":\"nope\",\"scene\":[{\"shape\":\"bad\"}]}]}").Pages[0].Scene is null, "A page with no valid items has no scene");
+            var twelveJson = "{\"title\":\"A long day out\",\"sensitive\":false,\"pages\":[" +
+                string.Join(",", Enumerable.Range(1, 12).Select(i => $"{{\"heading\":\"Step {i}\",\"text\":\"I do step {i} now. It is calm.\",\"picture\":\"home\"}}")) + "]}";
+            Assert(MetaStoryWriter.ParseContent(twelveJson) is { Success: true, Pages.Count: 12 }, "A 12-page story keeps all 12 pages");
+            var tooManyJson = "{\"title\":\"Too long\",\"sensitive\":false,\"pages\":[" +
+                string.Join(",", Enumerable.Range(1, 14).Select(i => $"{{\"heading\":\"Step {i}\",\"text\":\"I do step {i} now. It is calm.\",\"picture\":\"home\"}}")) + "]}";
+            Assert(MetaStoryWriter.ParseContent(tooManyJson) is { Success: true, Pages.Count: 12 }, "Stories stop at 12 pages");
 
             // Through the app: a failed writer gives no story; sensitive topics reach the carer but never block the story.
             var failApi = new MockBackstopApi(new MockGuardianService(new MailStore()), new MockApiOptions(), null, null, null, null, new StubWriter(new StoryDraft(false, "", [], false)));

@@ -14,13 +14,13 @@ namespace Backstop.Services.Api;
 /// </summary>
 public sealed class MetaStoryWriter : IStoryWriter
 {
-    private const int MaxPages = 5;
+    private const int MaxPages = 12;
     private const int MaxCast = 3;
     private const int MaxThings = 3;
-    private const int MaxResponseBytes = 64 * 1024;
+    private const int MaxResponseBytes = 128 * 1024;
 
-    /// <summary>A story with scenes is one long reply (about 40 seconds in testing). It waits at least this long, so a short general timeout cannot cut it off.</summary>
-    private const int MinStorySeconds = 100;
+    /// <summary>A story with scenes is one long reply (about 40 seconds for a short story in testing, longer for up to 12 pages). It waits at least this long, so a short general timeout cannot cut it off.</summary>
+    private const int MinStorySeconds = 180;
 
     private readonly HttpClient _http;
     private readonly ILogger<MetaStoryWriter> _logger;
@@ -38,7 +38,7 @@ public sealed class MetaStoryWriter : IStoryWriter
     private static readonly string Rules =
         "You write social stories for adults with learning disabilities, and for older people. A social story is a short, calm, first-person story about what will happen in a situation, what other people may do, how the person might feel, and what they can do.\n\n" +
         "STYLE:\n" +
-        "- 3 to 5 pages. Each page has a heading of 2 to 5 words and 2 to 3 short sentences a nine-year-old could read. Use \"I\". Be warm, calm and honest. Never scary.\n" +
+        "- Use as many pages as the situation needs, up to 12 pages. A simple situation needs only a few pages; a longer situation with several steps can use more, but never more than 12. Each page has a heading of 2 to 5 words and 2 to 3 short sentences a nine-year-old could read. Use \"I\". Be warm, calm and honest. Never scary.\n" +
         "- No medical, legal or financial advice. No web addresses, email addresses, phone numbers or digits in long runs. Do not promise that things will go well.\n" +
         "- Set sensitive to true ONLY when the situation is clearly about one of these: owing or handling money, debt or a bank; medicine, a medical treatment or a serious health problem; someone being hurt, abused, threatened or in danger; the police, a court or trouble with the law; or being pressured by a stranger. Sensitive only tells the carer to take a look. The story is still written.\n" +
         "- Do NOT set sensitive for ordinary life: holidays, travel, flights, hotels, parties, days out, meeting friends or family, appointments, shopping, work, or the person feeling nervous or unsure. Feeling nervous is the reason for the story, not a risk. When in doubt, set sensitive to false.\n\n" +
@@ -105,7 +105,7 @@ public sealed class MetaStoryWriter : IStoryWriter
                 model = _options.Model,
                 messages = new object[] { new { role = "system", content = system }, new { role = "user", content = user } },
                 temperature = 0.6,
-                max_tokens = 15000, // Muse spends tokens on reasoning first; stories with scenes need a lot of room
+                max_tokens = 30000, // Muse spends tokens on reasoning first; stories with scenes need a lot of room (up to 12 pages)
             };
 
             using var req = new HttpRequestMessage(HttpMethod.Post, _options.ChatUrl);

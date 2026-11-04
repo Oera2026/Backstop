@@ -66,14 +66,14 @@ static void Resilience(Microsoft.Extensions.Http.Resilience.HttpStandardResilien
     o.CircuitBreaker.FailureRatio = 0.6;
     o.CircuitBreaker.BreakDuration = TimeSpan.FromSeconds(20);
 }
-// Stories are one long reply (about 40 seconds with painted scenes), so they get longer limits than the other Meta calls.
+// Stories are one long reply (about 40 seconds for a short story with painted scenes, longer for up to 12 pages), so they get longer limits than the other Meta calls.
 // One retry is the least the handler allows; it cannot finish inside the total, so a slow story is not asked for twice.
 static void StoryResilience(Microsoft.Extensions.Http.Resilience.HttpStandardResilienceOptions o)
 {
     o.Retry.MaxRetryAttempts = 1;
-    o.AttemptTimeout.Timeout = TimeSpan.FromSeconds(110);
-    o.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(120);
-    o.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(230);
+    o.AttemptTimeout.Timeout = TimeSpan.FromSeconds(190);
+    o.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(200);
+    o.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(400);
     o.CircuitBreaker.MinimumThroughput = 5;
     o.CircuitBreaker.FailureRatio = 0.6;
     o.CircuitBreaker.BreakDuration = TimeSpan.FromSeconds(20);
