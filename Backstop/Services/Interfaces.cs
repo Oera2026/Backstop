@@ -14,9 +14,6 @@ public interface IMailService
     /// <summary>How many messages the helper is checking. The user is told only this number.</summary>
     int HeldCount { get; }
 
-    /// <summary>How many messages the helper blocked in the last day. Only a number: nothing about them is shown.</summary>
-    int RecentHelperBlocks { get; }
-
     /// <summary>Returns the message only if it is Cleared. Fail closed: otherwise null.</summary>
     MailMessage? GetClearedMessage(string id);
 

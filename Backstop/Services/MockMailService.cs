@@ -22,15 +22,6 @@ public sealed partial class MockMailService(MailStore store, IMetaScamChecker? m
     // Failed, Received and Scanning are never shown, but they are not "held by a helper" yet either.
     public int HeldCount => store.Count(m => m.State == MessageState.Held);
 
-    public int RecentHelperBlocks
-    {
-        get
-        {
-            var since = DateTimeOffset.Now.AddDays(-1);
-            return store.Count(m => m.State == MessageState.Blocked && m.HelperDecision == "Blocked" && m.ReceivedAt > since);
-        }
-    }
-
     public MailMessage? GetClearedMessage(string id)
     {
         var m = store.Find(id);

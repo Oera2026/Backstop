@@ -60,11 +60,10 @@ public static class HelperDecisionTests
         r = new Rig();
         m = await r.Held();
         var heldBefore = r.Mail.HeldCount;
-        Assert(r.Guardian.Propose(m.Id, false).Ok && r.Mail.RecentHelperBlocks == 0, "Not safe is accepted, and nothing is said to the user yet");
+        Assert(r.Guardian.Propose(m.Id, false).Ok, "Not safe is accepted");
         r.Pass(10);
         Assert(r.Fresh(m).State == MessageState.Blocked && r.Fresh(m).HelperDecision == "Blocked", "After the window: blocked");
         Assert(r.Mail.GetInbox().All(x => x.Id != m.Id) && r.Mail.GetClearedMessage(m.Id) is null && r.Mail.HeldCount == heldBefore - 1, "Blocked mail is gone from the user's view and the held count");
-        Assert(r.Mail.RecentHelperBlocks == 1, "The user is told a helper blocked one, as a number only");
         Assert(!r.Guardian.Propose(m.Id, true).Ok, "Blocked is final: it cannot be decided again");
         r.Guardian.Approve(m.Id);
         Assert(r.Fresh(m).State == MessageState.Blocked, "Even the old Approve cannot bring it back");
