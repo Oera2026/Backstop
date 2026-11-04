@@ -119,3 +119,30 @@ body { min-height: 100vh; min-height: 100dvh; }
   .page:has(.flowlist) h1 { font-size: calc(1.5rem * var(--tx)); }
   .page:has(.flowlist) .lead { line-height: 1.4; margin-bottom: 0; }
 }
+
+/* ---------- Phones ---------- */
+/* Tap targets respond at once, inputs never trigger the iOS zoom-on-focus, and a drag past the end does not pull the page. */
+a, button, input, select, textarea, summary, label { touch-action: manipulation; }
+input, select, textarea { font-size: max(16px, 1rem); }
+
+/* The welcome link keeps its word when the header has room (Try, welcome steps). */
+.site-header:has(.site-nav > .welcome-link:only-child) .welcome-link span { display: inline; }
+
+@media (max-width: 600px) {
+  /* Four tab labels fit at 360px: "Remember" is the longest. */
+  .appnav__item { font-size: .85rem; letter-spacing: -.02em; padding-inline: 0; }
+
+  /* Examples on Try: two across, so the form is not five screens down. */
+  .try-samples { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; }
+  .try-sample { font-size: calc(.9rem * var(--tx)); padding-inline: .4rem; line-height: 1.2; }
+
+  /* Guide card: the place chips go; the title already says where you are. The card takes less of the screen. */
+  .tourcard__trail { display: none; }
+  .tourcard { min-height: 0; }
+  .tour-on .shell > .page { padding-bottom: 15rem; }
+
+  /* Demo panel: two framed screens stacked on a phone is a page inside a page, so the side-by-side view is left out. */
+  .split-controls, .split { display: none; }
+}
+/* Headers with only the Welcome link: it sits at the right edge, not in the room kept for the guide button. */
+@media (max-width: 959px) { .site-header:has(.site-nav > .welcome-link:only-child) { padding-right: max(1rem, env(safe-area-inset-right)); } }
