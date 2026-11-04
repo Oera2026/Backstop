@@ -215,18 +215,22 @@ public sealed class MetaStoryWriter : IStoryWriter
                 return Fail(MetaFailures.BadReply("Story missing or not safe to show", null));
 
             var pages = new List<StoryPage>();
+            var rejected = 0;
             foreach (var p in pagesEl.EnumerateArray().Take(MaxPages))
             {
-                if (p.ValueKind != JsonValueKind.Object) return Fail(MetaFailures.BadReply("Bad page", null));
+                if (p.ValueKind != JsonValueKind.Object) { rejected++; continue; }
                 var heading = InputGuard.SafeText(Str(p, "heading"), 60, digitRun: 5, allowAdvice: true);
                 var text = InputGuard.SafeText(Str(p, "text"), 400, digitRun: 5, allowAdvice: true);
-                if (heading is null || text is null) return Fail(MetaFailures.BadReply("A page was not safe to show", null));
+                // A page that is not safe to show is left out. One bad page does not lose the whole story.
+                if (heading is null || text is null) { rejected++; continue; }
 
                 var pic = (Str(p, "picture") ?? "").Trim().ToLowerInvariant();
                 if (!SceneVocabulary.Pictures.Contains(pic)) pic = "home";
                 pages.Add(new StoryPage(heading, text, pic, ParseScene(p)));
             }
             if (pages.Count == 0) return Fail(MetaFailures.BadReply("No pages", null));
+            // Too many gone and it no longer reads as a story, so it is not shown.
+            if (rejected > 0 && (pages.Count < 2 || rejected > pages.Count)) return Fail(MetaFailures.BadReply("Too many pages were not safe to show", null));
             return new StoryDraft(true, title, pages, sensitive);
         }
         catch (Exception)

@@ -16,23 +16,35 @@ public sealed partial class MockBackstopApi
         var text = request.Situation.Trim();
         var when = string.IsNullOrWhiteSpace(request.When) ? null : request.When.Trim();
 
+        // Both run before the AI, so a failed story still tells the helper.
+        TellHelperIfAtRisk(text);
+        var sensitiveWords = StoryFixtures.IsSensitive(text);
+
         if (storyWriter is null)
+        {
+            if (sensitiveWords) NoteSensitiveStory(text);
             throw new BackstopApiException("Stories are not switched on yet. Please tell the person who looks after this app.");
+        }
         var draft = await storyWriter.WriteAsync(text, when, ct);
-        if (!draft.Success) throw new BackstopApiException("I could not make your story. Please try again.");
+        if (!draft.Success)
+        {
+            if (sensitiveWords) NoteSensitiveStory(text);
+            // The real reason in plain words, such as how long to wait, when there is one.
+            throw new BackstopApiException(draft.Failure?.Message ?? "I could not make your story. Please try again.");
+        }
         var title = draft.Title;
         var pages = draft.Pages.Select(p => p with { Text = Fill(p.Text) }).ToList();
 
         // A sensitive topic never blocks the story. The carer is told, and the person gets their story straight away.
         // The word list is a floor: the AI cannot lower it.
-        var notify = draft.Sensitive || StoryFixtures.IsSensitive(text);
+        var notify = draft.Sensitive || sensitiveWords;
 
         var story = new Story(NewId("s"), title, when, pages, DateTimeOffset.Now);
         lock (_gate)
         {
             _stories[story.Id] = story;
             MarkVisitorItem(story.Id);
-            if (notify) Log("story", $"{User} made a story about \"{Shorten(text)}\". It may be a sensitive topic, so you may want to ask how they are.");
+            if (notify) LogSensitiveStory(text);
         }
         Changed?.Invoke();
         return story;
@@ -55,6 +67,16 @@ public sealed partial class MockBackstopApi
     {
         await Wait(300, ct);
         lock (_gate) _stories.Remove(id);
+        Changed?.Invoke();
+    }
+
+    // Caller holds the lock.
+    private void LogSensitiveStory(string text) =>
+        Log("story", $"{User} made a story about \"{Shorten(text)}\". It may be a sensitive topic, so you may want to ask how they are.");
+
+    private void NoteSensitiveStory(string text)
+    {
+        lock (_gate) LogSensitiveStory(text);
         Changed?.Invoke();
     }
 

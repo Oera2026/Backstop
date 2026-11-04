@@ -19,7 +19,8 @@ public sealed record DocumentReading(
     IReadOnlyList<(string Word, string Meaning)> HardWords,
     string Text,
     bool Suspicious,
-    FailureInfo? Failure = null);
+    FailureInfo? Failure = null,
+    bool NeedsHelper = false);
 
 public sealed record DocumentAnswer(bool Success, string Text, bool NeedsHelper, FailureInfo? Failure = null);
 
@@ -197,6 +198,7 @@ public sealed class MetaDocumentExplainer : IDocumentExplainer
 
             var deadline = Str(root, "deadline", 80);
             var suspicious = root.TryGetProperty("suspicious", out var s) && s.ValueKind == JsonValueKind.True;
+            var needsHelper = root.TryGetProperty("needsHelper", out var nh) && nh.ValueKind == JsonValueKind.True;
 
             // From a picture, the words come from the model's reading. Kept plain, cut short, never trusted as markup.
             var transcript = "";
@@ -210,7 +212,7 @@ public sealed class MetaDocumentExplainer : IDocumentExplainer
                         "Code: NO_TEXT_IN_IMAGE\nWhat: The model returned no text for the picture."));
             }
 
-            return new(true, type, title, overview, deadline, chunks, actions, hard, transcript, suspicious);
+            return new(true, type, title, overview, deadline, chunks, actions, hard, transcript, suspicious, NeedsHelper: needsHelper);
         }
         catch (Exception)
         {

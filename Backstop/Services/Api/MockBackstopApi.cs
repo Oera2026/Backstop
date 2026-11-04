@@ -57,6 +57,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
 
     private const int MaxCheckLength = 20000;
     private const int MaxExplainImageBytes = 8 * 1024 * 1024;
+    private const int MaxFlagsShown = 4;
 
     public event Action? Changed;
 
@@ -78,13 +79,19 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         {
             if (request.Picture is null || (imgType = ImageSniff.ImageType(request.Picture)) is null)
                 throw new BackstopApiException("We could not read that file. Please choose a photo or a screenshot.");
-            text = ""; // Only the AI can read a picture. No local text stands in for it.
+            // Refused here, before any check is made, so nothing reaches the helper's queue.
+            if (request.Picture.Length > MetaAiScamChecker.MaxImageBytes)
+                throw new BackstopApiException("That picture is too big. Please choose a smaller one.");
+            // Only the AI can read a picture. Words typed with it still go through the local checks.
+            text = request.Text ?? "";
         }
         else text = request.Text ?? "";
         if (text.Length > MaxCheckLength) throw new BackstopApiException("That is too long to check. Please paste a shorter part.");
         if (string.IsNullOrWhiteSpace(text) && !isPicture) throw new BackstopApiException("Please paste the message first.");
 
         var display = Defang.ForUser(text.Trim());
+        // The AI gets every address, made harmless, so it can judge where a link goes. The person sees "[link removed]".
+        var forAi = Defang.ForHelper(text.Trim());
 
         // Simple local checks as the floor:
         var floor = MockRiskRules.Scan(display);
@@ -109,10 +116,11 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         // otherwise, send text only to save vision processing costs.
         var tip0 = new System.Runtime.CompilerServices.StrongBox<string?>();
         var (finalVerdict, finalReason, reviewStatus, failure) = await ApplyAiAsync(
-            isPicture ? c => c.CheckScamAsync(null, request.Picture, imgType, ct) : c => c.CheckScamAsync(display, null, null, ct),
+            isPicture ? c => c.CheckScamAsync(null, request.Picture, imgType, ct) : c => c.CheckScamAsync(forAi, null, null, ct),
             aiRequired: isPicture, aiTip: tip0, floorVerdict, MockRiskRules.ReasonFor(floorVerdict, floorBecause), combinedFlags);
+        if (!isPicture) (finalVerdict, finalReason) = NotSafeIfUnread(forAi, finalVerdict, finalReason);
 
-        var flags = combinedFlags.Take(4).ToList();
+        var flags = TopFlags(combinedFlags);
         var result = new CheckResult(NewId("chk"), request.Kind, finalVerdict, finalReason, flags,
             display, floor.Highlights.Where(h => flags.Any(f => f.Id == h.FlagId)).ToList(), null, reviewStatus, false, DateTimeOffset.Now, failure,
             Tip(finalVerdict, reviewStatus, tip0.Value, combinedFlags, finalReason));
@@ -172,6 +180,16 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
             : (floorVerdict, floorReason, ReviewStatus.NotAsked, null);
     }
 
+    // The AI only reads the first part of long text, so what it did not read can never be called safe.
+    private static (Verdict, string) NotSafeIfUnread(string sentToAi, Verdict verdict, string reason) =>
+        verdict == Verdict.LooksSafe && InputGuard.IsTooLong(sentToAi)
+            ? (Verdict.BeCareful, "This is long, so I could only read the first part. Please take care with the rest.")
+            : (verdict, reason);
+
+    // Only a few flags are shown, and a sign that someone may need help is never one of those left out.
+    private static List<RiskFlag> TopFlags(IEnumerable<RiskFlag> flags) =>
+        flags.OrderBy(f => f.Id switch { "at-risk" => 0, "review-needed" => 1, _ => 2 }).Take(MaxFlagsShown).ToList();
+
     private static (Verdict, string, ReviewStatus, FailureInfo?) HoldForReview(List<RiskFlag> flags, Verdict floorVerdict, string reason, FailureInfo? failure)
     {
         if (flags.All(f => f.Id != "review-needed"))
@@ -210,7 +228,13 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         foreach (var (sender, text) in ParseThread(display))
         {
             var fromUser = sender.Equals("Me", StringComparison.OrdinalIgnoreCase) || sender.Equals(User, StringComparison.OrdinalIgnoreCase);
-            var found = fromUser ? MockRiskRules.Scan("") : MockRiskRules.Scan(text);
+            // The person's own lines are not scam signs, but what they say about their own safety always counts.
+            var found = MockRiskRules.Scan(text);
+            if (fromUser)
+            {
+                var atRisk = found.Flags.Where(f => f.Id == "at-risk").ToList();
+                found = found with { Flags = atRisk, Highlights = found.Highlights.Where(h => h.FlagId == "at-risk").ToList(), Score = atRisk.Sum(f => MockRiskRules.Weight(f.Id)) };
+            }
             foreach (var f in found.Flags)
             {
                 running += MockRiskRules.Weight(f.Id);
@@ -226,12 +250,14 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         var combinedFlags = new List<RiskFlag>(seen.OrderByDescending(f => MockRiskRules.Weight(f.Id)));
 
         var tip0 = new System.Runtime.CompilerServices.StrongBox<string?>();
+        var forAi = Defang.ForHelper(conversation.Trim());
         var (finalVerdict, finalReason, reviewStatus, failure) = await ApplyAiAsync(
-            c => c.CheckScamAsync(display, null, null, ct), aiRequired: false, aiTip: tip0, floorVerdict,
+            c => c.CheckScamAsync(forAi, null, null, ct), aiRequired: false, aiTip: tip0, floorVerdict,
             MockRiskRules.ReasonFor(floorVerdict, MockRiskRules.BecauseFor(combinedFlags.FirstOrDefault()?.Id), startedFriendly: firstFlagged > 0),
             combinedFlags);
+        (finalVerdict, finalReason) = NotSafeIfUnread(forAi, finalVerdict, finalReason);
 
-        var flags = combinedFlags.Take(4).ToList();
+        var flags = TopFlags(combinedFlags);
         var result = new CheckResult(NewId("chk"), CheckKind.Conversation, finalVerdict,
             finalReason,
             flags, display, [], thread, reviewStatus, false, DateTimeOffset.Now, failure,
@@ -284,6 +310,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
 
     public async Task<Guide?> GenerateGuideAsync(GuideRequest request, CancellationToken ct = default)
     {
+        TellHelperIfAtRisk(request.Goal);
         await Wait(1600, ct);
         if (string.IsNullOrWhiteSpace(request.Goal)) throw new BackstopApiException("Please say what you want to do.");
 
@@ -352,6 +379,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
             // Links come out first, so nothing clickable or hidden is sent on or shown.
             typed = Defang.ForUser(request.Text.Trim());
             if (typed.Length > MaxCheckLength) throw new BackstopApiException("That is too long to explain. Please paste a shorter part.");
+            TellHelperIfAtRisk(typed);
         }
 
         if (documentExplainer is null)
@@ -360,7 +388,18 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         if (!reading.Success)
             throw new BackstopApiException(reading.Failure?.Message ?? "Something went wrong. Please try again in a minute.");
 
+        // A photo's words are only known now.
+        if (typed is null) TellHelperIfAtRisk(reading.Text);
+
         var explanation = BuildExplanation(reading, typed ?? Defang.ForUser(reading.Text), request.Level, request.Format);
+        if (typed is not null && InputGuard.IsTooLong(typed))
+            explanation = explanation with { Chunks = [new("Only the first part", "This is long, so I only read the first part. Paste the rest on its own to read it too."), .. explanation.Chunks] };
+        if (reading.NeedsHelper)
+        {
+            AskHelperToLook(explanation.Title);
+            if (!explanation.Overview.Contains(Helper, StringComparison.OrdinalIgnoreCase))
+                explanation = explanation with { Overview = $"{explanation.Overview} {Helper} can look at it with you." };
+        }
         lock (_gate)
         {
             _explanations[explanation.Id] = explanation;
@@ -382,10 +421,12 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         Explanation? e;
         lock (_gate) e = _explanations.GetValueOrDefault(explanationId);
         if (e is null) throw new BackstopApiException("We could not find that page. Please explain it again.");
+        TellHelperIfAtRisk(question);
         if (documentExplainer is null)
             throw new BackstopApiException("Questions are not switched on yet. Please tell the person who looks after this app.");
 
         var reply = await documentExplainer.AnswerAsync(e.OriginalText, Defang.ForUser(question.Trim()), ct);
+        if (reply.NeedsHelper) AskHelperToLook(e.Title);
         if (!reply.Success)
             throw new BackstopApiException(reply.Failure?.Message ?? "Something went wrong. Please try again in a minute.");
         var answer = reply.Text;
@@ -704,6 +745,8 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         _ => $"A message {User} checked",
     };
 
+    private const string PictureNotKept = "The picture was not kept.";
+
     private ReviewItem FromCheck(StoredCheck c)
     {
         var r = c.Result;
@@ -712,7 +755,11 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         var high = r.Thread?.Select((m, i) => (m.Level, Number: i + 1)).FirstOrDefault(x => x.Level == RiskLevel.High).Number ?? 0;
         var trend = high > 0 ? $" The risk rose across the chat: calm at first, high by message {high} of {r.Thread!.Count}." : "";
         var reasoning = $"{signs}{trend} {User} asked you to look before replying.";
-        return new ReviewItem(r.Id, ReviewSource.Check, TitleFor(r, c.Original), Defang.ForHelper(c.Original), r.Verdict, r.Flags,
+        // Pictures are never kept, so the helper is told that rather than shown an empty box.
+        var preview = r.Kind == CheckKind.Picture
+            ? c.Original.Length == 0 ? PictureNotKept : $"{PictureNotKept}\n\n{Defang.ForHelper(c.Original)}"
+            : Defang.ForHelper(c.Original);
+        return new ReviewItem(r.Id, ReviewSource.Check, TitleFor(r, c.Original), preview, r.Verdict, r.Flags,
             reasoning, r.CallRequested, c.AskedAt ?? r.CheckedAt, r.WatchFor);
     }
 

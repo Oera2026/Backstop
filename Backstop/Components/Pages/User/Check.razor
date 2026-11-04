@@ -30,7 +30,7 @@ else
 
         @if (_kind == "picture")
         {
-            <PicturePicker Id="check-picture" Prompt="Drop a screenshot or photo here, or tap to choose one" OnPicked="f => _picture = f" />
+            <PicturePicker Id="check-picture" MaxMegabytes="6" Prompt="Drop a screenshot or photo here, or tap to choose one" OnPicked="f => _picture = f" />
         }
         else
         {

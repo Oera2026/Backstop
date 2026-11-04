@@ -2,25 +2,24 @@
 
 @* Drop a file on the box, or tap it to choose one. The file input covers the whole box, so dropping works with no script. *@
 <div class="dropzone @(_over ? "dropzone--over" : "")" @ondragenter="() => _over = true" @ondragleave="() => _over = false">
-    <span class="pic pic--blue" aria-hidden="true"><Icon Name="@(AcceptsPdf ? "file" : "upload")" /></span>
+    <span class="pic pic--blue" aria-hidden="true"><Icon Name="upload" /></span>
     <span>@Prompt</span>
     <img @ref="_img" alt="The picture you chose" hidden />
     @if (_name is not null)
     {
         <span class="dropzone__name">@_name</span>
     }
-    <InputFile @ref="_input" id="@Id" accept="@Accept" OnChange="Picked" aria-label="@Prompt" capture="@(Camera ? "environment" : null)" />
+    <InputFile @ref="_input" id="@Id" accept="image/*" OnChange="Picked" aria-label="@Prompt" capture="@(Camera ? "environment" : null)" />
 </div>
 <p class="form-error" role="alert">@_error</p>
 
 @code {
     public sealed record PickedFile(byte[] Bytes, string Name);
 
-    private const long MaxBytes = 10 * 1024 * 1024;
-
     [Parameter] public string Id { get; set; } = "picture";
     [Parameter] public string Prompt { get; set; } = "Drop a picture here, or tap to choose one";
-    [Parameter] public bool AcceptsPdf { get; set; }
+    /// <summary>The largest file this screen can use.</summary>
+    [Parameter] public int MaxMegabytes { get; set; } = 10;
     /// <summary>On phones, open the camera straight away.</summary>
     [Parameter] public bool Camera { get; set; }
     [Parameter] public EventCallback<PickedFile> OnPicked { get; set; }
@@ -30,15 +29,13 @@
     private string? _name, _error;
     private bool _over;
 
-    private string Accept => AcceptsPdf ? "image/*,application/pdf" : "image/*";
-
     private async Task Picked(InputFileChangeEventArgs e)
     {
         _over = false;
         _error = null;
         try
         {
-            await using var stream = e.File.OpenReadStream(MaxBytes);
+            await using var stream = e.File.OpenReadStream(MaxMegabytes * 1024L * 1024L);
             using var memory = new MemoryStream();
             await stream.CopyToAsync(memory);
             _name = e.File.Name;
@@ -48,7 +45,7 @@
         catch (IOException)
         {
             _name = null;
-            _error = "That file is too big. Please choose one smaller than 10 MB.";
+            _error = $"That file is too big. Please choose one smaller than {MaxMegabytes} MB.";
         }
     }
 }

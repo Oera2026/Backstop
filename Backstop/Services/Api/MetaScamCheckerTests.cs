@@ -1161,6 +1161,9 @@ public class MetaScamCheckerTests
         // 37c. Page flows: real pages rendered with real services and no AI key.
         await PageFlowTests.RunAsync();
 
+        // 37d. AI features: the helper is told first and when the AI fails, links reach the AI, nothing unread is called safe.
+        await AiSafeguardTests.RunAsync();
+
         // 38. Show me: the AI writes the guide; unsafe goals are refused; failures give a plain error, never a canned guide.
         {
             static HttpResponseMessage Say(string json)

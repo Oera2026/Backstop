@@ -132,6 +132,9 @@ public static class PageFlowTests
         Assert(await app.Mail.CheckOnceAsync(own, false) == MessageState.Held, "A visitor's email: no AI key is Held");
         Assert(!(await app.Render<Inbox>()).Contains("Zebra own email") && !(await app.Render<Queue>()).Contains("Zebra own email"), "A visitor's email: not in the inbox or the helper's queue");
 
+        // ---- Explain asks only for what it can read ----
+        Assert(!(await app.Render<Explain>()).Contains("PDF"), "Explain: PDFs are not offered");
+
         // ---- A page for something that has gone says so plainly ----
         Assert((await app.Render<CheckResultView>(("Id", "chk-gone"))).Contains("We cannot find that check"), "Check page: a disposed check says it cannot be found");
         Assert((await app.Render<StoryView>(("Id", "s-gone"))).Contains("We cannot find that story"), "Story page: a disposed story says it cannot be found");
