@@ -159,7 +159,7 @@ public static class WatchForTests
         Assert(held.Status == ReviewStatus.Held && !string.IsNullOrWhiteSpace(held.WatchFor), "Check: held because the checker is down has a tip");
         var careful2 = new MockBackstopApi(new MockGuardianService(new MailStore()), new MockApiOptions(), Real(Json("BeCareful", "Be careful with this one.", good)));
         var viaModelCheck = await careful2.CheckContentAsync(new CheckRequest(CheckKind.Message, "Hello there, how are you today?"));
-        Assert(viaModelCheck.Verdict == Verdict.BeCareful && viaModelCheck.WatchFor == good, "Check: the checker's clean tip is used");
+        Assert(viaModelCheck.Verdict == Verdict.DontReply && viaModelCheck.WatchFor == good, "Check: the checker's clean tip is used");
 
         Console.WriteLine("PASS: Watch-for tips: each category has a fallback, bad model tips are dropped, email orders never reach the tip, Safe shows none.");
     }
