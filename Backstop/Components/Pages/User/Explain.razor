@@ -21,10 +21,10 @@ else
     }
     <form class="form" @onsubmit="Run" novalidate>
         <ChoiceGroup Legend="What do you have?" Name="source" Value="@_source" OnPick="v => { _source = v; _error = null; }"
-                     Options="@(new[] { ("text", "Words to paste"), ("file", "A photo or PDF of a letter") })" />
+                     Options="@(new[] { ("text", "Words to paste"), ("file", "A photo of a letter") })" />
         @if (_source == "file")
         {
-            <PicturePicker Id="explain-file" AcceptsPdf="true" Prompt="Drop a photo or PDF here, or tap to choose one" OnPicked="f => _file = f" />
+            <PicturePicker Id="explain-file" MaxMegabytes="8" Prompt="Drop a photo here, or tap to choose one" OnPicked="f => _file = f" />
         }
         else
         {
@@ -72,7 +72,7 @@ else
         _problem = null;
         if (_source == "file" ? _file is null : string.IsNullOrWhiteSpace(_text))
         {
-            _error = _source == "file" ? "Please choose a photo or PDF first." : "Please paste the words first.";
+            _error = _source == "file" ? "Please choose a photo first." : "Please paste the words first.";
             return;
         }
         _busy = true;
