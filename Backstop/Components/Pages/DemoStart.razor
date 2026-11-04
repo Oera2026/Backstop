@@ -1,26 +1,27 @@
 @page "/demo-start"
 @layout LoginLayout
 
-<PageTitle>Try the demo – Backstop</PageTitle>
+<PageTitle>Welcome – Backstop</PageTitle>
 
-<h1>Try the demo</h1>
-<p class="lead">Which side do you want to see?</p>
+<h1>Welcome to Backstop</h1>
+<p class="lead">Email that is checked before you see it. Which side do you want to see?</p>
 
 <ul class="sidecards">
     <li>
-        <a class="sidecard" href="/account/demo?side=user" data-enhance-nav="false">
+        <a class="sidecard" href="/home?tour=1" data-enhance-nav="false">
             <span class="pic pic--navy" aria-hidden="true"><Icon Name="user" /></span>
-            <span class="sidecard__title">The user</span>
+            <span class="sidecard__title">See the user's side</span>
             <span class="sidecard__text">Reads and writes messages.</span>
             <span class="sidecard__go">Start <Icon Name="arrow-right" /></span>
         </a>
     </li>
     <li>
-        <a class="sidecard sidecard--helper" href="/account/demo?side=helper" data-enhance-nav="false">
+        <a class="sidecard sidecard--helper" href="/helper?tour=1" data-enhance-nav="false">
             <span class="pic pic--safe" aria-hidden="true"><Icon Name="people" /></span>
-            <span class="sidecard__title">The helper</span>
+            <span class="sidecard__title">See the helper's side</span>
             <span class="sidecard__text">Decides on held messages.</span>
             <span class="sidecard__go">Start <Icon Name="arrow-right" /></span>
         </a>
     </li>
 </ul>
+<p class="login-try"><a class="btn btn-quiet" href="/try"><Icon Name="inspect" /> Check an email yourself</a></p>

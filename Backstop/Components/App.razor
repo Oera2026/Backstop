@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en-GB">
 
 <head>
@@ -96,15 +96,15 @@
     private static readonly IComponentRenderMode InteractiveNoPrerender = new InteractiveServerRenderMode(prerender: false);
 
     private static readonly string[] ListPaths = ["", "messages", "stories", "remember", "contacts", "sent", "helper", "helper/messages", "helper/history"];
-    // Pages with no side bar or tab bar: sign-in, the demo panel and the welcome walkthroughs.
-    private static readonly string[] NoNavPaths = ["login", "demo-start", "demo", "welcome", "helper/welcome", "try"];
+    // Pages with no side bar or tab bar: start page, the demo panel and the welcome walkthroughs.
+    private static readonly string[] NoNavPaths = ["demo-start", "demo", "welcome", "helper/welcome", "try"];
     private string Path => (HttpContext?.Request.Path.Value ?? "").Trim('/').ToLowerInvariant();
     private bool IsListPath => ListPaths.Contains(Path);
     private bool IsHome => Path == "home";
     private bool IsHelper => Path == "helper" || Path.StartsWith("helper/");
     private bool HasNav => !NoNavPaths.Contains(Path);
 
-    // The sign-in page is plain server-rendered HTML (its form posts to /account/login); everything else is interactive.
+    // The start page is plain server-rendered HTML; everything else is interactive.
     private IComponentRenderMode? PageRenderMode =>
-        HttpContext?.Request.Path.StartsWithSegments("/login") == true || HttpContext?.Request.Path.StartsWithSegments("/demo-start") == true ? null : InteractiveNoPrerender;
+        HttpContext?.Request.Path.StartsWithSegments("/demo-start") == true ? null : InteractiveNoPrerender;
 }

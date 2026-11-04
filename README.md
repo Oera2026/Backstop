@@ -37,9 +37,9 @@ Calls retry twice with backoff, honour `Retry-After`, and pause for 20 seconds i
 
 Explain and questions about a document go to Meta AI. Photos of a document are read by the AI; PDFs cannot be read yet, so Explain asks for a photo or pasted text. Show me guides and Remember questions also go to Meta AI: guides are written fresh for any goal (unsafe goals are refused), and memory answers are written only from the person's saved cards. Guide and story pictures are simple line drawings the app makes itself, from a picture the AI picks — that is the chosen art style, not generated imagery.
 
-## Persistence (Supabase)
+## Data
 
-Persistence is planned as one generic Supabase table, `entities`, with row-level security on. `SUPABASE_URL` and `SUPABASE_SERVICE_KEY` are reserved for it and are read on the server only. **It is not wired up yet:** today all state is in memory and resets when the app restarts.
+All state is in memory and resets when the app restarts. There is no database and no sign-in.
 
 ## Run locally
 
@@ -69,8 +69,6 @@ Set these as environment variables (locally in the untracked `.env`, in producti
 | `ENABLE_DIAGNOSTICS` | Set to `true` to show "Test the connection" (settings and Meta's raw reply). Off by default outside development. |
 | `CLIENT_IP_HEADER` | Optional. A header the host sets to the visitor address (for example `CF-Connecting-IP`). Empty uses `X-Forwarded-For`. |
 | `DEMO_RESET_SECRET` | The code needed for "Reset demo" and "Empty Remember" on `/demo`. With no value, both are switched off. |
-| `ACCOUNT_USER_PASSWORD`, `ACCOUNT_HELPER_PASSWORD` | Passwords for the made-up accounts `sam@example.com` (user side) and `alex@example.com` (helper side). With no value, that account cannot sign in. |
-| `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` | Supabase project URL and service key (server only). Not used yet. |
 | `SAFE_BROWSING_API_KEY`, `URLHAUS_AUTH_KEY` | Optional. Blocklist lookups for links on `/try` only. Empty skips them silently. |
 
 ## Docker deployment
@@ -90,7 +88,7 @@ Notes for the host:
 - **WebSockets must be enabled**, because the app uses SignalR.
 - The app listens on `$PORT` if set, otherwise 5106.
 - Free hosts sleep when idle, so the first request can be slow.
-- The outbound destinations are the Meta Dev API, later Supabase, and, on `/try` only, the links a visitor pastes (opened by the guarded Link check) plus the optional Safe Browsing and URLhaus lookups. Fonts and scripts are self-hosted and the content security policy is strict.
+- The outbound destinations are the Meta Dev API and, on `/try` only, the links a visitor pastes (opened by the guarded Link check) plus the optional Safe Browsing and URLhaus lookups. Fonts and scripts are self-hosted and the content security policy is strict.
 
 ## Routes
 
@@ -102,13 +100,13 @@ Notes for the host:
 | `/explain`, `/check`, `/ask-me` | User | Explain a letter, check a message, Ask Me |
 | `/helper` | Helper | Queue of held messages and recent decisions |
 | `/helper/{id}` | Helper | Evidence card: Safe, let it through · Not safe, block it · Call the sender first |
-| `/login` | Public | Sign in, or "Try the demo" (both sides, with a User / Helper switch and a guided walk-around) |
+| `/demo-start` | Public | Start page: pick the user side or the helper side, each with a guided walk-around |
 | `/try` | Public | Paste an email or pick an example and see whether Backstop would block it, and why |
 | `/demo` | Demo | Simulate incoming email, watch the four checks, split-screen user and helper |
 
-## Try it (for judges, no sign-in)
+## Try it (for judges)
 
-Open `/try` (linked below "Try the demo" on the sign-in page). Paste an email, or press one of ten examples (phishing link, redirect link, install software, move to WhatsApp, normal family email, "Mum" from a new address, look-alike address, replies go elsewhere, contact with a new address, tricky but real). Choose **Coming in** or **Going out**, then **Check it**.
+Open `/try` (linked from the start page). Paste an email, or press one of ten examples (phishing link, redirect link, install software, move to WhatsApp, normal family email, "Mum" from a new address, look-alike address, replies go elsewhere, contact with a new address, tricky but real). Choose **Coming in** or **Going out**, then **Check it**.
 
 You get a verdict (**Blocked**, **Held for helper** or **Safe**), the warning signs found, a plain explanation, and what the trusted helper would see.
 
@@ -129,7 +127,7 @@ You get a verdict (**Blocked**, **Held for helper** or **Safe**), the warning si
 
 ## Link check (the Try it page only)
 
-On `/try`, links in a pasted message, and the standalone **Check one link** box, are opened by the Link check (`ILinkInspector`). Real mail never is: incoming mail, the helper queue and the guardian judge links by address only. This is an owner-approved exception to the "Meta and Supabase only" rule (see AGENTS.md).
+On `/try`, links in a pasted message, and the standalone **Check one link** box, are opened by the Link check (`ILinkInspector`). Real mail never is: incoming mail, the helper queue and the guardian judge links by address only. This is an owner-approved exception to the "Meta only" rule (see AGENTS.md).
 
 - GET only, http and https on ports 80 and 443, at most 5 redirects, 5 seconds a hop, 1 MB read, no cookies, no sign-in headers.
 - Every hop looks the name up again and refuses private, loopback, link-local (including the cloud metadata address), carrier-grade NAT, reserved, documentation, multicast and unique-local addresses, and `localhost`. The connection is pinned to the address that passed, so a name cannot change between the check and the visit.

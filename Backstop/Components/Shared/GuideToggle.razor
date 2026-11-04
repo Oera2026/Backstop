@@ -2,10 +2,8 @@
 @inject DemoTour Tour
 @inject NavigationManager Nav
 
-@* Demo visitors only: turns the guide off and on. *@
-<AuthorizeView Roles="@Roles.Demo">
-    <button type="button" class="guide-toggle" aria-pressed="@(Tour.Active ? "true" : "false")" aria-label="Guide" @onclick="Toggle"><Icon Name="question" /> <span class="guide-toggle__text">Guide</span></button>
-</AuthorizeView>
+@* Turns the guide off and on. *@
+<button type="button" class="guide-toggle" aria-pressed="@(Tour.Active ? "true" : "false")" aria-label="Guide" @onclick="Toggle"><Icon Name="question" /> <span class="guide-toggle__text">Guide</span></button>
 
 @code {
     protected override void OnInitialized() => Tour.Changed += OnChanged;

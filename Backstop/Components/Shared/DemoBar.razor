@@ -3,8 +3,7 @@
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 
-@* Demo visitors only: a guide that goes through one side page by page, lighting up what it talks about. *@
-<AuthorizeView Roles="@Roles.Demo">
+@* A guide that goes through one side page by page, lighting up what it talks about. *@
     @if (_ready && !_framed && Tour.Active)
     {
         var s = Tour.Current;
@@ -37,25 +36,21 @@
             </div>
         </section>
     }
-</AuthorizeView>
 
 @code {
-    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
-
     private string _key = "", _saved = "";
-    private bool _isDemo, _ready, _framed;
+    private bool _ready, _framed;
 
     private string Here => Nav.ToBaseRelativePath(Nav.Uri);
     private static TourSide SideOf(string path) => DemoTour.SideOf(path);
 
     protected override async Task OnInitializedAsync()
     {
-        _isDemo = AuthState is not null && (await AuthState).User.IsInRole(Roles.Demo);
         Tour.Changed += OnChanged;
         Nav.LocationChanged += OnMoved;
         // A new load of the page waits for the first render, to read where this tab left the guide.
         // A layout change in the same circuit just carries on.
-        if (!_isDemo || !Tour.Begun) return;
+        if (!Tour.Begun) return;
         _ready = true;
         if (Tour.Side != SideOf(Here) && !DemoTour.Matches(Tour.Current, Here)) Tour.Start(SideOf(Here));
         Tour.Follow(Here);
@@ -90,7 +85,6 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!_isDemo) return;
         try
         {
             if (firstRender && !_ready)
@@ -138,7 +132,6 @@
     {
         Tour.Changed -= OnChanged;
         Nav.LocationChanged -= OnMoved;
-        if (!_isDemo) return;
         try { await JS.InvokeVoidAsync("backstopTour.hide"); } catch (Exception) { }
     }
 }

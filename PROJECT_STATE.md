@@ -2,6 +2,8 @@
 
 Generated 2026-11-01 from commit `2dc315c`. Updated 2026-11-03: the public Try it page (`/try`) is added (section 4). Other sections still describe 1 Nov and are partly out of date (sign-in cookies, the Render deployment and the Dockerfile now exist; Supabase persistence is still not wired).
 
+**4 Nov 2026 update:** sign-in (cookie login, accounts, roles, `RoleGate`) and Supabase were removed by the owner. Nothing is gated; `/demo-start` is the start page and the guided tour is offered to everyone. All state is in memory. Sections below that mention sign-in, accounts or Supabase are history.
+
 ## 1. Executive Summary & Core Stack
 
 - **Project Purpose:** **Backstop** is a safe email and messaging client for elderly people and adults with learning disabilities. Every incoming message is held until checked. The user never sees held mail (no sender, no subject, only "N messages being checked by your helper"). Anything unclear goes to a trusted **helper**, who approves, blocks, or asks to "call them first". Around the mail core sit assistive modes: Check (scam check), Show me (step guides), Explain, Remember (memory cards), Stories (social stories), Ask Me (AI chat), and Chat with approved people.

@@ -1,4 +1,4 @@
-namespace Backstop.Services.Accounts;
+namespace Backstop.Services;
 
 public enum TourSide { User, Helper }
 

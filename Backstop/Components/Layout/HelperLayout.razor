@@ -8,10 +8,8 @@
     </a>
     <nav aria-label="Account" class="site-nav">
         <GuideToggle />
-        <a class="nav-signout" href="/account/logout" data-enhance-nav="false" target="_self">Sign out</a>
     </nav>
 </header>
-<RoleGate Allow="@Roles.HelperSide">
 <DemoBar />
 <div class="shell">
     <HelperNav />
@@ -21,7 +19,6 @@
     </main>
     <ProfileMenu Role="ProfileRole.Helper" />
 </div>
-</RoleGate>
 
 <div id="blazor-error-ui" data-nosnippet>
     Something went wrong.

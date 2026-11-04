@@ -9,10 +9,8 @@
         <GuideToggle />
         <a href="/help">Help</a>
         <a href="/settings">Settings</a>
-        <a class="nav-signout" href="/account/logout" data-enhance-nav="false" target="_self">Sign out</a>
     </nav>
 </header>
-<RoleGate Allow="@Roles.UserSide">
 <DemoBar />
 <div class="shell">
     <AppNav />
@@ -23,7 +21,6 @@
     <AskDock />
     <ProfileMenu Role="ProfileRole.User" />
 </div>
-</RoleGate>
 
 <div id="blazor-error-ui" data-nosnippet>
     Something went wrong.

@@ -569,8 +569,6 @@ section.chat .chat__log { max-height: min(24rem, calc(100vh - 22rem)); max-heigh
 
 /* Sign in */
 .page--login { max-width: 32rem; margin-inline: auto; }
-.login .actions { display: flex; flex-direction: column; gap: .75rem; }
-.login .actions .btn { width: 100%; justify-content: center; }
 
 /* Demo guide: User / Helper switch and the walk-around. One compact row; the step words fold away. */
 .card--spaced { margin-block-start: 1.5rem; }
@@ -711,7 +709,6 @@ section.chat .chat__log { max-height: min(24rem, calc(100vh - 22rem)); max-heigh
   .profile__btn .pic { width: 2.75rem; height: 2.75rem; }
   .profile__panel { left: auto; right: 0; top: calc(100% + .5rem); bottom: auto; }
 }
-.profile__out { justify-self: center; }
 
 /* Helper pages use the room they have: the chat sits beside the list of people */
 @media (min-width: 960px) {
@@ -876,7 +873,3 @@ section.chat .chat__log { max-height: min(24rem, calc(100vh - 22rem)); max-heigh
 
 /* Landing page: the two demo sides first, the account sign-in folded away underneath. */
 .page--login .sidecards { margin-top: 1.25rem; }
-.login-existing { margin-top: 1.5rem; border-top: 1px solid var(--border, currentColor); padding-top: 1rem; }
-.login-existing > summary { min-height: 56px; display: flex; align-items: center; cursor: pointer; font-weight: 700; }
-.login-existing > summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
-.login-existing[open] > summary { margin-bottom: .5rem; }

@@ -2,7 +2,6 @@
 using System.Net;
 using Backstop.Models;
 using Backstop.Services;
-using Backstop.Services.Accounts;
 using Backstop.Services.Api;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -181,16 +180,7 @@ public static class ReviewFixTests
             Assert(api.ModePhotoBytes <= MockBackstopApi.ModePhotoBudgetBytes && api.GetPhoto("p11") is not null && api.GetPhoto("p0") is null, "Oldest photos go first past the budget");
         }
 
-        // ---- A stranger's wrong passwords cannot lock the real person out ----
-        {
-            var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["ACCOUNT_USER_PASSWORD"] = "quiet-harbour-41" }).Build();
-            var accounts = new AccountStore(config);
-            for (var i = 0; i < 5; i++) accounts.Verify("sam@example.com", "guess", "198.51.100.7");
-            Assert(accounts.Verify("sam@example.com", "quiet-harbour-41", "198.51.100.7") is null, "Five misses lock that visitor out");
-            Assert(accounts.Verify("sam@example.com", "quiet-harbour-41", "198.51.100.8") is not null, "Someone else can still sign in");
-        }
-
-        Console.WriteLine("PASS: Review fixes: decisions beat rescans, rescans back off, retries are capped, shared state is bounded and per visitor, sign-in locks are per visitor.");
+        Console.WriteLine("PASS: Review fixes: decisions beat rescans, rescans back off, retries are capped, shared state is bounded and per visitor.");
     }
 
     private sealed class StubGuide(GuideDraft draft) : IGuideWriter

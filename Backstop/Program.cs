@@ -2,9 +2,6 @@ using System.Globalization;
 using Backstop.Components;
 using Backstop.Services;
 using Backstop.Services.Api;
-using Backstop.Services.Accounts;
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Cookies;
 
 // Dates read the British way ("Tuesday 27 October") whatever culture the server runs in.
 var british = CultureInfo.GetCultureInfo("en-GB");
@@ -126,35 +123,7 @@ builder.Services.AddTransient<IMemoryAnswerer>(sp => sp.GetRequiredService<MetaM
 builder.Services.AddTransient<IMetaScamChecker>(sp => sp.GetRequiredService<MetaAiScamChecker>());
 builder.Services.AddTransient<IMetaDiagnostics>(sp => sp.GetRequiredService<MetaAiScamChecker>());
 
-// Sign-in: a cookie holds the role (User, Helper or Demo). Accounts are made up and seeded (see AccountStore).
-builder.Services.AddSingleton<AccountStore>();
-builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
-    .AddCookie(o =>
-    {
-        o.Cookie.Name = "backstop.auth";
-        o.Cookie.HttpOnly = true;
-        o.Cookie.SameSite = SameSiteMode.Lax;
-        o.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
-        o.ExpireTimeSpan = TimeSpan.FromHours(8);
-        o.SlidingExpiration = true;
-        o.LoginPath = "/login";
-    });
-builder.Services.AddAuthorization();
-builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddScoped<DemoTour>();
-
-// Each sign-in costs a deliberately slow password hash, so one visitor gets 10 tries a minute. Over that, the page says to wait.
-builder.Services.AddRateLimiter(o =>
-{
-    o.AddPolicy("login", http => System.Threading.RateLimiting.RateLimitPartition.GetFixedWindowLimiter(
-        ClientIdentity.Resolve(http, builder.Configuration["CLIENT_IP_HEADER"]) ?? "unknown",
-        _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
-    o.OnRejected = (ctx, _) =>
-    {
-        ctx.HttpContext.Response.Redirect("/login?error=wait");
-        return ValueTask.CompletedTask;
-    };
-});
 
 // MOCK: swap these registrations for real implementations later. No other code needs to change.
 builder.Services.AddScoped<AskSession>();
@@ -214,9 +183,9 @@ app.UseRequestLocalization(o =>
     o.SetDefaultCulture("en-GB").AddSupportedCultures("en-GB").AddSupportedUICultures("en-GB");
     o.RequestCultureProviders.Clear();
 });
-app.UseAuthentication();
-app.UseAuthorization();
-app.UseRateLimiter();
+
+
+
 app.UseAntiforgery();
 
 app.MapStaticAssets();
@@ -229,7 +198,7 @@ app.MapGet("/contact-photo/{id}", (string id, HttpContext http, IMailService mai
     http.Response.Headers.XContentTypeOptions = "nosniff";
     http.Response.Headers.CacheControl = "private, max-age=3600";
     return Results.File(photo.Bytes, photo.ContentType);
-}).RequireAuthorization();
+});
 
 // Photos added in Show me. MOCK: served from memory, typed by the sniffed bytes.
 app.MapGet("/mode-photo/{id}", (string id, HttpContext http, IBackstopApi api) =>
@@ -239,36 +208,6 @@ app.MapGet("/mode-photo/{id}", (string id, HttpContext http, IBackstopApi api) =
     http.Response.Headers.XContentTypeOptions = "nosniff";
     http.Response.Headers.CacheControl = "private, max-age=3600";
     return Results.File(photo.Bytes, photo.ContentType);
-}).RequireAuthorization();
-
-// Sign in with an email and password. Nobody is told which half was wrong.
-app.MapPost("/account/login", async (HttpContext http, AccountStore accounts, IConfiguration config, [Microsoft.AspNetCore.Mvc.FromForm] string? email, [Microsoft.AspNetCore.Mvc.FromForm] string? password) =>
-{
-    var account = accounts.Verify(email, password, ClientIdentity.Resolve(http, config["CLIENT_IP_HEADER"]));
-    if (account is null)
-    {
-        // Keep the typed email for the next page, but never in the address bar.
-        if (!string.IsNullOrEmpty(email) && email.Length <= 200)
-            http.Response.Cookies.Append("backstop.login-email", email, new CookieOptions { MaxAge = TimeSpan.FromMinutes(5), HttpOnly = true, SameSite = SameSiteMode.Lax, Secure = http.Request.IsHttps, Path = "/login" });
-        return Results.Redirect("/login?error=1");
-    }
-    await http.SignInAsync(AccountStore.Principal(account.DisplayName, account.Role));
-    return Results.Redirect(account.Role == Roles.Helper ? "/helper" : "/");
-}).RequireRateLimiting("login");
-
-// Demo mode: one click, both sides, with the guided tour. Only two places can be asked for.
-app.MapGet("/account/demo", async (HttpContext http, string? next, string? side) =>
-{
-    // Opening the demo without picking a side goes to the sign-in page, which offers the demo.
-    if (next != "demo" && side is not ("user" or "helper")) return Results.Redirect("/login");
-    await http.SignInAsync(AccountStore.Principal("Demo visitor", Roles.Demo));
-    return Results.Redirect(next == "demo" ? "/demo" : side == "helper" ? "/helper?tour=1" : "/home?tour=1");
-});
-
-app.MapGet("/account/logout", async (HttpContext http) =>
-{
-    await http.SignOutAsync();
-    return Results.Redirect("/login");
 });
 
 app.MapRazorComponents<App>()

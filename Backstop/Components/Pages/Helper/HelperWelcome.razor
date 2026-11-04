@@ -5,7 +5,6 @@
 
 <PageTitle>Welcome – Backstop Helper</PageTitle>
 
-<RoleGate Allow="@Roles.HelperSide">
     <p class="progress" role="status">
         <span class="progress__dots" aria-hidden="true">
             @for (var i = 1; i <= Steps; i++)
@@ -58,7 +57,6 @@
                             </div>
             break;
     }
-</RoleGate>
 
 @code {
     private const int Steps = 3;
