@@ -139,7 +139,9 @@
 
     @if (_playing is { } playing)
     {
-        <div class="storytheatre" role="dialog" aria-modal="true" aria-label="@playing.Title">
+        <div class="storytheatre" role="dialog" aria-modal="true" aria-label="@playing.Title"
+             @onkeydown="@(e => { if (e.Key == "Escape") _playing = null; })" @onkeydown:stopPropagation="true">
+            <ModalFocus Root=".storytheatre" Focus=".storytheatre__exit" />
             <div class="storytheatre__bar">
                 <h2 class="storytheatre__title">@playing.Title</h2>
                 <button type="button" class="btn btn-quiet storytheatre__exit" @onclick="() => _playing = null">

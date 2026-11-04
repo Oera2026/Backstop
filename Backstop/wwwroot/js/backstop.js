@@ -19,6 +19,42 @@ window.backstop = {
     el.focus({ preventScroll: true });
     el.scrollIntoView({ block: "start", behavior: calm ? "auto" : "smooth" });
   },
+  // Focus the first match, making it focusable if it is not. Says whether there was one.
+  focusSel(selector) {
+    const el = document.querySelector(selector);
+    if (!el) return false;
+    if (!el.matches('a[href], button, input, select, textarea, [tabindex]')) el.setAttribute('tabindex', '-1');
+    el.focus();
+    return true;
+  },
+  // A dialog is open: everything outside root goes inert and focus moves in. The connection dialog and error bar stay usable.
+  modalOpen(rootSel, focusSel, returnSel) {
+    const b = window.backstop;
+    b.modalClose();
+    const root = document.querySelector(rootSel);
+    if (!root) return;
+    const inert = [];
+    for (let n = root; n && n !== document.body; n = n.parentElement) {
+      for (const s of n.parentElement.children) {
+        if (s === n || s.inert || s.tagName === 'SCRIPT' || s.tagName === 'DIALOG' || s.id === 'blazor-error-ui') continue;
+        s.inert = true;
+        inert.push(s);
+      }
+    }
+    b._modal = { inert, back: document.activeElement, returnSel };
+    b.focusSel(focusSel);
+  },
+  // Focus goes back only if it was lost with the dialog. If the page has moved on and focused its heading, it stays there.
+  modalClose() {
+    const b = window.backstop, m = b._modal;
+    if (!m) return;
+    b._modal = null;
+    for (const s of m.inert) s.inert = false;
+    const a = document.activeElement;
+    if (a && a !== document.body && a.isConnected) return;
+    if (m.back && m.back !== document.body && m.back.isConnected) m.back.focus();
+    else if (m.returnSel) b.focusSel(m.returnSel);
+  },
   canSpeak() {
     return 'speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined';
   },
@@ -130,6 +166,30 @@ document.addEventListener('keydown', function (e) {
   var next = all[all.indexOf(f) + 1];
   if (next) next.focus();
 });
+
+// When the thing that has focus is removed from the page (a loading heading replaced by the result, a button on a step that
+// has finished), focus would fall back to the very top and a screen reader would hear nothing. It goes to the page's heading instead.
+(function () {
+  var last = null, lastInMain = false, wait = 0;
+  document.addEventListener('focusin', function (e) {
+    last = e.target;
+    lastInMain = !!(last.closest && last.closest('main'));
+  });
+  function check() {
+    wait = 0;
+    if (!last || last.isConnected || !lastInMain) return;
+    var a = document.activeElement;
+    if (a && a !== document.body) { last = null; return; }
+    if (document.querySelector('dialog[open], [aria-modal="true"]')) return;
+    var h = document.querySelector('main h1');
+    if (!h) return; // not drawn yet: the next change looks again
+    h.setAttribute('tabindex', '-1');
+    h.focus({ preventScroll: true });
+  }
+  new MutationObserver(function () {
+    if (last && !last.isConnected && !wait) wait = setTimeout(check, 120);
+  }).observe(document.documentElement, { childList: true, subtree: true });
+})();
 
 // The skip link moves focus inside this page. With <base href="/">, following "#main" would go to the Inbox instead.
 document.addEventListener('click', function (e) {
