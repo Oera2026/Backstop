@@ -155,3 +155,17 @@ input, select, textarea { font-size: max(16px, 1rem); }
   .page--try .try-samples { grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr)); }
   .page--try .try-sample { padding-inline: .6rem; overflow-wrap: anywhere; hyphens: auto; }
 }
+
+/* Try page on a big screen: there is width to spare, so the form uses it and the whole email check shows without scrolling. */
+@media (min-width: 1500px) {
+  .page.page--try:not(.page--login):not(.page--demo) { padding-top: 1.25rem; padding-bottom: 2rem; }
+  .try-panel { padding: 1.25rem 1.5rem; }
+  .page--try .try-samples { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .try-mailform { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 1rem; align-content: start; }
+  .try-mailform .try-pair { display: contents; }
+  .try-mailform > .try-mode, .try-mailform > .field:has(textarea), .try-mailform > .form-error, .try-mailform > .actions { grid-column: 1 / -1; }
+  .try-mode { margin-bottom: .5rem; }
+  .try-mode legend { margin-right: 1rem; }
+  .try-mailform textarea { min-height: 7rem; }
+}
+@media (min-width: 1500px) { .try-mailform .actions { margin: 0; } .try-mailform .field:has(textarea) { margin-bottom: .75rem; } .page.page--try:not(.page--login):not(.page--demo) { padding-bottom: 2.5rem; } }
