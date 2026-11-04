@@ -650,6 +650,8 @@ public class MetaScamCheckerTests
         {
             var safeAi = new StubMeta(new MetaScamAnalysis(Verdict.LooksSafe, "Fine.", [], true));
             var mail = new MockMailService(new MailStore(), safeAi);
+            // Block 12 makes 18 receives on one service: lift the per-visitor cap, as the Try tests do.
+            mail.ReceiveGuard = new MetaCallGuard(100000, null, 100000);
             // What the demo author expects (regression only). The scenarios themselves carry no outcome.
             var expected = new Dictionary<string, MessageState>
             {
@@ -1242,6 +1244,20 @@ public class MetaScamCheckerTests
             Assert((await askApi.AskAsync([], "When does https://shop.example.net open?")).Href != "check", "A question with an ordinary link is not forced to Check");
             Assert((await askApi.AskAsync([], "What is bit.ly/win?")).Href == "check", "A question with a disguised link still points to Check");
             Console.WriteLine("PASS: One ordinary link does not block LooksSafe; a disguised link still flags.");
+        }
+
+        // 41. Mail receive: an unknown visitor shares one capped bucket, so one address cannot flood the queue.
+        {
+            var safeAi = new StubMeta(new MetaScamAnalysis(Verdict.LooksSafe, "Fine.", [], true));
+            var mail = new MockMailService(new MailStore(), safeAi);
+            ClientIdentity.Current = null;
+            for (var i = 0; i < 12; i++)
+                Assert((await mail.ReceiveAsync(new InboundMail("Sam Lee", "sam.lee@example.org", "Tea", "See you at three."), false)) is not null, "Twelve receives a minute are allowed with no visitor address");
+            Assert((await mail.ReceiveAsync(new InboundMail("Sam Lee", "sam.lee@example.org", "Tea", "See you at three."), false)) is null, "The thirteenth in a minute is refused, never checked");
+            ClientIdentity.Current = "203.0.113.11";
+            Assert((await mail.ReceiveAsync(new InboundMail("Sam Lee", "sam.lee@example.org", "Tea", "See you at three."), false)) is not null, "A known visitor is not affected by the shared bucket");
+            ClientIdentity.Current = null;
+            Console.WriteLine("PASS: Unknown visitors share one capped receive bucket.");
         }
 
         Console.WriteLine("\nALL TESTS PASSED SUCCESSFULLY.");
