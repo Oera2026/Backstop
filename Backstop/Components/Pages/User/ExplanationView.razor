@@ -126,7 +126,7 @@ else
     {
         <ErrorState Message="@_saveProblem" OnRetry="Save" />
     }
-    <div class="actions">
+    <div class="actions actions--stick">
         @if (!_chatOpen)
         {
             <button type="button" class="btn btn-primary" @onclick="() => _chatOpen = true"><Icon Name="question" /> Ask a question about this</button>

@@ -35,7 +35,7 @@ else if (_finished)
     <PageTitle>@_story.Title – Backstop</PageTitle>
     <p><span class="badge badge--safe"><Icon Name="check" /><span>All read</span></span></p>
     <h1>You have read the whole story.</h1>
-    <div class="actions">
+    <div class="actions actions--stick">
         <a class="btn btn-primary" href="stories"><Icon Name="story" /> My stories</a>
         <button type="button" class="btn btn-quiet" @onclick="Again"><Icon Name="refresh" /> Read it again</button>
     </div>
@@ -68,7 +68,7 @@ else
     {
         <BackLink OnClick="() => _at--" Text="Back a page" />
     }
-    <div class="actions">
+    <div class="actions actions--stick">
         <button type="button" class="btn btn-primary" @onclick="Next"><Icon Name="arrow-right" /> @(_at == _story.Pages.Count - 1 ? "Finish" : "Next page")</button>
         <ReadAloudButton Text="@($"{pg.Heading}. {pg.Text}")" />
     </div>

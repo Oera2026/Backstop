@@ -237,6 +237,8 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 .bubble { padding: .6rem .9rem; border-radius: var(--radius); max-width: 36rem; }
 .bubble--q { background: var(--surface); justify-self: end; font-weight: 700; }
 .bubble--a { background: var(--band); }
+/* The follow-up questions stay on screen: the mini log scrolls inside itself instead of pushing the box away. */
+section.chat .chat__log { max-height: min(24rem, calc(100vh - 22rem)); max-height: min(24rem, calc(100dvh - 22rem)); overflow-y: auto; overscroll-behavior-y: contain; }
 .askrow { display: flex; flex-wrap: wrap; gap: .6rem; }
 .askrow input { flex: 1 1 12rem; min-width: 0; }
 
@@ -369,6 +371,36 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 /* ---------- Messages ---------- */
 .page:has(.convo) { --col: 52rem; padding-bottom: 0; display: flex; flex-direction: column; }
 .convo { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+
+/* ---------- Chat shell: the log scrolls inside the screen, the composer stays put ---------- */
+/* Full-page Ask Me and one-to-one conversations fit the viewport: heading, scrolling log, composer.
+   8rem clears the sticky header and the tab bar on phones; wide screens have a side bar instead. */
+.page:has(> .chat--page), .page:has(> .convo) {
+  display: flex; flex-direction: column; flex: none;
+  height: calc(100vh - 8rem - env(safe-area-inset-bottom));
+  height: calc(100dvh - 8rem - env(safe-area-inset-bottom));
+  min-height: 22rem; padding-bottom: 0;
+}
+@media (min-width: 960px) {
+  .page:has(> .chat--page), .page:has(> .convo) {
+    height: calc(100vh - 5rem);
+    height: calc(100dvh - 5rem);
+  }
+}
+.chat--page, .page:has(> .convo) > .convo { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.page:has(> .chat--page) > .chat--page > .chat__log, .page:has(> .convo) > .convo > .convo__log {
+  flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior-y: contain;
+}
+/* In the shell the composer sits at the column bottom, always in view: no sticking needed. */
+.page:has(> .chat--page) .composer, .page:has(> .convo) .composer { position: static; }
+/* Scroll regions are keyboard reachable. */
+.chat__log:focus-visible, .convo__log:focus-visible { outline: 4px solid var(--focus); outline-offset: 2px; }
+/* A landscape phone is too short for the shell: back to page scroll with the sticky composer. */
+@media (max-height: 500px) {
+  .page:has(> .chat--page), .page:has(> .convo) { display: block; flex: 1 1 auto; height: auto; min-height: 0; }
+  .page:has(> .chat--page) > .chat--page > .chat__log, .page:has(> .convo) > .convo > .convo__log { overflow: visible; }
+  .page:has(> .chat--page) .composer, .page:has(> .convo) .composer { position: sticky; }
+}
 .convo__head { display: flex; align-items: center; gap: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--rule); }
 .convo__head .pic { width: 3.5rem; height: 3.5rem; flex: none; }
 .convo__who { min-width: 0; }
@@ -403,7 +435,7 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 .msgs__tag { display: inline-flex; align-items: center; gap: .4rem; font-weight: 800; color: var(--text); background: var(--check-soft); border: 1px solid var(--check-edge); border-radius: 999px; padding: .15rem .7rem; }
 .msgs__pane { min-width: 0; border: var(--line) solid var(--border); border-radius: var(--radius-lg); padding: 1rem 1.25rem; display: flex; flex-direction: column; }
 .msgs__pane h2 { margin-top: 0; }
-.msgs__pane .convo__log { max-height: 30rem; overflow-y: auto; min-height: 12rem; }
+.msgs__pane .convo__log { max-height: min(30rem, calc(100vh - 22rem)); max-height: min(30rem, calc(100dvh - 22rem)); overflow-y: auto; min-height: 12rem; }
 .msgs__pane .composer { position: static; padding-bottom: 0; }
 .held { border: var(--line) solid var(--check-edge); background: var(--check-soft); border-radius: var(--radius-lg); padding: 1rem 1.25rem; margin-bottom: 1rem; display: grid; gap: .5rem; }
 .held p { margin: 0; }
@@ -816,6 +848,20 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 .try-link__final { margin: 0 0 .5rem; overflow-wrap: anywhere; }
 .try-signals__detail { display: block; }
 .try-chain--single { list-style: none; padding-left: 0; }
+
+/* Short windows (small laptop, split screen, zoomed text): tighten spacing so content and buttons share the screen.
+   Only air shrinks. Targets and text sizes never do. */
+@media (max-height: 700px) {
+  .page { padding-top: 1rem; }
+  h1 { margin-bottom: .75rem; }
+  h2 { margin-top: 1.25rem; }
+  .field { margin-bottom: .9rem; }
+  .composer { padding-block: .5rem .75rem; }
+  .composer textarea { min-height: 3.5rem; }
+  .convo__head { padding-bottom: .6rem; }
+  .chat--page h1 { margin-bottom: .5rem; }
+  .demo-row { margin-bottom: .4rem; }
+}
 
 /* Landing page: the two demo sides first, the account sign-in folded away underneath. */
 .page--login .sidecards { margin-top: 1.25rem; }

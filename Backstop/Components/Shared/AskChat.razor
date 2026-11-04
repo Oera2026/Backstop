@@ -2,13 +2,13 @@
 @inject IJSRuntime JS
 @inject AskSession Session
 
-<div class="chat @(Compact ? "chat--dock" : "")">
+<div class="chat @(Compact ? "chat--dock" : "chat--page")">
     @if (!Compact)
     {
         <h1>Ask Me</h1>
     }
 
-    <ol class="chat__log" aria-live="polite" aria-label="Your conversation">
+    <ol class="chat__log" aria-live="polite" aria-label="Your conversation" tabindex="0">
         <li class="bubble bubble--bot">What do you need help with?</li>
         @foreach (var t in Session.Turns)
         {
@@ -128,7 +128,7 @@
 </div>
 
 @code {
-    /// <summary>True in the dock on the right: no page heading, and the layout fits a narrow panel.</summary>
+    /// <summary>True in the dock on the right: no page heading, and the layout fits a narrow panel. The full page gets chat--page, which fits the viewport.</summary>
     [Parameter] public bool Compact { get; set; }
 
     private const long MaxPicture = 10 * 1024 * 1024;

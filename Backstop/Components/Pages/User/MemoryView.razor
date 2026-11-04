@@ -80,7 +80,7 @@ else
     {
         <ErrorState Message="@_problem" />
     }
-    <div class="actions">
+    <div class="actions actions--stick">
         <button type="button" class="btn btn-primary" @onclick="ToggleShare" disabled="@_working">
             <Icon Name="share" /> @(_card.Shared ? $"Stop sharing with {Helper}" : $"Share with {Helper}")
         </button>

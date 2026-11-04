@@ -49,7 +49,7 @@ else if (_r.Status == ReviewStatus.Released)
     <p><StatusBadge State="MessageState.Cleared" /></p>
     <h1>@Helper says this is safe.</h1>
     <MarkedText Text="@_r.DisplayText" />
-    <div class="actions">
+    <div class="actions actions--stick">
         <a class="btn btn-primary" href="explain?check=@_r.Id"><Icon Name="book" /> Explain this to me</a>
     </div>
 }
@@ -62,14 +62,14 @@ else if (_r.Status == ReviewStatus.Blocked)
     @if (_confirmDelete)
     {
         <h2>Delete this check?</h2>
-        <div class="actions">
+        <div class="actions actions--stick">
             <button type="button" class="btn btn-primary" @onclick="() => _confirmDelete = false"><Icon Name="arrow-left" /> No, keep it</button>
             <button type="button" class="btn btn-quiet btn-danger" @onclick="Delete" disabled="@_working"><Icon Name="trash" /> Yes, delete it</button>
         </div>
     }
     else
     {
-        <div class="actions">
+        <div class="actions actions--stick">
             <button type="button" class="btn btn-primary" @onclick="() => _confirmDelete = true"><Icon Name="trash" /> Delete it</button>
         </div>
     }
@@ -104,7 +104,7 @@ else
     @if (_confirmDelete)
     {
         <h2>Delete this check?</h2>
-        <div class="actions">
+        <div class="actions actions--stick">
             <button type="button" class="btn btn-primary" @onclick="() => _confirmDelete = false"><Icon Name="arrow-left" /> No, keep it</button>
             <button type="button" class="btn btn-quiet btn-danger" @onclick="Delete" disabled="@_working"><Icon Name="trash" /> Yes, delete it</button>
         </div>
@@ -112,7 +112,7 @@ else
     else
     {
         var askWords = _working ? "Asking…" : $"Ask {Helper} to look";
-        <div class="actions">
+        <div class="actions actions--stick">
             @if (_r.Verdict == Verdict.LooksSafe)
             {
                 <a class="btn btn-primary" href="explain?check=@_r.Id"><Icon Name="book" /> Explain this to me</a>

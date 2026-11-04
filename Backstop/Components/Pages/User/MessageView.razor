@@ -38,7 +38,7 @@ else
     {
         <p class="note"><Icon Name="cross" /> <span>You cannot reply to this message.</span></p>
     }
-    <div class="actions">
+    <div class="actions actions--stick">
         <ReadAloudButton Primary="true" Text="@($"Message from {m.FromName}. {m.Subject}. {Defang.ForUser(m.Body)}")" />
         @if (!noReply)
         {

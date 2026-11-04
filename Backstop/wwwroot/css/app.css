@@ -113,6 +113,12 @@ h1:focus, main:focus, h1[tabindex]:focus-visible, main[tabindex]:focus-visible {
 /* Buttons: min 56px tall, 3px outline. The one primary is navy and the biggest thing on screen. */
 .actions { display: flex; flex-direction: column; gap: .75rem; margin: 1.5rem 0; }
 @media (min-width: 640px) { .actions { flex-direction: row; flex-wrap: wrap; align-items: center; } }
+/* Pinned decision bar for long pages: the buttons stay above the tab bar while the page scrolls. */
+.actions--stick {
+  position: sticky; bottom: var(--tabbar, 0px); z-index: 5;
+  margin-bottom: 0; padding: .75rem 0 calc(.75rem + env(safe-area-inset-bottom));
+  background: var(--bg); border-top: var(--line) solid var(--border);
+}
 
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: .6rem;
@@ -271,7 +277,7 @@ textarea { min-height: 10rem; resize: vertical; }
 .split { display: grid; gap: 1.5rem; margin-bottom: 2rem; }
 @media (min-width: 900px) { .split { grid-template-columns: 1fr 1fr; } }
 .split__pane h2 { margin-top: 0; font-size: calc(1rem * var(--tx)); color: var(--text-2); }
-.split__pane iframe { width: 100%; height: 640px; border: var(--line) solid var(--border); border-radius: var(--radius-lg); background: var(--bg); }
+.split__pane iframe { width: 100%; height: min(640px, calc(100vh - 12rem)); height: min(640px, calc(100dvh - 12rem)); border: var(--line) solid var(--border); border-radius: var(--radius-lg); background: var(--bg); }
 
 /* Blazor error bar */
 #blazor-error-ui { display: none; position: fixed; bottom: 0; left: 0; right: 0; z-index: 1000; padding: .8rem 1rem; background: var(--block-soft); color: var(--block); border-top: var(--line) solid var(--block); font-weight: 800; }
@@ -423,6 +429,7 @@ input.is-locked { background: var(--surface); border-style: dashed; cursor: not-
 /* A phone on its side is short: the pinned decision bar would cover half the screen */
 @media (max-height: 500px) {
   .actionbar { position: static; margin-inline: 0; }
+  .actions--stick { position: static; border-top: 0; background: transparent; }
 }
 
 /* Weekday names get shorter when big text leaves too little width for three letters */
