@@ -143,7 +143,7 @@ public sealed class MetaDocumentExplainer : IDocumentExplainer
             using var inner = JsonDocument.Parse(StripFences(content));
             var root = inner.RootElement;
             if (root.ValueKind != JsonValueKind.Object) throw new FormatException();
-            var needs = root.TryGetProperty("needsHelper", out var h) && h.ValueKind == JsonValueKind.True;
+            var needs = root.TryGetProperty("needsHelper", out var h) && MetaHttp.IsTrue(h);
             var answer = root.TryGetProperty("answer", out var a) && a.ValueKind == JsonValueKind.String
                 ? InputGuard.SafeText(a.GetString(), 600, digitRun: 9, allowAdvice: true) : null;
             return answer is null
@@ -196,7 +196,7 @@ public sealed class MetaDocumentExplainer : IDocumentExplainer
                         hard.Add((word, meaning));
 
             var deadline = Str(root, "deadline", 80);
-            var suspicious = root.TryGetProperty("suspicious", out var s) && s.ValueKind == JsonValueKind.True;
+            var suspicious = root.TryGetProperty("suspicious", out var s) && MetaHttp.IsTrue(s);
 
             // From a picture, the words come from the model's reading. Kept plain, cut short, never trusted as markup.
             var transcript = "";
@@ -221,9 +221,7 @@ public sealed class MetaDocumentExplainer : IDocumentExplainer
     private static string StripFences(string content)
     {
         var raw = content.Trim();
-        if (raw.StartsWith("```json", StringComparison.OrdinalIgnoreCase)) raw = raw[7..];
-        else if (raw.StartsWith("```")) raw = raw[3..];
-        if (raw.EndsWith("```")) raw = raw[..^3];
+        raw = MetaHttp.JsonIn(raw);
         return raw.Trim();
     }
 
@@ -247,7 +245,7 @@ public sealed class MetaDocumentExplainer : IDocumentExplainer
         }
 
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        cts.CancelAfter(TimeSpan.FromSeconds(Math.Max(2, _options.TimeoutSeconds)));
+        cts.CancelAfter(_options.CallBudget);
         try
         {
             var body = new

@@ -144,9 +144,7 @@ public sealed class MetaGuideWriter : IGuideWriter
     private static string StripFences(string content)
     {
         var raw = content.Trim();
-        if (raw.StartsWith("```json", StringComparison.OrdinalIgnoreCase)) raw = raw[7..];
-        else if (raw.StartsWith("```")) raw = raw[3..];
-        if (raw.EndsWith("```")) raw = raw[..^3];
+        raw = MetaHttp.JsonIn(raw);
         return raw.Trim();
     }
 
@@ -170,7 +168,7 @@ public sealed class MetaGuideWriter : IGuideWriter
         }
 
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        cts.CancelAfter(TimeSpan.FromSeconds(Math.Max(2, _options.TimeoutSeconds)));
+        cts.CancelAfter(_options.CallBudget);
         try
         {
             var body = new

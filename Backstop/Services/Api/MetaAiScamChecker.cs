@@ -46,14 +46,28 @@ public sealed class MetaAiOptions
     /// <summary>Model identifier (e.g. muse-spark-1.3, muse-wonder-1.0).</summary>
     public string Model { get; set; } = "muse-spark-1.3";
 
-    /// <summary>Timeout in seconds. If exceeded, fail-closed kicks in. Muse models reason before they answer and often take 10 to 30 seconds, so the default is generous.</summary>
+    /// <summary>How long one try waits, in seconds. If exceeded, it is tried once more. Muse models reason before they answer and often take 10 to 30 seconds, so the default is generous.</summary>
     public int TimeoutSeconds { get; set; } = 45;
+
+    /// <summary>How long one try may take.</summary>
+    public TimeSpan AttemptTimeout => TimeSpan.FromSeconds(Math.Clamp(TimeoutSeconds, 2, MaxTimeoutSeconds));
+
+    /// <summary>How long a whole call may take: two tries and the pause between them. After this, fail-closed kicks in.</summary>
+    public TimeSpan CallBudget => AttemptTimeout * 2 + TimeSpan.FromSeconds(5);
+
+    private const int MaxTimeoutSeconds = 300;
 
     /// <summary>Reads the options from configuration, including the alternate environment variable names.</summary>
     public static MetaAiOptions Load(IConfiguration config)
     {
         var options = new MetaAiOptions();
-        config.GetSection(SectionName).Bind(options);
+        // Read one by one, so a mistyped number in the host's settings is ignored instead of stopping the app.
+        var section = config.GetSection(SectionName);
+        options.ApiKey = section["ApiKey"];
+        if (!string.IsNullOrWhiteSpace(section["EndpointUrl"])) options.EndpointUrl = section["EndpointUrl"]!;
+        if (!string.IsNullOrWhiteSpace(section["Model"])) options.Model = section["Model"]!;
+        var nested = int.TryParse(section["TimeoutSeconds"]?.Trim(), out var nestedSeconds) && nestedSeconds > 0;
+        if (nested) options.TimeoutSeconds = nestedSeconds;
 
         var key = options.ApiKey;
         if (string.IsNullOrWhiteSpace(key))
@@ -64,8 +78,8 @@ public sealed class MetaAiOptions
         if (!string.IsNullOrWhiteSpace(endpoint)) options.EndpointUrl = endpoint;
 
         // The documented setting. The nested MetaAI:TimeoutSeconds form still works and wins if both are set.
-        if (string.IsNullOrWhiteSpace(config[$"{SectionName}:TimeoutSeconds"]) && int.TryParse(config["META_AI_TIMEOUT_SECONDS"]?.Trim(), out var secs) && secs > 0)
-            options.TimeoutSeconds = Math.Clamp(secs, MinEnvTimeoutSeconds, 300); // a value below what Muse needs would make every call fail, so it is raised
+        if (!nested && int.TryParse(config["META_AI_TIMEOUT_SECONDS"]?.Trim(), out var secs) && secs > 0)
+            options.TimeoutSeconds = Math.Clamp(secs, MinEnvTimeoutSeconds, MaxTimeoutSeconds); // a value below what Muse needs would make every call fail, so it is raised
 
         var model = config["META_AI_MODEL"];
         if (!string.IsNullOrWhiteSpace(model)) options.Model = model.Trim();
@@ -240,7 +254,33 @@ public sealed class MetaAiScamChecker : IMetaScamChecker, IMetaDiagnostics
             .Select(f => "- " + InputGuard.Fold(f).Replace("DATA-", "DATA_").Replace('\n', ' ').Replace('\r', ' '))
             .Select(f => f.Length > 400 ? f[..400] : f);
 
+    // Meta sometimes sends nothing, or a reply cut short or not in the form asked for. One more try nearly always works, and saves
+    // a false hold. Both tries share one time budget. If neither can be read, the first failure stands: held, never cleared.
     private async Task<MetaScamAnalysis> CheckCoreAsync(
+        string? text,
+        byte[]? imageBytes,
+        string? mimeType,
+        IReadOnlyList<string>? linkFindings,
+        IReadOnlyList<string>? senderFindings,
+        CancellationToken ct)
+    {
+        using var budget = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        budget.CancelAfter(_options.CallBudget);
+        return await MetaHttp.OnceMoreIfUnreadableAsync(
+            () => CheckOnceAsync(text, imageBytes, mimeType, linkFindings, senderFindings, budget.Token),
+            first => !first.Success && first.FailureNote is UnreadableEmpty or UnreadableParse or UnreadableVerdict or UnreadableNoVerdict or UnreadableVerdictKind,
+            (first, again) => again.Success ? again : first,
+            first => _logger.LogWarning("Scam check reply could not be used ({Note}). Trying once more.", first.FailureNote),
+            budget.Token);
+    }
+
+    private const string UnreadableEmpty = "Empty response content from Meta AI";
+    private const string UnreadableParse = "Failed to parse Meta AI output";
+    private const string UnreadableVerdict = "Unrecognized verdict from Meta AI";
+    private const string UnreadableNoVerdict = "Meta AI response missing verdict field";
+    private const string UnreadableVerdictKind = "Meta AI verdict was not a word";
+
+    private async Task<MetaScamAnalysis> CheckOnceAsync(
         string? text,
         byte[]? imageBytes,
         string? mimeType,
@@ -277,9 +317,6 @@ public sealed class MetaAiScamChecker : IMetaScamChecker, IMetaDiagnostics
             _logger.LogWarning("Meta call limit reached ({Reason}, {Used} used). Failing closed.", denial, used);
             return FailClosed("Local call limit reached", MetaFailures.Limited(denial, waitSeconds, used, _guard, _options));
         }
-
-        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        cts.CancelAfter(TimeSpan.FromSeconds(Math.Max(2, _options.TimeoutSeconds)));
 
         try
         {
@@ -359,14 +396,14 @@ public sealed class MetaAiScamChecker : IMetaScamChecker, IMetaDiagnostics
                     new { role = "user", content = userContent }
                 },
                 temperature = 0.0,
-                max_tokens = 2000 // Muse spends tokens on reasoning first; a low cap returns empty content
+                max_tokens = 4000 // Muse spends tokens on reasoning first; a low cap returns empty content
             };
 
             using var httpRequest = new HttpRequestMessage(HttpMethod.Post, _options.ChatUrl);
             httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.ApiKey);
             httpRequest.Content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
 
-            using var response = await _http.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead, cts.Token);
+            using var response = await _http.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead, ct);
             if (!response.IsSuccessStatusCode)
             {
                 // Status only. The body could echo the inspected message, so it is never logged.
@@ -378,11 +415,15 @@ public sealed class MetaAiScamChecker : IMetaScamChecker, IMetaDiagnostics
             if (response.Content.Headers.ContentLength is > MaxResponseBytes)
                 return FailClosed("Meta AI response was too large");
 
-            var jsonResponse = await ReadCappedAsync(response.Content, cts.Token);
+            var jsonResponse = await ReadCappedAsync(response.Content, ct);
             if (jsonResponse is null) return FailClosed("Meta AI response was too large");
 
             var analysis = ParseMetaAiResponse(jsonResponse);
-            if (!analysis.Success) return analysis;
+            if (!analysis.Success)
+            {
+                _logger.LogWarning("Scam check reply was not usable: {Why}. {Shape}", analysis.FailureNote, MetaHttp.Shape(jsonResponse));
+                return analysis;
+            }
 
             // Cannot be called safe if part of it was never read, or if it tried to give orders to the checker.
             var unread = text is not null && InputGuard.IsTooLong(text);
@@ -468,26 +509,17 @@ public sealed class MetaAiScamChecker : IMetaScamChecker, IMetaDiagnostics
 
             if (string.IsNullOrWhiteSpace(content))
             {
-                return FailClosed("Empty response content from Meta AI");
+                return FailClosed(UnreadableEmpty);
             }
 
-            var raw = content.Trim();
-            if (raw.StartsWith("```json", StringComparison.OrdinalIgnoreCase))
-                raw = raw[7..];
-            else if (raw.StartsWith("```"))
-                raw = raw[3..];
-            if (raw.EndsWith("```"))
-                raw = raw[..^3];
-            raw = raw.Trim();
-
-            using var analysisDoc = JsonDocument.Parse(raw);
+            using var analysisDoc = JsonDocument.Parse(MetaHttp.JsonIn(content));
             var aRoot = analysisDoc.RootElement;
 
             if (!aRoot.TryGetProperty("verdict", out var verdictElem))
-                return FailClosed("Meta AI response missing verdict field");
+                return FailClosed(UnreadableNoVerdict);
 
             if (aRoot.ValueKind != JsonValueKind.Object || verdictElem.ValueKind != JsonValueKind.String)
-                return FailClosed("Meta AI verdict was not a word");
+                return FailClosed(UnreadableVerdictKind);
 
             // Exactly one of the three names. Enum.TryParse alone would also take "1", "7" or "LooksSafe, DontReply".
             var verdict = (verdictElem.GetString() ?? "").Trim().ToLowerInvariant() switch
@@ -497,7 +529,7 @@ public sealed class MetaAiScamChecker : IMetaScamChecker, IMetaDiagnostics
                 "dontreply" => Verdict.DontReply,
                 _ => null,
             };
-            if (verdict is null) return FailClosed("Unrecognized verdict from Meta AI");
+            if (verdict is null) return FailClosed(UnreadableVerdict);
 
             // The model's own wording is only shown if it passes InputGuard. Otherwise fixed wording is used.
             var modelReason = aRoot.TryGetProperty("reason", out var reasonElem) && reasonElem.ValueKind == JsonValueKind.String
@@ -526,9 +558,9 @@ public sealed class MetaAiScamChecker : IMetaScamChecker, IMetaDiagnostics
                 }
             }
 
-            // Only a real JSON true counts. These can only add care: they hold the item for a human, never release it.
-            var atRisk = aRoot.TryGetProperty("personAtRisk", out var riskElem) && riskElem.ValueKind == JsonValueKind.True;
-            var needsHuman = atRisk || (aRoot.TryGetProperty("needsHelper", out var helpElem) && helpElem.ValueKind == JsonValueKind.True);
+            // These can only add care: they hold the item for a human, never release it. So the word "true" counts as well.
+            var atRisk = aRoot.TryGetProperty("personAtRisk", out var riskElem) && MetaHttp.IsTrue(riskElem);
+            var needsHuman = atRisk || (aRoot.TryGetProperty("needsHelper", out var helpElem) && MetaHttp.IsTrue(helpElem));
             var final = verdict.Value;
             if (needsHuman)
             {
@@ -553,7 +585,7 @@ public sealed class MetaAiScamChecker : IMetaScamChecker, IMetaDiagnostics
         }
         catch (Exception)
         {
-            return FailClosed("Failed to parse Meta AI output");
+            return FailClosed(UnreadableParse);
         }
     }
 }

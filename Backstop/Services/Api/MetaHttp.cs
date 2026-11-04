@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.Extensions.Logging;
 
 namespace Backstop.Services.Api;
@@ -12,6 +13,49 @@ internal static class MetaHttp
             caller, (int)response.StatusCode, response.RequestMessage?.RequestUri?.ToString() ?? options.ChatUrl, options.Model);
         return Task.CompletedTask;
     }
+
+    /// <summary>Sizes and the stop reason of a reply, for the log. Never any of the text. finish_reason=length means the reply was cut off.</summary>
+    public static string Shape(string body)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            var choice = doc.RootElement.GetProperty("choices")[0];
+            var finish = choice.TryGetProperty("finish_reason", out var fr) ? fr.GetString() : null;
+            var len = choice.GetProperty("message").TryGetProperty("content", out var c) && c.ValueKind == JsonValueKind.String ? c.GetString()!.Length : -1;
+            var tokens = doc.RootElement.TryGetProperty("usage", out var u) && u.TryGetProperty("completion_tokens", out var ct) ? ct.GetInt32() : -1;
+            return $"finish_reason={finish}, content_chars={len}, completion_tokens={tokens}";
+        }
+        catch (Exception) { return "reply shape unreadable"; }
+    }
+
+    /// <summary>
+    /// One more try when the reply could not be read. Every try is counted against the caps by the caller. Nothing more is tried
+    /// once the shared time budget has gone. <paramref name="keep"/> chooses what stands when both have answered.
+    /// </summary>
+    public static async Task<T> OnceMoreIfUnreadableAsync<T>(Func<Task<T>> once, Func<T, bool> unreadable, Func<T, T, T> keep, Action<T> onRetry, CancellationToken budget)
+    {
+        var first = await once();
+        if (!unreadable(first) || budget.IsCancellationRequested) return first;
+        onRetry(first);
+        return keep(first, await once());
+    }
+
+    /// <summary>
+    /// The JSON object in a model's reply: code fences and any words around it are dropped. If more than one object is
+    /// there, the span between them does not parse, so the reply fails closed like any other unreadable reply.
+    /// </summary>
+    public static string JsonIn(string content)
+    {
+        var start = content.IndexOf('{');
+        var end = content.LastIndexOf('}');
+        return start >= 0 && end > start ? content[start..(end + 1)] : content.Trim();
+    }
+
+    /// <summary>For flags that only ever bring a human in: a JSON true, or the word true. Missing or anything else is false.</summary>
+    public static bool IsTrue(JsonElement value) =>
+        value.ValueKind == JsonValueKind.True
+        || (value.ValueKind == JsonValueKind.String && string.Equals(value.GetString()?.Trim(), "true", StringComparison.OrdinalIgnoreCase));
 
     /// <summary>Reads at most the first <paramref name="maxChars"/> characters of the body, on one line, with the key blanked out.</summary>
     public static async Task<string> SnippetAsync(HttpResponseMessage response, string? apiKey, int maxChars)

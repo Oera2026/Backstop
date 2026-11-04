@@ -72,13 +72,16 @@ public sealed class MetaAssistant : IAssistant
 
     public async Task<AssistantReply> ReplyAsync(IReadOnlyList<AssistantTurn> history, string message, AssistantMaterial? material = null, CancellationToken ct = default)
     {
-        var reply = await ReplyOnceAsync(history, message, material, ct);
-        if (reply.Success || !IsUnreadable(reply)) return reply;
-
-        // Meta sometimes sends nothing, or something that is not the answer. One more try nearly always works. A helper flag from the first reply is kept.
-        _logger.LogWarning("Ask Me reply could not be used ({Note}). Trying once more.", reply.FailureNote);
-        var again = await ReplyOnceAsync(history, message, material, ct);
-        return again.Success ? again with { NeedsHuman = again.NeedsHuman || reply.NeedsHuman, AtRisk = again.AtRisk || reply.AtRisk } : reply;
+        // Meta sometimes sends nothing, or something that is not the answer. One more try nearly always works. Both tries share one
+        // time budget. A helper flag from either reply is kept, whichever one can be used.
+        using var budget = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        budget.CancelAfter(_options.CallBudget);
+        return await MetaHttp.OnceMoreIfUnreadableAsync(
+            () => ReplyOnceAsync(history, message, material, budget.Token),
+            first => !first.Success && IsUnreadable(first),
+            (first, again) => (again.Success ? again : first) with { NeedsHuman = again.NeedsHuman || first.NeedsHuman, AtRisk = again.AtRisk || first.AtRisk },
+            first => _logger.LogWarning("Ask Me reply could not be used ({Note}). Trying once more.", first.FailureNote),
+            budget.Token);
     }
 
     private static bool IsUnreadable(AssistantReply r) => r.FailureNote is "Empty response" or "Could not read the reply" or "Reply missing or not safe to show";
@@ -100,9 +103,6 @@ public sealed class MetaAssistant : IAssistant
             _logger.LogWarning("Meta call limit reached ({Reason}, {Used} used). Ask Me cannot answer.", denial, used);
             return Fail("Local call limit reached", MetaFailures.Limited(denial, waitSeconds, used, _guard, _options));
         }
-
-        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        cts.CancelAfter(TimeSpan.FromSeconds(Math.Max(2, _options.TimeoutSeconds)));
 
         try
         {
@@ -155,7 +155,7 @@ public sealed class MetaAssistant : IAssistant
             req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.ApiKey);
             req.Content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
 
-            using var response = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cts.Token);
+            using var response = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
             if (!response.IsSuccessStatusCode)
             {
                 await MetaHttp.LogFailureAsync(_logger, "Ask Me", response, _options);
@@ -163,18 +163,18 @@ public sealed class MetaAssistant : IAssistant
             }
             if (response.Content.Headers.ContentLength is > MaxResponseBytes) return Fail("Response too large");
 
-            await using var stream = await response.Content.ReadAsStreamAsync(cts.Token);
+            await using var stream = await response.Content.ReadAsStreamAsync(ct);
             using var ms = new MemoryStream();
             var buffer = new byte[8192];
             int n;
-            while ((n = await stream.ReadAsync(buffer, cts.Token)) > 0)
+            while ((n = await stream.ReadAsync(buffer, ct)) > 0)
             {
                 if (ms.Length + n > MaxResponseBytes) return Fail("Response too large");
                 ms.Write(buffer, 0, n);
             }
             var bodyText = Encoding.UTF8.GetString(ms.ToArray());
             var parsed = Parse(bodyText);
-            if (!parsed.Success) _logger.LogWarning("Ask Me reply was not usable: {Why}. {Shape}", parsed.FailureNote, Shape(bodyText));
+            if (!parsed.Success) _logger.LogWarning("Ask Me reply was not usable: {Why}. {Shape}", parsed.FailureNote, MetaHttp.Shape(bodyText));
             return parsed;
         }
         catch (Polly.CircuitBreaker.BrokenCircuitException)
@@ -204,21 +204,6 @@ public sealed class MetaAssistant : IAssistant
         }
     }
 
-    /// <summary>Sizes and the stop reason of a reply, for the log. Never any of the text.</summary>
-    private static string Shape(string body)
-    {
-        try
-        {
-            using var doc = JsonDocument.Parse(body);
-            var choice = doc.RootElement.GetProperty("choices")[0];
-            var finish = choice.TryGetProperty("finish_reason", out var fr) ? fr.GetString() : null;
-            var len = choice.GetProperty("message").TryGetProperty("content", out var c) && c.ValueKind == JsonValueKind.String ? c.GetString()!.Length : -1;
-            var tokens = doc.RootElement.TryGetProperty("usage", out var u) && u.TryGetProperty("completion_tokens", out var ct) ? ct.GetInt32() : -1;
-            return $"finish_reason={finish}, content_chars={len}, completion_tokens={tokens}";
-        }
-        catch (Exception) { return "reply shape unreadable"; }
-    }
-
     private static AssistantReply Fail(string note, FailureInfo? info = null) => new("", false, FailureNote: note, Failure: info ?? MetaFailures.BadReply(note, null));
 
     private static AssistantReply Parse(string responseBody)
@@ -229,18 +214,13 @@ public sealed class MetaAssistant : IAssistant
             var content = doc.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString();
             if (string.IsNullOrWhiteSpace(content)) return Fail("Empty response");
 
-            var raw = content.Trim();
-            if (raw.StartsWith("```json", StringComparison.OrdinalIgnoreCase)) raw = raw[7..];
-            else if (raw.StartsWith("```")) raw = raw[3..];
-            if (raw.EndsWith("```")) raw = raw[..^3];
-
-            using var inner = JsonDocument.Parse(raw.Trim());
+            using var inner = JsonDocument.Parse(MetaHttp.JsonIn(content));
             var root = inner.RootElement;
             if (root.ValueKind != JsonValueKind.Object) return Fail("Not an object");
 
-            // Only a real JSON true counts. These can only bring a human in, never keep one out.
-            var atRisk = root.TryGetProperty("personAtRisk", out var r) && r.ValueKind == JsonValueKind.True;
-            var needs = atRisk || (root.TryGetProperty("needsHelper", out var h) && h.ValueKind == JsonValueKind.True);
+            // These can only bring a human in, never keep one out. So the word "true" counts as well.
+            var atRisk = root.TryGetProperty("personAtRisk", out var r) && MetaHttp.IsTrue(r);
+            var needs = atRisk || (root.TryGetProperty("needsHelper", out var h) && MetaHttp.IsTrue(h));
 
             string? suggest = null;
             if (root.TryGetProperty("suggest", out var s) && s.ValueKind == JsonValueKind.String)
