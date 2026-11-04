@@ -45,8 +45,9 @@ public interface IBackstopApi
     Task<MemoryCard?> GetMemoryCardAsync(string id, CancellationToken ct = default);
     Task<MemoryAnswer> AskMemoryAsync(string question, CancellationToken ct = default);
     IReadOnlyList<string> SuggestedMemoryQuestions { get; }
-    Task<MemoryCard> SaveGuideToMemoryAsync(string guideId, CancellationToken ct = default);
-    Task<MemoryCard> SaveExplanationToMemoryAsync(string explanationId, CancellationToken ct = default);
+    /// <summary><paramref name="today"/> is the reader's date, which can differ from the server's.</summary>
+    Task<MemoryCard> SaveGuideToMemoryAsync(string guideId, DateOnly? today = null, CancellationToken ct = default);
+    Task<MemoryCard> SaveExplanationToMemoryAsync(string explanationId, DateOnly? today = null, CancellationToken ct = default);
     Task<MemoryCard> RenameMemoryAsync(string id, string title, CancellationToken ct = default);
     Task<MemoryCard> ShareMemoryAsync(string id, bool shared, CancellationToken ct = default);
     Task DeleteMemoryAsync(string id, CancellationToken ct = default);

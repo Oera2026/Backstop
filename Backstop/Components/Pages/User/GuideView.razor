@@ -170,7 +170,7 @@ else
     {
         _saving = true;
         _saveProblem = null;
-        try { _saved = await Api.SaveGuideToMemoryAsync(Id); }
+        try { _saved = await Api.SaveGuideToMemoryAsync(Id, Clock.Today); }
         catch (BackstopApiException ex) { _saveProblem = ex.Message; }
         _saving = false;
     }

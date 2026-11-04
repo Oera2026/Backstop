@@ -7,6 +7,8 @@ namespace Backstop.Services.Api;
 // Without the writer there is no story: nothing canned is ever passed off as its work.
 public sealed partial class MockBackstopApi
 {
+    private const int MaxSituationLength = 1000, MaxWhenLength = 100;
+
     private readonly Dictionary<string, Story> _stories = [];
 
     public async Task<Story> MakeStoryAsync(StoryRequest request, CancellationToken ct = default)
@@ -15,6 +17,8 @@ public sealed partial class MockBackstopApi
 
         var text = request.Situation.Trim();
         var when = string.IsNullOrWhiteSpace(request.When) ? null : request.When.Trim();
+        if (text.Length > MaxSituationLength) throw new BackstopApiException("That is a bit long. Please make it shorter.");
+        if (when?.Length > MaxWhenLength) throw new BackstopApiException("Please say when in a few words.");
 
         if (storyWriter is null)
             throw new BackstopApiException("Stories are not switched on yet. Please tell the person who looks after this app.");
