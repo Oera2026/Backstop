@@ -1,9 +1,9 @@
 @page "/"
 @inherits LiveComponentBase
 
-<PageTitle>My messages – Backstop</PageTitle>
+<PageTitle>Inbox – Backstop</PageTitle>
 
-<h1>My messages</h1>
+<h1>Inbox</h1>
 
 <div class="home">
     <div class="home__side">
@@ -20,9 +20,16 @@
     </div>
 
     <div class="home__list">
+        @if (Mail.HeldCount is var held and > 0)
+        {
+            <div class="banner banner--check" role="status">
+                <Icon Name="hourglass" />
+                <p>@(held == 1 ? "1 message is" : $"{held} messages are") being checked by your helper.</p>
+            </div>
+        }
         @if (Mail.RecentHelperBlocks is var blocked and > 0)
         {
-            <p class="note" role="status"><Icon Name="cross" /> <span>@(blocked == 1 ? "Your helper blocked this one." : $"Your helper blocked {blocked} messages.")</span></p>
+            <p class="note" role="status"><Icon Name="cross" /> <span>@(blocked == 1 ? "Your helper blocked a message today." : $"Your helper blocked {blocked} messages today.")</span></p>
         }
         @* Privacy rule still holds: the user only ever sees Cleared mail (GetInbox). Held mail is simply not listed. *@
         @{ var inbox = Mail.GetInbox(); }
@@ -38,21 +45,34 @@
         }
         else
         {
-            <ul class="rows" aria-label="Your messages">
-                @foreach (var m in inbox)
-                {
-                    <li>
-                        <a class="row" href="message/@m.Id">
-                            <span class="pic pic--blue" aria-hidden="true"><Icon Name="mail" /></span>
-                            <span class="row__main">
-                                <span class="row__from">@m.FromName</span>
-                                <span class="row__subject">@m.Subject</span>
-                                <span class="row__preview">@Defang.ForUser(m.Preview)</span>
-                            </span>
-                        </a>
-                    </li>
-                }
-            </ul>
+            @foreach (var group in inbox.GroupBy(m => DayName(m.ReceivedAt)))
+            {
+                <h2>@group.Key</h2>
+                <ul class="rows" aria-label="@group.Key">
+                    @foreach (var m in group)
+                    {
+                        <li>
+                            <a class="row" href="message/@m.Id">
+                                <span class="pic pic--blue" aria-hidden="true"><Icon Name="mail" /></span>
+                                <span class="row__main">
+                                    <span class="row__from">@m.FromName</span>
+                                    <span class="row__subject">@m.Subject</span>
+                                    <span class="row__time">@Clock.When(m.ReceivedAt)</span>
+                                    <span class="row__preview">@Defang.ForUser(m.Preview)</span>
+                                </span>
+                            </a>
+                        </li>
+                    }
+                </ul>
+            }
         }
     </div>
 </div>
+
+@code {
+    private string DayName(DateTimeOffset at)
+    {
+        var day = DateOnly.FromDateTime(Clock.Local(at).DateTime);
+        return day >= Clock.Today ? "Today" : day == Clock.Today.AddDays(-1) ? "Yesterday" : "Earlier";
+    }
+}

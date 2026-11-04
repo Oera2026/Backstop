@@ -76,3 +76,15 @@ document.addEventListener('change', function (e) {
   var field = document.getElementById(box.dataset.showPassword);
   if (field) field.type = box.checked ? 'text' : 'password';
 });
+
+// Enter in a field marked data-enter-next moves to the next field. It never sends the form.
+document.addEventListener('keydown', function (e) {
+  var f = e.target;
+  if (e.key !== 'Enter' || e.isComposing || !f || !f.dataset || f.dataset.enterNext === undefined) return;
+  e.preventDefault();
+  var all = Array.prototype.filter.call(f.form ? f.form.elements : [], function (el) {
+    return (el.matches('input, textarea, select')) && !el.readOnly && !el.disabled && el.type !== 'hidden';
+  });
+  var next = all[all.indexOf(f) + 1];
+  if (next) next.focus();
+});

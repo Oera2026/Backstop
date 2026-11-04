@@ -239,7 +239,13 @@ app.MapGet("/mode-photo/{id}", (string id, HttpContext http, IBackstopApi api) =
 app.MapPost("/account/login", async (HttpContext http, AccountStore accounts, IConfiguration config, [Microsoft.AspNetCore.Mvc.FromForm] string? email, [Microsoft.AspNetCore.Mvc.FromForm] string? password) =>
 {
     var account = accounts.Verify(email, password, ClientIdentity.Resolve(http, config["CLIENT_IP_HEADER"]));
-    if (account is null) return Results.Redirect("/login?error=1");
+    if (account is null)
+    {
+        // Keep the typed email for the next page, but never in the address bar.
+        if (!string.IsNullOrEmpty(email) && email.Length <= 200)
+            http.Response.Cookies.Append("backstop.login-email", email, new CookieOptions { MaxAge = TimeSpan.FromMinutes(5), HttpOnly = true, SameSite = SameSiteMode.Lax, Secure = http.Request.IsHttps, Path = "/login" });
+        return Results.Redirect("/login?error=1");
+    }
     await http.SignInAsync(AccountStore.Principal(account.DisplayName, account.Role));
     return Results.Redirect(account.Role == Roles.Helper ? "/helper" : "/");
 }).RequireRateLimiting("login");

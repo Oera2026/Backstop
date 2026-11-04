@@ -41,7 +41,7 @@
         <AntiforgeryToken />
         <div class="field">
             <label for="email">Email</label>
-            <input id="email" name="email" type="email" autocomplete="username" maxlength="200" required />
+            <input id="email" name="email" type="email" autocomplete="username" maxlength="200" value="@_email" required />
         </div>
         <div class="field">
             <label for="password">Password</label>
@@ -60,4 +60,19 @@
 @code {
     [SupplyParameterFromQuery(Name = "error")] private string? ErrorFlag { get; set; }
     private bool Error => ErrorFlag is not null;
+
+    [CascadingParameter] private HttpContext? Http { get; set; }
+    private string _email = "";
+
+    // A wrong password brings the person back here. The email they typed comes back in a short cookie, once.
+    protected override void OnInitialized()
+    {
+        if (Http is { Response.HasStarted: false } http && http.Request.Cookies.TryGetValue(CookieName, out var saved))
+        {
+            if (Error && saved.Length <= 200) _email = saved;
+            http.Response.Cookies.Delete(CookieName, new CookieOptions { Path = "/login" });
+        }
+    }
+
+    private const string CookieName = "backstop.login-email";
 }

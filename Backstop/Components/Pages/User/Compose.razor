@@ -33,13 +33,14 @@
             <p><StatusBadge State="MessageState.Held" /></p>
             <h1 id="asked-title">We have not sent your message.</h1>
             <p class="lead">Your helper will look at it first.</p>
-            <p class="actions"><a class="btn btn-primary" href="/">Back to my messages</a></p>
+            <p class="actions"><a class="btn btn-primary" href="/">Back to inbox</a></p>
         </section>
         break;
 
     case Stage.Sending:
         <PageTitle>Sending – Backstop</PageTitle>
         <section aria-labelledby="sending-title">
+            <NavigationLock OnBeforeInternalNavigation="CancelSending" />
             <h1 id="sending-title">Sending your message</h1>
             <p class="lead" role="status">Sending in @_secs seconds.</p>
             <span class="countdown" style="--secs:@(UndoSeconds)s" aria-hidden="true"></span>
@@ -54,31 +55,31 @@
         <section aria-labelledby="sent-title">
             <p><span class="badge badge--safe"><Icon Name="check" /><span>Sent</span></span></p>
             <h1 id="sent-title">Your message has been sent.</h1>
-            @if (_newPerson)
-            {
-                <p class="lead">This is the first time you have written to this person, so your helper has been told.</p>
-            }
-            <p class="actions"><a class="btn btn-primary" href="/">Back to my messages</a></p>
+            <p class="actions"><a class="btn btn-primary" href="/">Back to inbox</a></p>
         </section>
         break;
 
     default:
         <PageTitle>@(_reply is null ? "Write a message" : "Reply") – Backstop</PageTitle>
-        <BackLink Href="@(_reply is null ? "/" : $"message/{_reply.Id}")" Text="@(_reply is null ? "My messages" : "The message")" />
+        <BackLink Href="@(_reply is null ? "/" : $"message/{_reply.Id}")" Text="@(_reply is null ? "Inbox" : "The message")" />
         <h1>@(_reply is null ? "Write a message" : $"Reply to {_reply.FromName}")</h1>
         <form class="form" @onsubmit="Send" novalidate>
             <div class="field">
                 <label for="to">To</label>
                 @if (_locked)
                 {
-                    var person = Mail.FindContact(_to);
-                    <div class="recipient">
-                        <Avatar Contact="person" />
-                        <span class="recipient__who">
-                            <strong>@(person?.Name ?? _reply?.FromName ?? _to)</strong>
-                            @if (person is not null) { <span>@person.Relationship</span> }
-                        </span>
-                    </div>
+                    @* On a reply the heading already names the person. *@
+                    @if (_reply is null)
+                    {
+                        var person = Mail.FindContact(_to);
+                        <div class="recipient">
+                            <Avatar Contact="person" />
+                            <span class="recipient__who">
+                                <strong>@(person?.Name ?? _to)</strong>
+                                @if (person is not null) { <span>@person.Relationship</span> }
+                            </span>
+                        </div>
+                    }
                     @* Read-only, so the address cannot be changed or spoiled by mistake. *@
                     <input id="to" type="email" value="@_to" readonly class="is-locked" />
                     @if (_reply is null)
@@ -88,14 +89,14 @@
                 }
                 else
                 {
-                    <input id="to" type="email" inputmode="email" @bind="_to" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="next" placeholder="name@example.com" />
+                    <input id="to" type="email" inputmode="email" @bind="_to" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="next" data-enter-next placeholder="name@example.com" />
                 }
             </div>
             @if (_reply is null)
             {
                 <div class="field">
                     <label for="subject">Subject</label>
-                    <input id="subject" type="text" @bind="_subject" autocomplete="off" />
+                    <input id="subject" type="text" @bind="_subject" autocomplete="off" enterkeyhint="next" data-enter-next />
                 </div>
             }
             else
@@ -130,7 +131,7 @@
 
     private Stage _stage = Stage.Form;
     private string _to = "", _subject = "", _body = "", _error = "", _quick = "";
-    private bool _newPerson, _locked;
+    private bool _locked;
     private IReadOnlyList<string> _reasons = [];
     private MailMessage? _reply;
     private int _secs;
@@ -167,7 +168,15 @@
     private void ApplyQuery()
     {
         _reply = string.IsNullOrWhiteSpace(ReplyId) ? null : Mail.GetClearedMessage(ReplyId);
-        _locked = false;
+        // A link that carries only a draft (Ask Me) keeps the person and subject already typed.
+        // Any other link starts clean, so nothing from an earlier reply carries over.
+        var draftOnly = _reply is null && ReplyId is null && string.IsNullOrWhiteSpace(ToAddress)
+            && string.IsNullOrWhiteSpace(SubjectText) && !string.IsNullOrWhiteSpace(BodyText);
+        if (!draftOnly)
+        {
+            _to = ""; _subject = ""; _body = ""; _quick = ""; _locked = false;
+        }
+        _error = "";
         if (_reply is not null && !NoReply.IsNoReply(_reply.FromAddress))
         {
             _to = _reply.FromAddress;
@@ -196,8 +205,10 @@
 
     private void PickQuick(string value)
     {
+        // Only an empty box, or one still holding an earlier quick answer, is replaced. Typed words stay.
+        var untouched = string.IsNullOrWhiteSpace(_body) || (_quick.Length > 0 && _body == QuickText[_quick]);
+        _body = untouched ? QuickText[value] : _body.TrimEnd() + "\n" + QuickText[value];
         _quick = value;
-        _body = QuickText[value];
     }
 
     // Typing over a quick answer un-picks it, so the choice never shows something the message no longer says.
@@ -240,7 +251,8 @@
         await StartSending();
     }
 
-    // The message waits a few seconds so a wrong tap can be undone. Leaving the page sends it, as the user asked.
+    // The message waits a few seconds so a wrong tap can be undone. Moving to another page in the app,
+    // including the browser Back button, stops it. Closing the tab sends it, as the user asked.
     private async Task StartSending()
     {
         _stage = Stage.Sending;
@@ -273,8 +285,14 @@
             _stage = Stage.Form;
             return;
         }
-        _newPerson = result.NewRecipient;
         _stage = Stage.Sent;
+    }
+
+    private void CancelSending(LocationChangingContext context)
+    {
+        context.PreventNavigation();
+        Undo();
+        _error = "Not sent.";
     }
 
     private void Undo()

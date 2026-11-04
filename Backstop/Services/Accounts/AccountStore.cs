@@ -33,8 +33,8 @@ public sealed class AccountStore
 
     public AccountStore(IConfiguration config)
     {
-        Seed("sam@example.com", "Sam", Roles.User, config["ACCOUNT_USER_PASSWORD"]);
-        Seed("alex@example.com", "Alex", Roles.Helper, config["ACCOUNT_HELPER_PASSWORD"]);
+        Seed("sam@example.com", "Margaret", Roles.User, config["ACCOUNT_USER_PASSWORD"]);
+        Seed("alex@example.com", "Priya", Roles.Helper, config["ACCOUNT_HELPER_PASSWORD"]);
     }
 
     private void Seed(string email, string name, string role, string? password)
