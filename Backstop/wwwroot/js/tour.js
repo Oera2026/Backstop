@@ -1,7 +1,7 @@
 // Demo guide: lights up one thing on the page, dims the rest, and keeps the guide card next to it.
 // The page underneath stays clickable.
 (function () {
-  var spot = null, target = null, settled = null, sel = '', started = 0, frame = 0;
+  var spot = null, target = null, settled = null, sel = '', started = 0, frame = 0, glideTimer = 0;
   var PHONE = 700, GAP = 16, M = 12;
 
   function ensure() {
@@ -86,7 +86,7 @@
       if (c && Date.now() - started > 3000) { c.style.left = M + 'px'; c.style.top = Math.max(M, window.innerHeight - tabBarHeight() - c.offsetHeight - M) + 'px'; c.classList.add('tourcard--placed'); }
       return;
     }
-    if (target !== settled) { settled = target; [0, 250, 800].forEach(function (ms) { setTimeout(function () { if (target === settled) bring(target); }, ms); }); }
+    if (target !== settled) { glide(c); settled = target; [0, 250, 800].forEach(function (ms) { setTimeout(function () { if (target === settled) bring(target); }, ms); }); }
     spot.style.display = '';
     var r = target.getBoundingClientRect(), pad = 6;
     var top = r.top - pad, height = r.height + pad * 2;
@@ -103,6 +103,20 @@
     spot.style.left = (r.left - pad) + 'px';
     spot.style.width = (r.width + pad * 2) + 'px';
     spot.style.height = height + 'px';
+  }
+
+  // A new thing to light up: the spot and the card slide to it instead of jumping. The slide switches off again
+  // once it has landed, so scrolling the page is followed at once.
+  function glide(c) {
+    if (!spot) return;
+    spot.classList.add('tour-spot--glide');
+    if (c) c.classList.add('tourcard--glide');
+    clearTimeout(glideTimer);
+    glideTimer = setTimeout(function () {
+      if (spot) spot.classList.remove('tour-spot--glide');
+      var card = document.querySelector('.tourcard');
+      if (card) card.classList.remove('tourcard--glide');
+    }, 500);
   }
 
   function loop() { place(); frame = requestAnimationFrame(loop); }
@@ -126,8 +140,9 @@
   // Lights up the thing the selector names. The page may still be drawing, so the search goes on every frame until it is found,
   // and starts again if the page replaces it.
   function show(selector) {
-    hide();
-    if (framed()) return;
+    if (framed()) { hide(); return; }
+    // The spot stays on screen between slides so it can slide to the next place.
+    target = null; settled = null;
     document.documentElement.classList.add('tour-on');
     sel = selector; started = Date.now();
     ensure(); cancelAnimationFrame(frame); loop();

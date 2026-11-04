@@ -593,6 +593,12 @@ section.chat .chat__log { max-height: min(24rem, calc(100vh - 22rem)); max-heigh
   background: var(--bg); border: var(--line) solid var(--navy); border-radius: var(--radius-lg); padding: .75rem 1rem 1rem; box-shadow: 0 8px 24px var(--scrim);
 }
 .tourcard--placed { visibility: visible; }
+/* Movement: the spot and the card fade in, and slide from one place to the next. */
+@keyframes tour-in { from { opacity: 0; } to { opacity: 1; } }
+.tour-spot { animation: tour-in .35s ease-out; }
+.tour-spot--glide { transition: top .4s cubic-bezier(.2, .7, .2, 1), left .4s cubic-bezier(.2, .7, .2, 1), width .4s cubic-bezier(.2, .7, .2, 1), height .4s cubic-bezier(.2, .7, .2, 1); }
+.tourcard--glide { transition: left .4s cubic-bezier(.2, .7, .2, 1), top .4s cubic-bezier(.2, .7, .2, 1); }
+@media (prefers-reduced-motion: reduce) { .tour-spot { animation: none; } .tour-spot--glide, .tourcard--glide { transition: none; } }
 .tourcard__head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
 .tourcard__title { margin: 0; font-weight: 800; font-size: calc(1.2rem * var(--tx, 1)); }
 .tourcard__count { color: var(--text-2); font-weight: 600; font-size: .9rem; white-space: nowrap; }

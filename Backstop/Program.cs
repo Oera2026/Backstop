@@ -262,7 +262,7 @@ app.MapGet("/account/demo", async (HttpContext http, string? next, string? side)
     // Opening the demo without picking a side goes to the sign-in page, which offers the demo.
     if (next != "demo" && side is not ("user" or "helper")) return Results.Redirect("/login");
     await http.SignInAsync(AccountStore.Principal("Demo visitor", Roles.Demo));
-    return Results.Redirect(next == "demo" ? "/demo" : side == "helper" ? "/helper?tour=1" : "/?tour=1");
+    return Results.Redirect(next == "demo" ? "/demo" : side == "helper" ? "/helper?tour=1" : "/home?tour=1");
 });
 
 app.MapGet("/account/logout", async (HttpContext http) =>
