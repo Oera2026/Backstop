@@ -20,7 +20,7 @@ public sealed partial class MockBackstopApi
 
         var floor = MockRiskRules.Scan(Defang.ForUser(text));
         var localRisk = floor.Flags.Any(f => f.Id == "at-risk");
-        var looksScammy = floor.Flags.Any(f => f.Id is not ("at-risk" or "injection"));
+        var looksScammy = floor.Flags.Any(f => f.Id is not ("at-risk" or "injection" or "link")) || LinkFinder.Inspect(text).Problems > 0;
 
         var today = context?.Today ?? DateOnly.FromDateTime(DateTime.Now);
         var (material, links) = GatherMaterial(text, context, today);
@@ -57,8 +57,9 @@ public sealed partial class MockBackstopApi
 
         // Only fixed pages of the app can be suggested, never anything taken from the message or the reply.
         // An email that itself looks like a scam is never helped with: no draft, and the person is pointed to Check.
-        var openLooksScammy = openMessage is not null &&
-            MockRiskRules.Scan(Defang.ForUser(openMessage.Subject + "\n" + openMessage.Body)).Flags.Any(f => f.Id is not ("at-risk" or "injection"));
+        var openText = openMessage is null ? null : openMessage.Subject + "\n" + openMessage.Body;
+        var openLooksScammy = openText is not null &&
+            (MockRiskRules.Scan(Defang.ForUser(openText)).Flags.Any(f => f.Id is not ("at-risk" or "injection" or "link")) || LinkFinder.Inspect(openText).Problems > 0);
         var suggest = looksScammy || openLooksScammy ? "check" : reply.Suggest;
         var (href, link) = suggest switch
         {

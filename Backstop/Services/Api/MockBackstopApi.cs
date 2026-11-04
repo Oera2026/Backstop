@@ -88,18 +88,20 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
 
         // Simple local checks as the floor:
         var floor = MockRiskRules.Scan(display);
+        // The link rule is left to the Link check below, so each link is counted once.
         // The text shown has its links taken out, so the addresses are judged from the text as written.
         var links = LinkFinder.Inspect(text);
-        var floorScore = floor.Score + (links.Problems > 0 ? 1 : 0);
+        var floorFlags = floor.Flags.Where(f => f.Id != "link").ToList();
+        var floorScore = floorFlags.Sum(f => MockRiskRules.Weight(f.Id)) + (links.Problems > 0 ? 1 : 0);
         var floorVerdict = MockRiskRules.VerdictFor(floorScore);
-        var combinedFlags = new List<RiskFlag>(floor.Flags);
-        var floorBecause = floor.TopBecause;
+        var combinedFlags = new List<RiskFlag>(floorFlags);
+        var floorBecause = floorFlags.OrderByDescending(f => MockRiskRules.Weight(f.Id)).Select(f => MockRiskRules.BecauseFor(f.Id)).FirstOrDefault();
         if (links.Problems > 0)
         {
             combinedFlags.Add(links.Deceptive
                 ? new RiskFlag("link-hidden", "link", "The link hides where it goes", "The address is disguised or shortened, so you cannot tell which website it leads to.")
                 : new RiskFlag("link-odd", "link", "The link looks unusual", "The address has words or a form that real senders rarely use."));
-            if (floorBecause is null || floorBecause == MockRiskRules.BecauseFor("link"))
+            if (floorBecause is null)
                 floorBecause = links.Deceptive ? "its link hides where it goes" : "its link looks unusual";
         }
 

@@ -1229,6 +1229,21 @@ public class MetaScamCheckerTests
             Console.WriteLine("PASS: Remember answers come from the AI and only from saved cards.");
         }
 
+        // 40. One ordinary link is counted once: a benign message with a plain link can be LooksSafe.
+        {
+            var safeAi = new StubMeta(new MetaScamAnalysis(Verdict.LooksSafe, "Looks like a normal message.", [], true));
+            var api = new MockBackstopApi(new MockGuardianService(new MailStore()), new MockApiOptions(), safeAi);
+            var benign = await api.CheckContentAsync(new CheckRequest(CheckKind.Message, "Hello. The opening times are at https://shop.example.net/times. See you soon."));
+            Assert(benign.Verdict == Verdict.LooksSafe && benign.Status == ReviewStatus.NotAsked, "A benign message with one ordinary link can be LooksSafe");
+            var nasty = await api.CheckContentAsync(new CheckRequest(CheckKind.Message, "Your prize is waiting: bit.ly/win"));
+            Assert(nasty.Verdict != Verdict.LooksSafe, "A disguised link is still flagged");
+            var talk = new StubAssistant(_ => new AssistantReply("The shop opens at nine.", true));
+            var askApi = new MockBackstopApi(new MockGuardianService(new MailStore()), new MockApiOptions(), null, talk);
+            Assert((await askApi.AskAsync([], "When does https://shop.example.net open?")).Href != "check", "A question with an ordinary link is not forced to Check");
+            Assert((await askApi.AskAsync([], "What is bit.ly/win?")).Href == "check", "A question with a disguised link still points to Check");
+            Console.WriteLine("PASS: One ordinary link does not block LooksSafe; a disguised link still flags.");
+        }
+
         Console.WriteLine("\nALL TESTS PASSED SUCCESSFULLY.");
     }
 
