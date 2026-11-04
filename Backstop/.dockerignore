@@ -6,3 +6,7 @@ graphify-out/
 .vs/
 Dockerfile
 .dockerignore
+.env.*
+secrets.json
+appsettings.*.local.json
+launchSettings.local.json

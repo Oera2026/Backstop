@@ -13,3 +13,8 @@ secrets.json
 launchSettings.local.json
 graphify-out/
 bin-preview/
+
+# Local tooling, kept on disk but not in the repo
+.claude/skills/
+.impeccable/
+.tmp-run/
