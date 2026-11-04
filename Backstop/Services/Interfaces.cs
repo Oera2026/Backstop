@@ -71,13 +71,6 @@ public interface IMailService
     Task<MailMessage?> ReceiveAsync(InboundMail mail, bool simulateFailure, Action<int, TierResult>? onTier = null);
 
     /// <summary>
-    /// Same pipeline as ReceiveAsync for one visitor-typed email, but keeps nothing: the message is never added to
-    /// the shared store and no other visitor sees it. The tier callbacks still fire so the demo timeline works.
-    /// Any error ends Held, never Cleared.
-    /// </summary>
-    Task<MailMessage?> ReceiveStatelessAsync(InboundMail mail, bool simulateFailure, Action<int, TierResult>? onTier = null);
-
-    /// <summary>
     /// Scans held mail that is waiting for the AI again (all of it, or just <paramref name="id"/>). Mail leaves
     /// the held state only when the AI answers. Returns how many got an answer. A failure leaves the mail held.
     /// </summary>

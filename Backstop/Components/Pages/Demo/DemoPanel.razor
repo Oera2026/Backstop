@@ -138,13 +138,10 @@
     private static TierResult[] Fresh() =>
         [.. MockData.TierNames.Select(n => new TierResult(n, TierStatus.Pending, "Waiting"))];
 
-    private string OutcomeText => (_result?.State, _scenarioId == Own) switch
+    private string OutcomeText => _result?.State switch
     {
-        (MessageState.Cleared, true) => "Cleared. It would go straight to the user's inbox.",
-        (MessageState.Cleared, false) => "Cleared. It is now in the user's inbox.",
-        (MessageState.Blocked, true) => "Blocked. The user would never see it.",
-        (MessageState.Blocked, false) => "Blocked. The user never sees it.",
-        (_, true) => "Held. It would be in the helper's queue. The user would only see a count.",
+        MessageState.Cleared => "Cleared. It is now in the user's inbox.",
+        MessageState.Blocked => "Blocked. The user never sees it.",
         _ => "Held. It is in the helper's queue. The user only sees a count.",
     };
 
@@ -162,7 +159,7 @@
                 _ = InvokeAsync(StateHasChanged);
             }
             _result = _scenarioId == Own
-                ? await Mail.ReceiveStatelessAsync(new InboundMail(_ownFrom.Trim(), _ownFrom.Trim(), _ownSubject.Trim(), _ownBody), _fail, OnTier)
+                ? await Mail.ReceiveAsync(new InboundMail(_ownFrom.Trim(), _ownFrom.Trim(), _ownSubject.Trim(), _ownBody), _fail, OnTier)
                 : await Mail.ReceiveAsync(_scenarioId, _fail, OnTier);
         }
         finally
