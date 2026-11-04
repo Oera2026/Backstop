@@ -19,92 +19,52 @@ public sealed class DemoTour
 {
     private static readonly string[] HelperPages = ["messages", "history", "settings", "write", "check", "story"];
 
-    /// <summary>The places the walk-around visits, in the order of the navigation bar.</summary>
-    public static readonly IReadOnlyList<string> UserSections = ["Home", "Inbox", "Ask Me", "Messages", "Remember", "More"];
-    public static readonly IReadOnlyList<string> HelperSections = ["Waiting", "Messages", "History", "Settings"];
-
     private static TourStep S(string section, string path, string title, string text, string selector, bool tap = false) =>
         new(path, title, text, selector, tap) { Section = section };
 
-    // Each place starts on its own button in the navigation bar, then goes through what is on its pages.
+    // One place at a time, in the order of the navigation bar: its button, then the one thing that matters there.
     public static readonly IReadOnlyList<TourStep> UserSteps =
     [
         S("Home", "home", "Home", "Your start page. Big buttons for the things you do most.", ".appnav__item[href='home'], .site-header .brand"),
-        S("Home", "home", "Choose one", "Tap a big button to go there.", ".modecards"),
-
-        S("Inbox", "/", "Inbox", "Your mail. Safe mail shows here. Mail still being checked stays hidden.", ".appnav__item[href='/']"),
+        S("Inbox", "/", "Inbox", "Your mail. Tap a message to read it.", ".home__list .row, .emptystate"),
         S("Inbox", "/", "Write", "Start a new message here.", ".home__side .btn-primary"),
-        S("Inbox", "/", "Shortcuts", "Contacts, sent mail, calendar and search.", ".tiles"),
-        S("Inbox", "/", "A message", "Tap a message to read it.", ".home__list .row, .emptystate"),
-        S("Inbox", "compose", "Write a message", "Say who it is for.", "#to"),
-        S("Inbox", "compose", "The subject", "A few words about what it is.", "#subject"),
-        S("Inbox", "compose", "Send", "Mail you send is checked before it goes.", ".form button[type='submit']"),
-        S("Inbox", "contacts", "Contacts", "The people you write to. Tap a person to write to them.", ".rows .row, main h1"),
-        S("Inbox", "sent", "Sent", "Messages you sent are kept here.", "main h1"),
-        S("Inbox", "calendar", "Calendar", "Things that are coming up. Today has a mark.", ".day--today, main h1"),
-        S("Inbox", "search", "Search", "Look for a message or a person.", "main h1"),
-
-        S("Ask Me", "ask-me", "Ask Me", "Ask for help in plain words. Check a message, get help, or see how to do something.", ".appnav__item[href='ask-me']"),
-        S("Ask Me", "ask-me", "Type here", "Type a question here.", ".composer textarea"),
-        S("Ask Me", "ask-me", "Send", "Press Send. Ask Me answers in plain words.", ".composer button[type='submit']"),
+        S("Ask Me", "ask-me", "Ask Me", "Type a question in plain words. You get a plain answer.", ".composer textarea"),
         S("Ask Me", "check", "Check a message", "Not sure about a message? Paste it here.", "#check-text"),
-        S("Ask Me", "check", "Check it", "Backstop looks for signs of a scam.", ".actions .btn-primary"),
-        S("Ask Me", "explain", "Explain something", "Paste hard words. Get easy ones back.", "#explain-text"),
-        S("Ask Me", "show-me", "Show me how", "Say what you want to do. You get steps.", "#goal"),
-        S("Ask Me", "stories", "Stories", "A short story about something coming up.", "main h1"),
-        S("Ask Me", "stories/new", "A new story", "Say what is coming up.", "#story-what"),
-
         S("Messages", "messages", "Messages", "Chats with the people you know.", ".appnav__item[href='messages']"),
-        S("Messages", "messages", "A chat", "Tap one to open it.", ".rows .row"),
-
-        S("Remember", "remember", "Remember", "Keeps how you did things before.", ".appnav__item[href='remember']"),
-        S("Remember", "remember", "Ask", "Ask how you did something before.", ".askbox .askrow"),
-        S("Remember", "remember", "Ideas", "Tap an idea if you are not sure what to ask.", ".chips"),
-
-        S("More", "help", "Help", "Answers to common questions.", "#h-read"),
-        S("More", "help", "Stuck?", "What to do if you are stuck.", "#h-stuck"),
-        S("More", "settings", "Reading", "Make the words bigger. Slow the voice down.", "#set-read"),
-        S("More", "settings", "Colours", "Light or dark. Stronger contrast. Less movement.", "#set-look"),
-        S("More", "settings", "All done", "Press Done to go back.", ".settings-foot .btn-primary"),
+        S("Remember", "remember", "Remember", "Ask how you did something before.", ".askbox .askrow"),
+        S("Settings", "settings", "Settings", "Make the words bigger. Change the colours.", "#set-read"),
     ];
 
     public static readonly IReadOnlyList<TourStep> HelperSteps =
     [
-        S("Waiting", "/helper", "Waiting", "Mail the checker was unsure about waits here. The number is how many.", ".appnav__item[href='/helper']"),
-        S("Waiting", "/helper", "Next up", "The most urgent message comes first.", ".hero, .rows a.row"),
+        S("Waiting", "/helper", "Waiting", "Mail the checker was unsure about waits here. The most urgent is first.", ".hero, .rows a.row"),
         S("Waiting", "/helper", "Review it", "Tap Review it to see why it was held.", ".hero__go, .rows a.row", true),
-        S("Waiting", "helper/:id", "Who sent it", "See who it is from and what it says.", ".evidence h1"),
-        S("Waiting", "helper/:id", "The checker's view", "A short reason, in plain words.", ".evidence .lead"),
-        S("Waiting", "helper/:id", "Warning signs", "Each thing that looked wrong is listed.", "#ev-flags, .evidence .lead"),
-        S("Waiting", "helper/:id", "Your decision", "Block it, approve it, or call them first.", ".actionbar"),
-
-        S("Messages", "helper/messages", "Messages", "Chats with the user and others.", ".appnav__item[href='/helper/messages']"),
-        S("Messages", "helper/messages", "A chat", "Tap a person to read and reply.", ".msgs__list .row, .msgs__list, main h1"),
-
+        S("Waiting", "helper/:id", "Your decision", "Safe lets it through. Not safe blocks it.", ".actionbar"),
+        S("Messages", "helper/messages", "Messages", "Chats with the user and others.", ".msgs__list"),
         S("History", "helper/history", "History", "Every decision is kept here.", ".appnav__item[href='/helper/history']"),
-        S("History", "helper/history", "Past decisions", "What was approved, blocked or called about.", ".rows .row, .rows"),
-
-        S("Settings", "helper/settings", "Settings", "The same reading and colour choices as the user.", ".appnav__item[href='/helper/settings']"),
-        S("Settings", "helper/settings", "Reading", "Make the words bigger.", "#set-read"),
-        S("Settings", "helper/settings", "Your access", "What you can and cannot see.", "#ha-title"),
+        S("Settings", "helper/settings", "Settings", "What you can and cannot see.", "#ha-title"),
     ];
 
     private readonly Dictionary<int, string> _seen = [];
 
     public TourSide Side { get; private set; } = TourSide.User;
-    public bool Active { get; private set; } = true;
+    public bool Active { get; private set; }
     public int Index { get; private set; }
 
-    public IReadOnlyList<string> Sections => Side == TourSide.User ? UserSections : HelperSections;
+    /// <summary>The places this side visits, in order. A place with no slides is not listed.</summary>
+    public IEnumerable<string> Sections => Steps.Select(s => s.Section).Distinct();
     public IReadOnlyList<TourStep> Steps => Side == TourSide.User ? UserSteps : HelperSteps;
     public TourStep Current => Steps[Index];
     public bool IsFirst => Index == 0;
     public bool IsLast => Index == Steps.Count - 1;
 
-    /// <summary>True once the guide has started for this visit. A new load of the app is a new visit.</summary>
+    /// <summary>True once the guide has been started or put back for this circuit.</summary>
     public bool Begun { get; private set; }
 
     public event Action? Changed;
+
+    public static TourSide SideOf(string relativePath) =>
+        Norm(relativePath).Split('/')[0] == "helper" ? TourSide.Helper : TourSide.User;
 
     private static string Norm(string path) => path.Split('?', '#')[0].Trim('/').ToLowerInvariant();
 
@@ -120,11 +80,10 @@ public sealed class DemoTour
     public void Back() { if (!IsFirst) { Index--; Changed?.Invoke(); } }
     public void Close() { Active = false; Changed?.Invoke(); }
 
-    public void Begin(TourSide side) { Begun = true; Start(side); }
-
     /// <summary>Begins the walk-around for one side, from its first slide.</summary>
     public void Start(TourSide side)
     {
+        Begun = true;
         Side = side;
         Index = 0;
         Active = true;
@@ -135,9 +94,11 @@ public sealed class DemoTour
     /// <summary>Puts the walk-around back where this browser tab left it.</summary>
     public void Restore(TourSide side, int index, bool active)
     {
+        Begun = true;
         Side = side;
         Index = Math.Clamp(index, 0, Steps.Count - 1);
         Active = active;
+        _seen.Clear();
         Changed?.Invoke();
     }
 

@@ -548,7 +548,7 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 
 /* Demo tour: the lit-up spot and the card that talks you through it */
 .tour-spot { position: fixed; z-index: 40; pointer-events: none; border-radius: var(--radius-lg); outline: 4px solid var(--marker); box-shadow: 0 0 0 250vmax var(--scrim); }
-.framed .tour-spot, .framed .tourcard { display: none; }
+.framed .tour-spot, .framed .tourcard, .framed .guide-toggle { display: none; }
 .tourcard {
   position: fixed; z-index: 50; left: 0; top: 0; visibility: hidden;
   width: min(22rem, calc(100vw - 1.5rem)); min-height: 14rem; max-height: calc(100vh - 1.5rem); overflow: auto;

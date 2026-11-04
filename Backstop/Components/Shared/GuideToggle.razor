@@ -15,8 +15,11 @@
     private void Toggle()
     {
         if (Tour.Active) { Tour.Close(); return; }
-        Tour.Start(Tour.Side);
-        if (Tour.PathForCurrent() is { } path) Nav.NavigateTo(path);
+        // Start on this page's first slide. A page with no slides sends the visitor to slide 1.
+        var here = Nav.ToBaseRelativePath(Nav.Uri);
+        Tour.Start(DemoTour.SideOf(here));
+        Tour.Follow(here);
+        if (!DemoTour.Matches(Tour.Current, here) && Tour.PathForCurrent() is { } path) Nav.NavigateTo(path);
     }
 
     public void Dispose() => Tour.Changed -= OnChanged;
