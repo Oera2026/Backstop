@@ -1,5 +1,5 @@
-@* "What it should look like when done". MOCK: a real back end generates this picture; here each task has a simple drawing.
-   Drawn with theme colours so it follows light, dark and high contrast. *@
+@* "What it should look like when done". The AI picks the closest picture for the guide; the app draws it.
+   Simple line drawings are the chosen art style. Drawn with theme colours so it follows light, dark and high contrast. *@
 <svg class="guidepic" viewBox="0 0 320 240" role="img" aria-label="@Label">
     @switch (Name)
     {
@@ -44,6 +44,18 @@
             <path class="gp-ink" d="M270 150c30 0 30 50 0 60H200" />
             <rect class="gp-mark" x="176" y="196" width="28" height="28" rx="6" />
             break;
+        case "steps":
+            <rect class="gp-paper" x="70" y="10" width="180" height="222" rx="8" />
+            <rect class="gp-paper" x="92" y="34" width="22" height="22" rx="4" />
+            <polyline class="gp-ink" points="96 45 102 51 112 38" />
+            <line class="gp-ink" x1="124" y1="45" x2="210" y2="45" />
+            <rect class="gp-paper" x="92" y="84" width="22" height="22" rx="4" />
+            <polyline class="gp-ink" points="96 95 102 101 112 88" />
+            <line class="gp-ink" x1="124" y1="95" x2="210" y2="95" />
+            <rect class="gp-paper" x="92" y="134" width="22" height="22" rx="4" />
+            <line class="gp-ink" x1="124" y1="145" x2="210" y2="145" />
+            <rect class="gp-mark" x="92" y="178" width="136" height="34" rx="6" />
+            break;
         default:
             <rect class="gp-band" x="40" y="70" width="240" height="150" rx="10" />
             <path class="gp-paper" d="M40 80l120 80 120-80" />
@@ -66,6 +78,7 @@
         "bed" => "Guide picture: a made bed with the sheet tucked in and the duvet on top",
         "form" => "Guide picture: a filled-in form with a tick and a signature in the bottom box",
         "router" => "Guide picture: the internet box with the first light green",
+        "steps" => "Guide picture: a checklist with ticked boxes",
         _ => "Guide picture: a letter and its envelope",
     };
 }

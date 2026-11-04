@@ -3,8 +3,8 @@ using Backstop.Services.Api.Fixtures;
 
 namespace Backstop.Services.Api;
 
-// MOCK: how Stories are "written". A real back end sends the situation to a language
-// model and checks the answer before it is shown. Here each situation is matched by its words.
+// Stories are written by the AI (see MetaStoryWriter) and checked before they are shown.
+// Without the writer there is no story: nothing canned is ever passed off as its work.
 public sealed partial class MockBackstopApi
 {
     private sealed record StoredStory(Story Story, string Situation);
@@ -13,32 +13,20 @@ public sealed partial class MockBackstopApi
 
     public async Task<Story> MakeStoryAsync(StoryRequest request, CancellationToken ct = default)
     {
-        if (storyWriter is null) await Wait(1600, ct);
         if (string.IsNullOrWhiteSpace(request.Situation)) throw new BackstopApiException("Please say what is coming up.");
 
         var text = request.Situation.Trim();
         var when = string.IsNullOrWhiteSpace(request.When) ? null : request.When.Trim();
 
-        string title;
-        List<StoryPage> pages;
-        // Stories written by the AI are shown straight away (owner decision, 2 Nov 2026). Only the offline sample stories keep the hold.
-        // A story the AI could not write is never invented: there is simply no story.
-        var held = StoryFixtures.IsSensitive(text);
-        if (storyWriter is not null)
-        {
-            // If the AI cannot write it, there is no story. Nothing canned is passed off as its work.
-            var draft = await storyWriter.WriteAsync(text, when, ct);
-            if (!draft.Success) throw new BackstopApiException("I could not make your story. Please try again.");
-            title = draft.Title;
-            pages = draft.Pages.Select(p => p with { Text = Fill(p.Text) }).ToList();
-            held = false;
-        }
-        else
-        {
-            var template = StoryFixtures.Match(text);
-            title = template.Title;
-            pages = template.Pages.Select(p => p with { Text = Fill(p.Text) }).ToList();
-        }
+        if (storyWriter is null)
+            throw new BackstopApiException("Stories are not switched on yet. Please tell the person who looks after this app.");
+        var draft = await storyWriter.WriteAsync(text, when, ct);
+        if (!draft.Success) throw new BackstopApiException("I could not make your story. Please try again.");
+        var title = draft.Title;
+        var pages = draft.Pages.Select(p => p with { Text = Fill(p.Text) }).ToList();
+
+        // Floor: a sensitive topic is always held for the helper first, whatever the AI said. Nothing can lower this.
+        var held = draft.Sensitive || StoryFixtures.IsSensitive(text);
 
         var story = new Story(NewId("s"), title, when, pages, held ? StoryStatus.Held : StoryStatus.Ready, DateTimeOffset.Now);
         lock (_gate)

@@ -37,16 +37,17 @@ public sealed class MockApiOptions
 
 /// <summary>
 /// MOCK implementation of <see cref="IBackstopApi"/>. Everything is kept in memory (singleton) so the user and
-/// trusted-person views see each other's changes live. Each call waits a little, like a real network call.
+/// trusted-person views see each other's changes live. Calls answer at once.
 /// Replace this class (and its registration in Program.cs) to wire the real back end.
 /// </summary>
-public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOptions options, IMetaScamChecker? metaChecker = null, IAssistant? assistant = null, IDocumentExplainer? documentExplainer = null, IMailService? mail = null, IStoryWriter? storyWriter = null) : IBackstopApi
+public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOptions options, IMetaScamChecker? metaChecker = null, IAssistant? assistant = null, IDocumentExplainer? documentExplainer = null, IMailService? mail = null, IStoryWriter? storyWriter = null, IGuideWriter? guideWriter = null, IMemoryAnswerer? memoryAnswerer = null) : IBackstopApi
 {
     private sealed record StoredCheck(CheckResult Result, string Original, DateTimeOffset? AskedAt);
+    private sealed record StoredGuide(Guide Guide, IReadOnlyList<string> Tags, string PastTense);
 
     private readonly object _gate = new();
     private readonly Dictionary<string, StoredCheck> _checks = [];
-    private readonly Dictionary<string, (Guide Guide, GuideFixtures.GuideTask Task)> _guides = [];
+    private readonly Dictionary<string, StoredGuide> _guides = [];
     private readonly Dictionary<string, Explanation> _explanations = [];
     private readonly Dictionary<string, ContactPhoto> _photos = [];
     private readonly Dictionary<string, string> _savedFrom = []; // guide or explanation id -> memory id
@@ -283,9 +284,14 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
             photoType = ImageSniff.ImageType(request.Photo) ?? throw new BackstopApiException("We could not use that file. Please take a photo or choose a picture.");
         }
 
-        // Example guides only: the photo is kept and shown back, never analysed. The goal's words pick a fixed guide.
-        var task = GuideFixtures.Match(request.Goal);
-        if (task is null) return null; // nothing to show it with, so the photo is not kept
+        // The AI writes the guide for any goal, looking at the photo when there is one.
+        // An unsafe goal is refused (null): there is nothing to show it with, so the photo is not kept.
+        if (guideWriter is null)
+            throw new BackstopApiException("Show me is not switched on yet. Please tell the person who looks after this app.");
+        var draft = await guideWriter.WriteAsync(request.Goal.Trim(), request.Photo, photoType, ct);
+        if (!draft.Success)
+            throw new BackstopApiException(draft.Failure?.Message ?? "Something went wrong. Please try again in a minute.");
+        if (draft.Refused) return null;
 
         string? photoUrl = null;
         if (photoType is not null)
@@ -294,9 +300,9 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
             KeepModePhoto(photoId, new ContactPhoto(request.Photo!, photoType));
             photoUrl = $"/mode-photo/{photoId}";
         }
-        var guide = new Guide(NewId("g"), task.Title, request.Goal.Trim(), photoUrl, task.Picture, task.Steps,
-            task.NeedsCare, DateTimeOffset.Now);
-        lock (_gate) _guides[guide.Id] = (guide, task);
+        var guide = new Guide(NewId("g"), draft.Title, request.Goal.Trim(), photoUrl, draft.Picture, draft.Steps,
+            draft.Care, DateTimeOffset.Now);
+        lock (_gate) _guides[guide.Id] = new StoredGuide(guide, draft.Tags, draft.PastTense);
         return guide;
     }
 
@@ -409,10 +415,19 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
             var top = scored.FirstOrDefault().Score;
             best = scored.Where(x => x.Score * 10 >= top * 7).Take(2).Select(x => x.Card).ToList();
         }
-        var answer = best.Count == 0
-            ? "I could not find that in your memory yet. When you save a Show me or Explain page, you can ask about it here."
-            : $"{best[0].HowYouDidIt} Here are the steps.";
-        return new MemoryAnswer(question.Trim(), answer, best);
+        if (best.Count == 0)
+            return new MemoryAnswer(question.Trim(), "I could not find that in your memory yet. When you save a Show me or Explain page, you can ask about it here.", []);
+        // The local match only shortlists cards. The AI writes the answer from those cards, and nothing else.
+        if (memoryAnswerer is null)
+            throw new BackstopApiException("Remember questions are not switched on yet. Please tell the person who looks after this app.");
+        var draft = await memoryAnswerer.AnswerAsync(question.Trim(), best, ct);
+        if (!draft.Success)
+            throw new BackstopApiException(draft.Failure?.Message ?? "Something went wrong. Please try again in a minute.");
+        if (!draft.Found)
+            return new MemoryAnswer(question.Trim(), "I could not find that in your memory yet. When you save a Show me or Explain page, you can ask about it here.", []);
+        var cards = draft.Uses.Where(i => i >= 0 && i < best.Count).Select(i => best[i]).ToList();
+        if (cards.Count == 0) cards = best;
+        return new MemoryAnswer(question.Trim(), draft.Answer, cards);
     }
 
     public async Task<MemoryCard> SaveGuideToMemoryAsync(string guideId, CancellationToken ct = default)
@@ -425,8 +440,8 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
             if (!_guides.TryGetValue(guideId, out var g)) throw new BackstopApiException("We could not find that guide. Please try Show me again.");
             var steps = g.Guide.Steps;
             card = new MemoryCard(NewId("m"), g.Guide.Title, Today, $"You asked: \"{g.Guide.Goal}\". {steps.Count} steps.",
-                g.Guide.PhotoUrl, g.Task.Picture, g.Task.Tags, steps,
-                $"Last time you {g.Task.PastTense} in {steps.Count} steps. The first one was: {LowerFirst(steps[0])}",
+                g.Guide.PhotoUrl, g.Guide.Picture, g.Tags, steps,
+                $"Last time you {g.PastTense} in {steps.Count} steps. The first one was: {LowerFirst(steps[0])}",
                 MemorySource.ShowMe, false);
             AddMemory(guideId, card);
         }
@@ -640,13 +655,12 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
 
     // ---------------- Helpers ----------------
 
-    private async Task Wait(int ms, CancellationToken ct)
+    // No artificial pause: the mock answers at once. The ms argument is kept so call sites need no change.
+    private Task Wait(int ms, CancellationToken ct)
     {
-#if !DEBUG
-        ms = Math.Min(ms, 150); // the pauses imitate a slow back end. Release keeps them short.
-#endif
-        await Task.Delay(ms, ct);
+        ct.ThrowIfCancellationRequested();
         if (options.FailRequests) throw new BackstopApiException("We could not reach Backstop just now. Please try again in a moment.");
+        return Task.CompletedTask;
     }
 
     private static string NewId(string prefix) => $"{prefix}{Guid.NewGuid():N}"[..(prefix.Length + 8)];

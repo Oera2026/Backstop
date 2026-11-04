@@ -167,9 +167,15 @@ public static class ReviewFixTests
             Assert(had > 0 && !demo.ClearMemories("wrong").Done && (await api.GetMemoryCardsAsync()).Count == had, "Empty Remember without the code changes nothing");
             Assert(demo.ClearMemories("lantern-otter").Done && (await api.GetMemoryCardsAsync()).Count == 0, "With the code it empties Remember");
 
-            // Show me keeps no photo when no guide matches, and photos have a total budget.
+            // Show me keeps no photo when there is no guide, and photos have a total budget.
             byte[] png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 0, 1, 2, 3];
-            Assert(await api.GenerateGuideAsync(new GuideRequest("xyzzy plugh", png, "a.png")) is null && api.ModePhotoBytes == 0, "No guide: the photo is not kept");
+            var noWriter = false;
+            try { await api.GenerateGuideAsync(new GuideRequest("set the washing machine", png, "a.png")); }
+            catch (BackstopApiException) { noWriter = true; }
+            Assert(noWriter && api.ModePhotoBytes == 0, "No writer: a plain error, and the photo is not kept");
+            var refusedApi = new MockBackstopApi(guardian, options, null, null, null, null, null,
+                new StubGuide(new GuideDraft(true, true, "", [], null, GuidePictures.Fallback, [], "")));
+            Assert(await refusedApi.GenerateGuideAsync(new GuideRequest("rewire the plug", png, "a.png")) is null && refusedApi.ModePhotoBytes == 0, "Refused goal: no guide, and the photo is not kept");
             var big = new ContactPhoto(new byte[9 * 1024 * 1024], "image/png");
             for (var i = 0; i < 12; i++) api.KeepModePhoto($"p{i}", big);
             Assert(api.ModePhotoBytes <= MockBackstopApi.ModePhotoBudgetBytes && api.GetPhoto("p11") is not null && api.GetPhoto("p0") is null, "Oldest photos go first past the budget");
@@ -185,6 +191,12 @@ public static class ReviewFixTests
         }
 
         Console.WriteLine("PASS: Review fixes: decisions beat rescans, rescans back off, retries are capped, shared state is bounded and per visitor, sign-in locks are per visitor.");
+    }
+
+    private sealed class StubGuide(GuideDraft draft) : IGuideWriter
+    {
+        public Task<GuideDraft> WriteAsync(string goal, byte[]? photo, string? mimeType, CancellationToken ct = default) =>
+            Task.FromResult(draft);
     }
 
     private sealed class Always(HttpStatusCode status, Action onSend) : HttpMessageHandler

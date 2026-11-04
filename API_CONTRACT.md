@@ -77,7 +77,7 @@ Icons are names from `Components/Shared/Icon.razor`.
 {
   id, title, goal,
   photoUrl: string|null,                 // the user's photo, served by the back end
-  picture: string,                       // the generated "what it looks like when done" image (URL in a real back end; a drawing key in the mock)
+  picture: string,                       // the "what it looks like when done" picture: a drawing key the model picks from a fixed list, drawn by the app
   steps: string[],
   highlight: { x, y, width, height, label } | null,   // percent of the photo
   needsCare: { topic: "Chemicals"|"Medicines"|"Electrics", text } | null,

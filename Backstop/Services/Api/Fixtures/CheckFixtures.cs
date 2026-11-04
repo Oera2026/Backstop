@@ -42,9 +42,6 @@ public static class CheckFixtures
         "Daniel: My bank card has stopped working out here. I need £300 for my flight home.\n" +
         "Daniel: Could you buy gift cards and send me the codes today? I will pay you back. Please hurry.";
 
-    /// <summary>What the mock "reads" from any picture the user adds to Check.</summary>
-    public const string PictureText = GiftCardScam;
-
     /// <summary>Examples the demo panel can open in Check (?example=...).</summary>
     public static IReadOnlyDictionary<string, (CheckKind Kind, string Text)> Examples { get; } =
         new Dictionary<string, (CheckKind, string)>

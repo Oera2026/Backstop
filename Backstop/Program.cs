@@ -95,6 +95,9 @@ MetaClient<MetaAssistant>(builder.Services, Resilience);
 MetaClient<MetaStoryWriter>(builder.Services, StoryResilience);
 // Explain and questions about a document: the same Meta endpoint, the same rules.
 MetaClient<MetaDocumentExplainer>(builder.Services, Resilience);
+// Show me guides and Remember questions: the same Meta endpoint, the same rules.
+MetaClient<MetaGuideWriter>(builder.Services, Resilience);
+MetaClient<MetaMemoryAnswerer>(builder.Services, Resilience);
 
 // Link check (the public /try page only; real mail never opens a link). Optional blocklist lookups: Google Safe Browsing and URLhaus,
 // skipped silently when their keys are empty. The fixed hosts are the only places those lookups go.
@@ -118,6 +121,8 @@ builder.Services.Configure<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>
 builder.Services.AddTransient<IAssistant>(sp => sp.GetRequiredService<MetaAssistant>());
 builder.Services.AddTransient<IStoryWriter>(sp => sp.GetRequiredService<MetaStoryWriter>());
 builder.Services.AddTransient<IDocumentExplainer>(sp => sp.GetRequiredService<MetaDocumentExplainer>());
+builder.Services.AddTransient<IGuideWriter>(sp => sp.GetRequiredService<MetaGuideWriter>());
+builder.Services.AddTransient<IMemoryAnswerer>(sp => sp.GetRequiredService<MetaMemoryAnswerer>());
 builder.Services.AddTransient<IMetaScamChecker>(sp => sp.GetRequiredService<MetaAiScamChecker>());
 builder.Services.AddTransient<IMetaDiagnostics>(sp => sp.GetRequiredService<MetaAiScamChecker>());
 

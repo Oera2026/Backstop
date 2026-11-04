@@ -35,7 +35,7 @@ Text and images being inspected are passed as data, never as instructions. Image
 
 Calls retry twice with backoff, honour `Retry-After`, and pause for 20 seconds if most recent calls fail. A per-minute call cap (default 40, shared by all visitors) holds items instead of calling Meta when it is exceeded. With no `META_AI_KEY`, every check fails closed and Ask Me says it cannot answer.
 
-Explain and questions about a document go to Meta AI. Photos of a document are read by the AI; PDFs cannot be read yet, so Explain asks for a photo or pasted text. Other demo features still use a local mock layer.
+Explain and questions about a document go to Meta AI. Photos of a document are read by the AI; PDFs cannot be read yet, so Explain asks for a photo or pasted text. Show me guides and Remember questions also go to Meta AI: guides are written fresh for any goal (unsafe goals are refused), and memory answers are written only from the person's saved cards. Guide and story pictures are simple line drawings the app makes itself, from a picture the AI picks — that is the chosen art style, not generated imagery.
 
 ## Persistence (Supabase)
 
