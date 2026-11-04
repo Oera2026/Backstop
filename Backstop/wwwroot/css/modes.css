@@ -627,8 +627,10 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 .guide-toggle { display: inline-flex; align-items: center; gap: .4rem; min-height: 56px; padding: 0 .9rem; font: inherit; font-weight: 800; color: inherit; background: transparent; border: var(--line) solid currentColor; border-radius: var(--radius); cursor: pointer; }
 .guide-toggle[aria-pressed="true"] { background: var(--accent-soft); color: var(--navy); border-color: var(--accent-soft); }
 .guide-toggle:focus-visible { outline: 3px solid var(--marker); outline-offset: 2px; }
+.brand__home { display: none; }
 @media (max-width: 959px) {
   .brand__word { display: none; }
+  .brand__home { display: inline; padding-inline-end: .5rem; }
   .nav-signout { display: none !important; }
   .site-header { flex-wrap: nowrap; padding-right: 4.5rem; }
   .header-for { margin-left: .5rem; }
