@@ -58,7 +58,7 @@ textarea:focus-visible, summary:focus-visible, [tabindex]:focus-visible {
 h1:focus, main:focus, h1[tabindex]:focus-visible, main[tabindex]:focus-visible { outline: none; box-shadow: none; }
 
 .skip-link {
-  position: absolute; left: .5rem; top: -5rem; z-index: 10;
+  position: absolute; left: .5rem; top: -5rem; z-index: 30;
   background: var(--navy); color: var(--on-navy); padding: .6rem 1rem; border-radius: var(--radius);
 }
 .skip-link:focus { top: .5rem; color: var(--on-navy); }

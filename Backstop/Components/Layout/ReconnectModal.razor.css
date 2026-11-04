@@ -157,3 +157,12 @@
         opacity: 0;
     }
 }
+@media (prefers-reduced-motion: reduce) {
+    #components-reconnect-modal,
+    #components-reconnect-modal[open],
+    #components-reconnect-modal::backdrop,
+    .components-rejoining-animation div {
+        animation: none;
+        transition: none;
+    }
+}
