@@ -52,6 +52,7 @@
         // A layout change in the same circuit just carries on.
         if (!Tour.Begun) return;
         _ready = true;
+        if (AsksToStart) { Tour.Start(SideOf(Here)); Go(); return; }
         if (Tour.Side != SideOf(Here) && !DemoTour.Matches(Tour.Current, Here)) Tour.Start(SideOf(Here));
         Tour.Follow(Here);
     }
@@ -61,7 +62,7 @@
     private async Task Resume()
     {
         var side = SideOf(Here);
-        if (Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(new Uri(Nav.Uri).Query).ContainsKey("tour"))
+        if (AsksToStart)
         {
             Tour.Start(side);
             Go();
@@ -75,11 +76,15 @@
         Tour.Follow(Here);
     }
 
+    private bool AsksToStart => Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(new Uri(Nav.Uri).Query).ContainsKey("tour");
+
     private void OnChanged() => InvokeAsync(StateHasChanged);
 
     private void OnMoved(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
     {
-        Tour.Follow(Here);
+        // Welcome is reached in the same session, so a closed guide has to start again here too.
+        if (_ready && !_framed && AsksToStart) { Tour.Start(SideOf(Here)); Go(); }
+        else Tour.Follow(Here);
         InvokeAsync(StateHasChanged);
     }
 

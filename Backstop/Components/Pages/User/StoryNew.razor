@@ -53,21 +53,26 @@ else
     private bool _busy;
     private string? _error, _problem;
 
-    protected override void OnInitialized()
+    private string? _appliedExample;
+
+    // A link can open this page again with a different example, so it is read whenever it changes.
+    protected override void OnParametersSet()
     {
-        base.OnInitialized();
+        if (Example == _appliedExample) return;
+        _appliedExample = Example;
         _situation = Example switch
         {
             "dentist" => Ideas[0],
             "bus" => Ideas[1],
             "money" => "I have to go to the bank about my money",
-            _ => "",
+            _ => _situation,
         };
         if (Example == "dentist") _when = "Thursday at 10";
     }
 
     private async Task Make()
     {
+        if (_busy) return;
         _error = null;
         _problem = null;
         if (string.IsNullOrWhiteSpace(_situation))

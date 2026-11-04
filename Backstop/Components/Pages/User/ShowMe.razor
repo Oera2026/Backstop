@@ -56,10 +56,16 @@ else
     private bool _busy, _noGuide;
     private string? _error, _problem;
 
-    protected override void OnInitialized()
+    private string? _appliedGoal;
+
+    // Ask Me can open this page again with a different goal, so the link is read whenever it changes.
+    protected override void OnParametersSet()
     {
-        base.OnInitialized();
-        if (!string.IsNullOrWhiteSpace(GoalText)) _goal = GoalText;
+        if (GoalText == _appliedGoal) return;
+        _appliedGoal = GoalText;
+        if (string.IsNullOrWhiteSpace(GoalText)) return;
+        _goal = GoalText;
+        _noGuide = false;
     }
 
     private async Task TryGoal(string goal)
@@ -71,6 +77,7 @@ else
 
     private async Task Run()
     {
+        if (_busy) return;
         _error = null;
         _problem = null;
         if (string.IsNullOrWhiteSpace(_goal))

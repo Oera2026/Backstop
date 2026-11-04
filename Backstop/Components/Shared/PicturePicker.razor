@@ -47,5 +47,10 @@
             _name = null;
             _error = $"That file is too big. Please choose one smaller than {MaxMegabytes} MB.";
         }
+        catch (Exception)
+        {
+            _name = null;
+            _error = "We could not read that file. Please try again.";
+        }
     }
 }

@@ -68,6 +68,7 @@ else
 
     private async Task Run()
     {
+        if (_busy) return;
         _error = null;
         _problem = null;
         if (_source == "file" ? _file is null : string.IsNullOrWhiteSpace(_text))

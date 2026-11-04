@@ -39,11 +39,18 @@
     private DateOnly _date;
     private TimeOnly? _time;
 
-    protected override void OnInitialized()
+    private string? _appliedQuery;
+
+    // Ask Me can fill this in, and can open this page again with something new, so the link is read whenever it changes.
+    // It is only a form: nothing is saved until the person presses Save.
+    protected override void OnParametersSet()
     {
-        base.OnInitialized();
-        _date = DateOnly.TryParse(DateText, out var d) ? d : Clock.Today;
-        // Ask Me can fill this in. It is only a form: nothing is saved until the person presses Save.
+        var query = $"{DateText}|{TitleText}|{TimeText}|{PlaceText}";
+        if (query == _appliedQuery) return;
+        var first = _appliedQuery is null;
+        _appliedQuery = query;
+        if (DateOnly.TryParse(DateText, out var d)) _date = d;
+        else if (first) _date = Clock.Today;
         if (!string.IsNullOrWhiteSpace(TitleText)) _title = TitleText.Length > 80 ? TitleText[..80] : TitleText;
         if (TimeOnly.TryParseExact(TimeText, "HH:mm", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var t)) _time = t;
         if (!string.IsNullOrWhiteSpace(PlaceText)) _place = PlaceText.Length > 80 ? PlaceText[..80] : PlaceText;

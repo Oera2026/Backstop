@@ -1167,6 +1167,9 @@ public class MetaScamCheckerTests
         // 37d. AI features: the helper is told first and when the AI fails, links reach the AI, nothing unread is called safe.
         await AiSafeguardTests.RunAsync();
 
+        // 37e. Page behaviour: double taps, undo, changing story, refused runs, Check again, changing links, uploads, the camera.
+        await PageBehaviourTests.RunAsync();
+
         // 38. Show me: the AI writes the guide; unsafe goals are refused; failures give a plain error, never a canned guide.
         {
             static HttpResponseMessage Say(string json)

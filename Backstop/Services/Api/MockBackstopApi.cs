@@ -56,6 +56,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
     private List<HelpRequest> _help = SeedHelp();
 
     private const int MaxCheckLength = 20000;
+    private const int MaxGoalLength = 300, MaxMemoryTitleLength = 80, MaxMemoryQuestionLength = 500;
     private const int MaxExplainImageBytes = 8 * 1024 * 1024;
     private const int MaxFlagsShown = 4;
 
@@ -324,6 +325,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         await Wait(1600, ct);
         var generation = CurrentGeneration;
         if (string.IsNullOrWhiteSpace(request.Goal)) throw new BackstopApiException("Please say what you want to do.");
+        if (request.Goal.Trim().Length > MaxGoalLength) throw new BackstopApiException("That is a bit long. Please make it shorter.");
 
         string? photoType = null;
         if (request.Photo is not null)
@@ -476,6 +478,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
     {
         await Wait(900, ct);
         if (string.IsNullOrWhiteSpace(question)) throw new BackstopApiException("Please type your question first.");
+        if (question.Trim().Length > MaxMemoryQuestionLength) throw new BackstopApiException("That is a bit long. Please make your question shorter.");
         List<MemoryCard> best;
         lock (_gate)
         {
@@ -500,7 +503,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         return new MemoryAnswer(question.Trim(), draft.Answer, cards);
     }
 
-    public async Task<MemoryCard> SaveGuideToMemoryAsync(string guideId, CancellationToken ct = default)
+    public async Task<MemoryCard> SaveGuideToMemoryAsync(string guideId, DateOnly? today = null, CancellationToken ct = default)
     {
         await Wait(500, ct);
         MemoryCard card;
@@ -509,7 +512,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
             if (Existing(guideId) is { } saved) return saved;
             if (!_guides.TryGetValue(guideId, out var g)) throw new BackstopApiException("We could not find that guide. Please try Show me again.");
             var steps = g.Guide.Steps;
-            card = new MemoryCard(NewId("m"), g.Guide.Title, Today, $"You asked: \"{g.Guide.Goal}\". {steps.Count} steps.",
+            card = new MemoryCard(NewId("m"), g.Guide.Title, today ?? Today, $"You asked: \"{g.Guide.Goal}\". {steps.Count} steps.",
                 g.Guide.Picture, g.Tags, steps,
                 $"Last time you {g.PastTense} in {steps.Count} steps. The first one was: {LowerFirst(steps[0])}",
                 MemorySource.ShowMe, false);
@@ -519,7 +522,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         return card;
     }
 
-    public async Task<MemoryCard> SaveExplanationToMemoryAsync(string explanationId, CancellationToken ct = default)
+    public async Task<MemoryCard> SaveExplanationToMemoryAsync(string explanationId, DateOnly? today = null, CancellationToken ct = default)
     {
         await Wait(500, ct);
         MemoryCard card;
@@ -527,7 +530,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         {
             if (Existing(explanationId) is { } saved) return saved;
             var e = _explanations.GetValueOrDefault(explanationId) ?? throw new BackstopApiException("We could not find that page. Please explain it again.");
-            card = new MemoryCard(NewId("m"), e.Title, Today, e.Overview, "letter", ["letters"],
+            card = new MemoryCard(NewId("m"), e.Title, today ?? Today, e.Overview, "letter", ["letters"],
                 e.Actions.Count > 0 ? e.Actions : e.Chunks.Select(c => c.Body).Take(4).ToList(),
                 $"Last time, the {LowerFirst(e.Title)} said this: {e.Overview}", MemorySource.Explain, false);
             AddMemory(explanationId, card);
@@ -540,6 +543,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
     {
         await Wait(400, ct);
         if (string.IsNullOrWhiteSpace(title)) throw new BackstopApiException("Please type a name.");
+        if (title.Trim().Length > MaxMemoryTitleLength) throw new BackstopApiException("That name is a bit long. Please make it shorter.");
         var card = Replace(id, c => c with { Title = title.Trim() });
         RaiseChanged();
         return card;

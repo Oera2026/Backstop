@@ -117,6 +117,7 @@ else
 
     private async Task Run()
     {
+        if (_busy) return;
         _error = null;
         _problem = null;
         if (_kind == "picture" ? _picture is null : string.IsNullOrWhiteSpace(_text))

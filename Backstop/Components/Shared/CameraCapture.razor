@@ -25,6 +25,8 @@
 @code {
     [Parameter] public EventCallback<PicturePicker.PickedFile> OnPhoto { get; set; }
 
+    private const long MaxBytes = 10 * 1024 * 1024;
+
     private ElementReference _video, _shot;
     private bool _live, _starting, _hasShot;
     private string? _error;
@@ -55,8 +57,13 @@
     {
         try
         {
-            var bytes = await JS.InvokeAsync<byte[]>("backstopCamera.capture", _video, _shot);
-            if (bytes is null || bytes.Length == 0) throw new InvalidOperationException("Empty photo.");
+            // One large message would close the connection, so the photo comes over as a stream in small pieces.
+            await using var photo = await JS.InvokeAsync<IJSStreamReference>("backstopCamera.capture", _video, _shot);
+            await using var stream = await photo.OpenReadStreamAsync(MaxBytes);
+            using var memory = new MemoryStream();
+            await stream.CopyToAsync(memory);
+            var bytes = memory.ToArray();
+            if (bytes.Length == 0) throw new InvalidOperationException("Empty photo.");
             _live = false;
             _hasShot = true;
             await OnPhoto.InvokeAsync(new PicturePicker.PickedFile(bytes, "camera.jpg"));

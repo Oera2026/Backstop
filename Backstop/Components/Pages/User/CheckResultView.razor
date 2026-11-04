@@ -157,6 +157,7 @@ else
 
     private async Task Ask()
     {
+        if (_working) return;
         _working = true;
         _actionProblem = null;
         try { _r = await Api.AskTrustedPersonAsync(Id); }
@@ -166,6 +167,7 @@ else
 
     private async Task Delete()
     {
+        if (_working) return;
         _working = true;
         _actionProblem = null;
         try

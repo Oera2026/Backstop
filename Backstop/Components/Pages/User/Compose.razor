@@ -219,6 +219,8 @@
 
     private async Task Send()
     {
+        // A second tap can arrive before the page has changed. Only the first one counts.
+        if (_stage != Stage.Form) return;
         _error = "";
         // A locked address always comes from the message or the link, never from anything typed on the page.
         if (_reply is not null) _to = _reply.FromAddress;
@@ -257,6 +259,7 @@
     {
         _stage = Stage.Sending;
         _secs = UndoSeconds;
+        _cts?.Dispose();
         _cts = new CancellationTokenSource();
         var token = _cts.Token;
         try
@@ -277,6 +280,7 @@
 
     private void Commit()
     {
+        _cts?.Dispose();
         _cts = null;
         var result = Mail.Send(_to, _subject, _body);
         if (result.Refused is not null)
@@ -298,6 +302,7 @@
     private void Undo()
     {
         _cts?.Cancel();
+        _cts?.Dispose();
         _cts = null;
         _stage = Stage.Form;
     }
@@ -305,6 +310,7 @@
     // The message is kept for the helper. Nothing is sent until they approve it.
     private void AskHelper()
     {
+        if (_stage != Stage.Pause) return;
         if (Mail.HoldOutgoing(_to, _subject, _body, _reasons) is { } refused)
         {
             _error = refused;

@@ -215,7 +215,7 @@ else
     {
         _saving = true;
         _saveProblem = null;
-        try { _saved = await Api.SaveExplanationToMemoryAsync(_e!.Id); }
+        try { _saved = await Api.SaveExplanationToMemoryAsync(_e!.Id, Clock.Today); }
         catch (BackstopApiException ex) { _saveProblem = ex.Message; }
         _saving = false;
     }

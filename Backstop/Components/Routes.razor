@@ -1,4 +1,6 @@
-﻿<CascadingValue Value="_clock" IsFixed="true">
+﻿@inject IJSRuntime JS
+
+<CascadingValue Value="_clock">
     <Router AppAssembly="typeof(Program).Assembly" NotFoundPage="typeof(Pages.NotFound)">
         <Found Context="routeData">
             <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.UserLayout)" />
@@ -14,4 +16,18 @@
     private UserClock _clock = UserClock.Server;
 
     protected override void OnInitialized() => _clock = UserClock.For(TimeZone);
+
+    // A first visit has no cookie yet, so the page starts on the server's time. Once it is live the browser can say.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || !string.IsNullOrWhiteSpace(TimeZone)) return;
+        try
+        {
+            var zone = await JS.InvokeAsync<string?>("backstopSettings.timeZone");
+            if (string.IsNullOrWhiteSpace(zone)) return;
+            _clock = UserClock.For(zone);
+            StateHasChanged();
+        }
+        catch (Exception) { /* the server's zone stays */ }
+    }
 }

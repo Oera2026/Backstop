@@ -36,6 +36,7 @@
     set: function (key, value) { var s = read(); s[key] = value; return write(s); },
     reset: function () { return write(Object.assign({}, DEFAULTS)); },
     speechRate: function () { return RATES[read().rate] || RATES.normal; },
+    timeZone: function () { try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch (e) { return null; } },
     // First run: the helper welcome shows once per device.
     markHelperWelcomed: function () { try { localStorage.setItem(HKEY, "1"); } catch (e) { /* storage blocked */ } }
   };
