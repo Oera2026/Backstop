@@ -29,7 +29,7 @@
 
             <div role="radiogroup" aria-label="Your status" class="profile__opts">
                 <button type="button" role="radio" aria-checked="@(p.Presence == Presence.Online ? "true" : "false")" class="profile__opt @(p.Presence == Presence.Online ? "profile__opt--on" : "")" @onclick="@(() => Api.SetPresence(Role, Presence.Online))">
-                    <span class="presence-dot presence-dot--online"><Icon Name="check" /></span>
+                    <span class="presence-dot presence-dot--online" aria-hidden="true"></span>
                     <span><strong>Online</strong><span class="profile__hint">People see you are here.</span></span>
                 </button>
                 <button type="button" role="radio" aria-checked="@(p.Presence == Presence.Hidden ? "true" : "false")" class="profile__opt @(p.Presence == Presence.Hidden ? "profile__opt--on" : "")" @onclick="@(() => Api.SetPresence(Role, Presence.Hidden))">

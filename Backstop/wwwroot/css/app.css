@@ -77,10 +77,10 @@ h1:focus, main:focus, h1[tabindex]:focus-visible, main[tabindex]:focus-visible {
 .logo { width: 2.5rem; height: 2.5rem; flex: none; }
 .logo__tile { fill: var(--marker); stroke: var(--logo-ink); stroke-width: 3; }
 .logo__b { fill: var(--logo-ink); }
-.role-tag { font-size: calc(.9rem * var(--tx)); font-weight: 800; background: var(--marker); color: var(--on-marker); border-radius: 8px; padding: .1rem .65rem; }
+.role-tag { font-size: calc(.9rem * var(--tx)); font-weight: 800; background: var(--on-navy); color: var(--navy); border-radius: 8px; padding: .1rem .65rem; }
 .site-nav { display: flex; flex-wrap: wrap; gap: .25rem; font-size: calc(.9rem * var(--tx)); font-weight: 700; }
 .site-nav a { color: var(--on-header); }
-.site-header a:focus-visible { outline-color: var(--marker); box-shadow: none; }
+.site-header a:focus-visible { outline-color: var(--on-header); box-shadow: none; }
 .site-nav a, .site-footer a { display: inline-flex; align-items: center; min-height: 56px; min-width: 44px; padding: 0 .75rem; }
 
 .page { width: 100%; max-width: var(--col, 44rem); margin: 0 auto; padding: 1.5rem 1rem 3rem; flex: 1; }
@@ -102,7 +102,7 @@ h1:focus, main:focus, h1[tabindex]:focus-visible, main[tabindex]:focus-visible {
 /* The picture tile: every statement gets a drawing beside it */
 .pic {
   display: inline-grid; place-items: center; flex: none; width: 4.25rem; height: 4.25rem;
-  border: var(--line) solid var(--border); border-radius: var(--radius); background: var(--marker); color: var(--on-marker);
+  border: var(--line) solid var(--border); border-radius: var(--radius); background: var(--accent-soft); color: var(--navy);
 }
 .pic .icon { width: 2.4rem; height: 2.4rem; stroke-width: 2.2; }
 .pic--safe { background: var(--safe-soft); color: var(--safe); border-color: var(--safe); }
@@ -137,8 +137,8 @@ h1:focus, main:focus, h1[tabindex]:focus-visible, main[tabindex]:focus-visible {
 
 /* Status badge: icon + word + colour, never colour alone */
 .badge {
-  display: inline-flex; align-items: center; gap: .45rem; font-weight: 800; font-size: calc(1rem * var(--tx));
-  padding: .25rem .8rem; border-radius: 8px; border: 2px solid currentColor;
+  display: inline-flex; align-items: center; gap: .35rem; font-weight: 700; font-size: calc(.9rem * var(--tx));
+  padding: .1rem .5rem; border-radius: 8px; border: 1px solid currentColor; min-height: 0; line-height: 1.4;
 }
 .badge--safe { background: var(--safe-soft); color: var(--safe); }
 .badge--check { background: var(--check-soft); color: var(--check); }
@@ -173,7 +173,7 @@ h1:focus, main:focus, h1[tabindex]:focus-visible, main[tabindex]:focus-visible {
 .row__from { font-weight: 800; font-size: calc(1.2rem * var(--tx)); letter-spacing: -.01em; }
 .row__subject { font-weight: 700; }
 .row__preview { color: var(--text-2); font-size: calc(.9rem * var(--tx)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.row__side { display: grid; justify-items: start; gap: .25rem; }
+.row__side { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem .6rem; min-width: 0; }
 .row__time { font-size: calc(.9rem * var(--tx)); color: var(--text-2); font-weight: 600; }
 .rows--compact .row { min-height: 72px; }
 
@@ -316,7 +316,7 @@ textarea { min-height: 10rem; resize: vertical; }
 
 /* Choice groups: big option buttons made from radio inputs */
 .choice { border: 0; padding: 0; margin: 0 0 2rem; min-width: 0; }
-.choice__q { display: flex; align-items: center; gap: .75rem; font-size: calc(1.3rem * var(--tx)); font-weight: 800; margin-bottom: .6rem; }
+.choice__q { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; font-size: calc(1.3rem * var(--tx)); font-weight: 800; margin-bottom: .6rem; }
 .choice .hint { margin: 0 0 .75rem; font-weight: 600; }
 .choice__options { display: flex; flex-wrap: wrap; gap: .75rem; }
 .choice input { position: absolute; opacity: 0; width: 1px; height: 1px; }
@@ -461,7 +461,7 @@ input.is-locked { background: var(--surface); border-style: dashed; cursor: not-
 .actions--quiet { margin-top: .5rem; }
 
 /* Marks made-up content. Not a status, so it is quiet and has no icon. */
-.demo-label { display: inline-block; font-size: calc(.85rem * var(--tx)); font-weight: 700; color: var(--text-2); background: var(--band); border: 1px solid var(--border); border-radius: var(--radius); padding: .05rem .6rem; }
+.demo-label { display: inline-block; font-size: calc(.9rem * var(--tx)); font-weight: 700; color: var(--text-2); background: var(--band); border: 1px solid var(--border); border-radius: var(--radius); padding: .05rem .6rem; }
 .demo-row { margin: 0 0 .75rem; }
 
 /* Sender checks: one row per warning about who sent a message. */

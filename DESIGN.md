@@ -2,22 +2,24 @@
 name: Backstop
 description: A safe email client drawn as an easy-read page: one sentence, one picture, one button.
 colors:
-  navy: "#0B2A6F"
-  navy-deep: "#061B4D"
-  ink: "#0B1B44"
-  ink-soft: "#31406B"
-  marker-yellow: "#FFE14D"
+  teal: "#0F4C5C"
+  teal-deep: "#0A3440"
+  teal-soft: "#E1F1F2"
+  ink: "#111827"
+  ink-soft: "#374151"
   page-white: "#FFFFFF"
-  band-blue: "#E2EAFF"
-  mist-blue: "#F0F4FF"
-  rule-blue: "#B8C6EE"
-  safe-green: "#0A6B3A"
-  safe-green-tint: "#D3F0DF"
-  waiting-orange: "#8A3F00"
-  waiting-orange-tint: "#FFE2BD"
-  blocked-red: "#A3121F"
-  blocked-red-deep: "#7D0C17"
-  blocked-red-tint: "#FFD9DC"
+  band-teal: "#D6ECEE"
+  mist-teal: "#F3F9F9"
+  rule-grey: "#6B7280"
+  safe-green: "#166534"
+  safe-green-tint: "#DCFCE7"
+  checking-amber-ink: "#92400E"
+  checking-amber: "#F59E0B"
+  checking-amber-tint: "#FEF3C7"
+  blocked-red: "#B91C1C"
+  blocked-red-fill: "#DC2626"
+  blocked-red-deep: "#991B1B"
+  blocked-red-tint: "#FEE2E2"
 typography:
   display:
     fontFamily: "Atkinson Hyperlegible Next, Atkinson Hyperlegible, system-ui, sans-serif"
@@ -40,31 +42,36 @@ typography:
     fontSize: "0.9rem"
     fontWeight: 700
 rounded:
-  md: "12px"
-  lg: "16px"
+  md: "8px"
+  lg: "12px"
 spacing:
   sm: "0.75rem"
   md: "1rem"
   lg: "1.5rem"
 components:
   button-primary:
-    backgroundColor: "{colors.navy}"
+    backgroundColor: "{colors.teal}"
     textColor: "{colors.page-white}"
     rounded: "{rounded.md}"
     height: "64px"
     padding: "0.6rem 2rem"
   button-primary-hover:
-    backgroundColor: "{colors.navy-deep}"
+    backgroundColor: "{colors.teal-deep}"
   button-quiet:
     backgroundColor: "{colors.page-white}"
-    textColor: "{colors.navy}"
+    textColor: "{colors.teal}"
     rounded: "{rounded.md}"
     height: "56px"
   button-block:
-    backgroundColor: "{colors.blocked-red}"
+    backgroundColor: "{colors.blocked-red-fill}"
     textColor: "{colors.page-white}"
     rounded: "{rounded.md}"
     height: "64px"
+  badge:
+    backgroundColor: "{colors.teal-soft}"
+    textColor: "{colors.teal}"
+    rounded: "{rounded.md}"
+    padding: "0.1rem 0.5rem"
   card:
     backgroundColor: "{colors.page-white}"
     rounded: "{rounded.lg}"
@@ -77,29 +84,30 @@ components:
 
 **Creative North Star: "The Easy Read Page"**
 
-Backstop looks like the easy-read documents made for people who find ordinary text hard: one short sentence, one drawn picture, one button. Everything is large, outlined and flat. A deep navy band owns the top of the screen, a pale blue band owns the foot, and a marker-yellow highlighter is the only decoration. The system is built for an anxious reader first and a stressed helper second.
+Backstop looks like the easy-read documents made for people who find ordinary text hard: one short sentence, one drawn picture, one button. Everything is large, outlined and flat. A deep teal band owns the top of the screen, a pale teal band owns the foot, and an amber highlighter under each title is the only decoration. The system is built for an anxious reader first and a stressed helper second.
 
 **Key Characteristics:**
-- Every box has a 3px navy outline and no shadow.
+- Every box has a 2px outline and no shadow (4px in High contrast).
 - Every statement is paired with a picture tile.
 - The single decision on a screen is the biggest, heaviest control.
 - State is always icon, word and colour together.
 
 ## Colors
 
-A committed navy-and-white page with three signal colours, each reserved for one meaning.
+A committed teal-and-white page with three signal colours, each reserved for one meaning. Amber only means being checked; brand uses teal.
 
 ### Primary
-- **Easy-Read Navy** (#0B2A6F): the header band, the primary button, every outline and link.
-- **Highlighter Yellow** (#FFE14D): the marker under each page title, the brand shield, the Helper tag, picture-tile fill and the selected checkbox. Never used for a state.
+- **Easy-Read Teal** (#0F4C5C): the header band, the primary button, links, the Helper role tag, Online presence, the waiting count and picture-tile icons. Soft teal (#E1F1F2) is its tint.
+- **Highlighter Amber** (#F59E0B): the marker under each page title and the logo tile. Beyond the logo and this marker, amber means only being checked.
 
 ### Neutral
-- **Ink** (#0B1B44) text, **Soft Ink** (#31406B) secondary text, **Page White** (#FFFFFF) ground, **Band Blue** (#E2EAFF) footer and hover, **Mist Blue** (#F0F4FF) reading wells, **Rule Blue** (#B8C6EE) quiet dividers.
+- **Ink** (#111827) text, **Soft Ink** (#374151) secondary text, **Page White** (#FFFFFF) ground, **Band Teal** (#D6ECEE) footer and hover, **Mist Teal** (#F3F9F9) reading wells, **Rule Grey** (#6B7280) outlines and dividers. Dark mode and High contrast swap the same tokens.
 
 ### State
-- **Signal Green** (#0A6B3A) on its tint: safe. **Waiting Orange** (#8A3F00) on its tint: being checked. **Blocked Red** (#A3121F) on its tint: blocked or scam verdict.
+- **Signal Green** (#166534) on its tint: safe. **Checking Amber** (#92400E text, #F59E0B edge) on its tint (#FEF3C7): being checked. **Blocked Red** (#B91C1C text, #DC2626 fill) on its tint: blocked or scam verdict.
+- Presence (Online) is neutral teal with a plain dot, never green and never amber.
 
-**The One Meaning Rule.** Green, orange and red mean safe, waiting and blocked and nothing else; each always has an icon and a word beside it.
+**The One Meaning Rule.** Green, amber and red mean safe, being checked and blocked and nothing else; each always has an icon and a word beside it. Amber only means being checked; brand uses teal.
 
 ## Typography
 
@@ -108,12 +116,12 @@ A committed navy-and-white page with three signal colours, each reserved for one
 **Character:** A typeface drawn by the Braille Institute for low vision, with letterforms that cannot be confused. Weight carries hierarchy: 800 for titles and the one action, 700 for badges and subjects, 400 for reading text.
 
 ### Hierarchy
-- **Display** (800, 1.8rem / 36px, 1.15): the page title, with a marker-yellow underline drawn behind each line.
+- **Display** (800, 1.8rem / 36px, 1.15): the page title, with an amber underline drawn behind each line.
 - **Headline** (800, 1.3rem, 1.15): section headings.
 - **Body** (400, 1rem / 20px, 1.6): reading text; sentences stay short.
-- **Label** (700, 0.9rem / 18px): badges, times, hints. Nothing is smaller than 18px.
+- **Label** (700, 0.9rem / 18px): badges, times, hints, tab bar labels (they grow to 1rem at larger text sizes). Nothing is smaller than 18px.
 
-**The Thick Marker Rule.** Titles get one yellow highlighter stroke; no other text is highlighted, gradient-filled or colour-washed.
+**The Thick Marker Rule.** Titles get one amber highlighter stroke; no other text is highlighted, gradient-filled or colour-washed.
 
 ## Layout
 
@@ -121,38 +129,41 @@ A single column, 44rem wide (52rem for the helper, 70rem for the demo), with 1re
 
 ## Elevation & Depth
 
-Flat. Depth comes only from the 3px outline and from banding, never from shadows or gradients. The helper action bar is separated from the page by a 3px navy top rule.
+Flat. Depth comes only from the 2px outline and from banding, never from shadows or gradients. The helper action bar is separated from the page by a teal top rule.
 
 **The Outline Not Shadow Rule.** If a box needs to stand apart, outline it.
 
 ## Shapes
 
-Softly squared: 12px on controls, picture tiles and inputs; 16px on cards, rows and banners. Badges are 8px rectangles, not pills. Picture tiles are square (4.25rem, 3.5rem in rows) with a heavy 2.2px-stroke drawing.
+Softly squared: 8px on controls, picture tiles, inputs and badges; 12px on cards, rows and banners. Picture tiles are square (4.25rem, 3.5rem in rows) with a heavy 2.2px-stroke drawing.
 
 ## Components
 
 ### Buttons
-- **Shape:** 12px corners, 3px navy outline, minimum 56px tall.
-- **Primary:** navy fill, white 800-weight text, 64px tall; the one per screen.
-- **Quiet:** white fill, navy text and outline.
+- **Shape:** 8px corners, 2px outline, minimum 56px tall.
+- **Primary:** teal fill, white 800-weight text, 64px tall; the one per screen.
+- **Quiet:** white fill, teal text and outline.
 - **Block:** solid red with a darker red outline; used where blocking is the safe choice.
-- **Text:** transparent, underlined navy.
-- **Hover / Focus:** hover shifts to Band Blue or a deeper fill; press nudges 2px (off under reduced motion). Focus is a 4px navy ring with an 8px yellow halo, yellow on the navy header.
+- **Text:** transparent, underlined teal.
+- **Hover / Focus:** hover shifts to Band Teal or a deeper fill; press nudges 2px (off under reduced motion). Motion eases out and never overshoots. Focus is a 4px teal ring with an 8px pale teal halo, a white ring on the teal header.
 
 ### Picture tile
-Square tile with a 3px outline and a drawn icon. Yellow by default; green, orange or red when it states a status.
+Square tile with a 2px outline and a drawn icon. Soft teal with a teal icon by default; green, amber or red when it states a status.
+
+### Badges
+Status badge: icon, word and tint, 18px text, 1px outline, 8px corners and only as tall as its text, so it never reads as a button. Presence uses a teal dot instead of an icon.
 
 ### Rows and cards
-White, 3px navy outline, 16px corners. A row is picture, words, status badge.
+White, 2px outline, 12px corners. A row is picture, words, status badge; the badge wraps under the words on narrow screens.
 
 ### Banners
-A tinted block with a 3px outline in the state colour and a white picture tile on the left.
+A tinted block in the state colour with a white picture tile on the left.
 
 ### Inputs
-White, 3px navy outline, 12px corners, 56px minimum. Checkbox is a 35px outlined square that fills yellow with a navy tick.
+White, 2px outline, 8px corners, 56px minimum. Checkbox is an outlined square that fills amber with a dark tick.
 
 ### Navigation
-A navy header band: yellow shield, white wordmark, and plain underlined links on the demo view.
+A teal header band: amber logo tile, white wordmark and a white Helper tag. On phones a four-tab bar sits at the foot (Inbox, Ask Me, Messages, Remember); wide screens get a side bar.
 
 ## Do's and Don'ts
 
@@ -163,5 +174,5 @@ A navy header band: yellow shield, white wordmark, and plain underlined links on
 
 ### Don't:
 - **Don't** use shadows, gradients or glass; outline the box instead.
-- **Don't** use yellow to mean a state.
+- **Don't** use amber for anything but being checked; brand uses teal.
 - **Don't** colour a status without an icon and a word.

@@ -1,6 +1,6 @@
 @* Online or Offline, as icon, word and colour. Someone who chose Hidden shows as Offline to everyone but themselves. *@
-<span class="badge badge--@(_online ? "safe" : "off")">
-    <Icon Name="@(_online ? "check" : "eye-off")" />
+<span class="badge badge--@(_online ? "presence" : "off")">
+    @if (_online) { <span class="badge__dot" aria-hidden="true"></span> } else { <Icon Name="eye-off" /> }
     <span>@(_online ? "Online" : Own ? "Hidden" : "Offline")</span>
 </span>
 
