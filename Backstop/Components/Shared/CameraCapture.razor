@@ -55,13 +55,11 @@
     {
         try
         {
-            var data = await JS.InvokeAsync<IJSStreamReference>("backstopCamera.capture", _video, _shot);
-            await using var stream = await data.OpenReadStreamAsync(10 * 1024 * 1024);
-            using var memory = new MemoryStream();
-            await stream.CopyToAsync(memory);
+            var bytes = await JS.InvokeAsync<byte[]>("backstopCamera.capture", _video, _shot);
+            if (bytes is null || bytes.Length == 0) throw new InvalidOperationException("Empty photo.");
             _live = false;
             _hasShot = true;
-            await OnPhoto.InvokeAsync(new PicturePicker.PickedFile(memory.ToArray(), "camera.jpg"));
+            await OnPhoto.InvokeAsync(new PicturePicker.PickedFile(bytes, "camera.jpg"));
         }
         catch (Exception)
         {
