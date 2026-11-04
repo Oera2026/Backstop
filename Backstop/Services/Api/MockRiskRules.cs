@@ -62,10 +62,14 @@ public static partial class MockRiskRules
                 if (injected) found.Add(rule);
                 continue;
             }
-            var matches = rule.Pattern.Matches(text);
-            if (matches.Count == 0 && !rule.Pattern.IsMatch(folded)) continue;
+            try
+            {
+                var matches = rule.Pattern.Matches(text);
+                if (matches.Count == 0 && !rule.Pattern.IsMatch(folded)) continue;
+                hits.AddRange(matches.Select(m => new Highlight(m.Index, m.Length, rule.Flag.Id)));
+            }
+            catch (RegexMatchTimeoutException) { /* could not finish reading it, so the warning stands: fail closed */ }
             found.Add(rule);
-            hits.AddRange(matches.Select(m => new Highlight(m.Index, m.Length, rule.Flag.Id)));
         }
         var ordered = found.OrderByDescending(r => r.Weight).ToList();
         return new Finding(
@@ -112,9 +116,9 @@ public static partial class MockRiskRules
         return kept;
     }
 
-    [GeneratedRegex(@"\bgift ?cards?\b|\bvouchers?\b|\bsend (?:me )?(?:the )?(?:money|codes?)\b|\b(?:read|tell|give|text) (?:me |us )?the (?:\d+[- ]?digit )?codes?\b|\bcodes? on the back\b|\b(?:send|transfer|pay|need|lend|owe)\b[^.\n]{0,30}£\s?\d|\bbank transfer\b|\bpay (?:you|me) back\b|\blend me\b", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"\bgift ?cards?\b|\bvouchers?\b|\bsend (?:me )?(?:the )?(?:money|codes?)\b|\b(?:read|tell|give|text) (?:me |us )?the (?:\d+[- ]?digit )?codes?\b|\bcodes? on the back\b|\b(?:send|transfer|pay|need|lend|owe)\b[^.\n]{0,30}£\s?\d|\b(?:bank|wire) transfers?\b|\bwire (?:me|the|it|money)\b|\bpay (?:you|me) back\b|\blend me\b|\bgift-cards?\b|\b(?:itunes|apple|steam|google play|amazon|ebay) (?:gift )?(?:cards?|vouchers?)\b|\bprepaid cards?\b|\bcrypto(?:currency|currencies)?\b|\bbitcoin\b|\bethereum\b|\bwestern union\b|\bmoneygram\b|\bsafe account\b|\b(?:send|transfer|pay|need|lend|owe)\b[^.\n]{0,30}(?:[$€]\s?\d|\b\d[\d,]*(?:\.\d{1,2})?\s?(?:pounds?|quid|dollars?|euros?)\b)", RegexOptions.IgnoreCase)]
     private static partial Regex Money();
-    [GeneratedRegex(@"£\s?\d[\d,]*")]
+    [GeneratedRegex(@"[£$€]\s?\d[\d,]*|\b\d[\d,]*(?:\.\d{1,2})?\s?(?:pounds?|quid|dollars?|euros?)\b", RegexOptions.IgnoreCase)]
     private static partial Regex Amount();
     [GeneratedRegex(@"\bkeep (?:this|it) (?:between us|secret|to yourself|quiet)\b|\bdon'?t tell\b|\bdo not tell\b|\bbetween you and me\b|\bour (?:little )?secret\b", RegexOptions.IgnoreCase)]
     private static partial Regex Secret();
@@ -125,11 +129,18 @@ public static partial class MockRiskRules
     [GeneratedRegex(@"\banydesk\b|\bteamviewer\b|\bultraviewer\b|\bremote (?:access|control|support|desktop)\b|\byour computer has (?:a )?(?:virus|been (?:hacked|infected))\b|\bread (?:us|me) (?:the|your) \d* ?digit code\b", RegexOptions.IgnoreCase)]
     private static partial Regex Remote();
     // "today" and "immediately" are everyday words ("Dinner today?"), so they only count when they press for an action.
-    [GeneratedRegex(@"\burgent(?:ly)?\b|\bright now\b|\bas soon as possible\b|\basap\b|\bhurry\b|\bstraight away\b|\bwithin \d+ hours\b|\b(?:by|before) (?:the end of )?today\b|\b(?:today|immediately),? or\b|\b(?:book|reply|respond|pay|call|act|send|click|confirm|buy)\b[^.\n]{0,40}\b(?:today|immediately)\b", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"\burgent(?:ly)?\b|\bright now\b|\bact now\b|\blast chance\b|\bfinal (?:notice|warning|reminder)\b|\b(?:account|card|access|service|subscription|membership|licen[cs]e)\b[^.\n]{0,30}\b(?:suspended|frozen|terminated|locked)\b|\b(?:will be|has been|have been|was) suspended\b|\bsuspended (?:your|the|my) \w+\b|\bas soon as possible\b|\basap\b|\bhurry\b|\bstraight away\b|\bwithin \d+ hours\b|\b(?:by|before) (?:the end of )?today\b|\b(?:today|immediately),? or\b|\b(?:book|reply|respond|pay|call|act|send|click|confirm|buy)\b[^.\n]{0,40}\b(?:today|immediately)\b", RegexOptions.IgnoreCase)]
     private static partial Regex Hurry();
     [GeneratedRegex(@"\bmy darling\b|\bi love you\b|\bsoul ?mate\b|\bvery special to me\b|\bknown you for years\b|\bmeant to be\b", RegexOptions.IgnoreCase)]
     private static partial Regex Feelings();
-    [GeneratedRegex(@"\bkill(?:ing)? (?:myself|yourself|you|her|him|them)\b|\bend (?:my|your) life\b|\bsuicid\w*|\bself[- ]?harm\b|\bhurt(?:ing)? (?:myself|yourself|you)\b|\bdon'?t want to (?:be here|live|go on)\b|\bno one would miss me\b|\b(?:scared|afraid|frightened) of (?:him|her|them)\b|\b(?:he|she|they) (?:hits?|hurts?|threatens?|beats?) me\b|\bi(?:'m| am) (?:in danger|being (?:threatened|blackmailed|abused|held|followed))\b|\bi know where you live\b|\bhelp me,? please\b|\bnot safe (?:here|at home)\b", RegexOptions.IgnoreCase)]
+    // Words about someone's own safety. Ordinary uses stay out: "can't go on Friday", "my son beats me at chess", "he hits me up for a lift".
+    [GeneratedRegex(@"\b(?:want|wants|wanting) to die\b|\bi wish i (?:was|were) dead\b|\bend(?:ing)? it all\b|\btake my own life\b|\bnot worth living\b|\bno reason to live\b|\bbetter off without me\b|\bcan'?t (?:go|carry) on(?: any ?more| like this)?\s*(?:[.!,]|$)|" +
+        @"\bmy (?:son|daughter|husband|wife|partner|carer|care worker|grandson|granddaughter|nephew|niece|brother|sister|neighbou?r|boyfriend|girlfriend|lodger) (?:\w+ )?(?:hits?|hurts?|beats?|threatens?|threatened|slaps?|slapped|kicks?|kicked|punch(?:es|ed)?|pushe[sd]|grabs|grabbed) me\b(?! (?:up|at|in|to|every|with a)\b)|" +
+        @"\b(?:he|she|they) (?:hit|beat|slapped|kicked|punched|pushed|threatened) me\b(?! (?:up|at|in|to|every|with a)\b)|" +
+        @"\b(?:he|she|they|my (?:son|daughter|husband|wife|partner|carer|care worker|grandson|granddaughter|nephew|niece|brother|sister|neighbou?r|boyfriend|girlfriend|lodger)) (?:(?:always|keeps?) )?(?:takes?|took|has taken|keeps?|stole|steals?|has stolen|controls?|spends?|spent|emptied) (?:all )?my (?:pension|money|savings|benefits|bank card|pin)\b|" +
+        @"\b(?:forc\w+|pressur\w+|mak(?:es|ing)|made) me (?:to )?(?:sign|hand over|transfer|withdraw|change my will|give (?:him|her|them) (?:all )?(?:my |the )?(?:money|pension|savings|pin|card))\b|" +
+        @"\bi(?:'?m| am) not allowed (?:to (?:see|talk|speak|call|ring|leave|go out|use the phone)|out)\b|\b(?:he|she|they|my \w+) (?:won'?t|will not|doesn'?t|does not|don'?t) let me (?:see|talk|speak|call|ring|leave|go out)\b|\b(?:scared|afraid|frightened) (?:to go home|of my (?:son|daughter|husband|wife|partner|carer|care worker|grandson|granddaughter|nephew|niece|brother|sister|neighbou?r|boyfriend|girlfriend|lodger))\b|\b(?:threatened|threatens|threatening) to (?:put me|send me|hurt me|leave me|kick me)\b|" +
+        @"\bkill(?:ing)? (?:myself|yourself|you|her|him|them)\b|\bend (?:my|your) life\b|\bsuicid\w*|\bself[- ]?harm\b|\bhurt(?:ing)? (?:myself|yourself|you)\b|\bdon'?t want to (?:be here|live|go on)\b|\bno one would miss me\b|\b(?:scared|afraid|frightened) of (?:him|her|them)\b|\b(?:he|she|they) (?:hits?|hurts?|threatens?|beats?) me\b|\bi(?:'?m| am) (?:in danger|being (?:threatened|blackmailed|abused|held|followed))\b|\bi know where you live\b|\bhelp me,? please\b|\bnot safe (?:here|at home)\b", RegexOptions.IgnoreCase)]
     private static partial Regex AtRisk();
     [GeneratedRegex(@"(?!)")]
     private static partial Regex Never();
