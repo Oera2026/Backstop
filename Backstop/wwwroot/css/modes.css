@@ -652,15 +652,15 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 .dock-tab {
   position: fixed; z-index: 45; right: max(.75rem, env(safe-area-inset-right)); bottom: calc(4.75rem + env(safe-area-inset-bottom));
   display: inline-flex; align-items: center; gap: .7rem; min-height: 64px; padding: 0 1.5rem 0 1.2rem;
-  font: inherit; font-size: calc(1.2rem * var(--tx)); font-weight: 800; color: var(--on-marker); background: var(--marker);
-  border: 3px solid var(--navy); border-radius: 999px; box-shadow: 0 6px 18px var(--scrim); cursor: pointer;
+  font: inherit; font-size: calc(1.2rem * var(--tx)); font-weight: 800; color: var(--on-accent); background: var(--accent);
+  border: 3px solid var(--bg); border-radius: 999px; box-shadow: 0 6px 18px var(--scrim); cursor: pointer;
 }
 .dock-tab .icon { width: 1.8rem; height: 1.8rem; stroke-width: 2.4; }
 @media (hover: hover) { .dock-tab:hover { box-shadow: 0 8px 22px var(--scrim); filter: brightness(.96); } }
 .dock-tab:focus-visible { outline: 4px solid var(--focus); outline-offset: 4px; }
 @media (min-width: 960px) { .dock-tab { bottom: 1.5rem; right: 1.5rem; } }
 /* A soft ring that breathes a few times, so a new visitor sees it */
-.dock-tab::after { content: ""; position: absolute; inset: -8px; border-radius: inherit; border: 3px solid var(--marker); opacity: 0; animation: ask-ring 2s ease-out 1s 3; pointer-events: none; }
+.dock-tab::after { content: ""; position: absolute; inset: -8px; border-radius: inherit; border: 3px solid var(--accent); opacity: 0; animation: ask-ring 2s ease-out 1s 3; pointer-events: none; }
 @keyframes ask-ring { 0% { opacity: .9; transform: scale(.96); } 100% { opacity: 0; transform: scale(1.12); } }
 @media (prefers-reduced-motion: reduce) { .dock-tab::after { animation: none; } }
 :root[data-motion="calm"] .dock-tab::after { animation: none; }
