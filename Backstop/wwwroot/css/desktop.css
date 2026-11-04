@@ -14,3 +14,8 @@
   .page--wide:not(.page--login):not(.page--demo) { max-width: calc(var(--col, 52rem) * var(--widen)); }
   .page--demo { max-width: calc(70rem * var(--widen)); }
 }
+
+/* Ask Me page: the chat is the page. No box inside a box, and it uses the whole space beside the side bar. */
+.chat--page { border: 0; border-radius: 0; padding: 0; margin: 0; }
+@media (min-width: 960px) { .shell > .page:has(> .chat--page):not(.page--login):not(.page--demo) { max-width: none; flex: 1 1 0; margin-inline: 0; } }
+.chat--page .bubble { max-width: min(85%, 48rem); }
