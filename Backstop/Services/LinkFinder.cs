@@ -21,39 +21,50 @@ public static class LinkFinder
 
     private const RegexOptions Options = RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled;
 
+    // A stuck match must fail fast and closed, never hang the check.
+    private static readonly TimeSpan MatchTimeout = TimeSpan.FromMilliseconds(250);
+
     /// <summary>Any link in the text.</summary>
-    public static Regex Pattern { get; } = new(PatternText, Options);
+    public static Regex Pattern { get; } = new(PatternText, Options, MatchTimeout);
 
     /// <summary>Any link, or the marker left where one was taken out.</summary>
-    public static Regex PatternOrRemoved { get; } = new(@"\[link removed\]|" + PatternText, Options);
+    public static Regex PatternOrRemoved { get; } = new(@"\[link removed\]|" + PatternText, Options, MatchTimeout);
 
     private static readonly string[] ShortenerHosts =
         ["bit.ly", "tinyurl.com", "t.co", "goo.gl", "is.gd", "ow.ly", "rb.gy", "cutt.ly", "buff.ly", "shorturl.at"];
     private static readonly string[] ShortenerLabels = ["short", "shorten", "tiny", "tinyurl"];
     private static readonly Regex RiskyWords = new(
-        @"\b(?:login|log-in|signin|sign-in|verify|password|download|claim|reward|prize)s?\b", Options);
+        @"\b(?:login|log-in|signin|sign-in|verify|password|download|claim|reward|prize)s?\b", Options, MatchTimeout);
 
     /// <summary>Every distinct link in the text (up to <see cref="MaxLinks"/>), judged by its address.</summary>
     public static Scan Inspect(string text)
     {
-        var all = Pattern.Matches(text).Select(m => m.Value.TrimEnd('.', ',', ';', ':', '!', '?')).Where(v => v.Length > 0).Distinct().ToList();
-        var links = new List<LinkCheck>();
-        var problems = 0;
-        var deceptive = false;
-        foreach (var raw in all.Take(MaxLinks))
+        try
         {
-            var (signals, bad, trick) = Judge(raw);
-            var shown = Defang.Url(raw.Length > MaxLength ? raw[..MaxLength] : raw);
-            links.Add(new LinkCheck(shown, signals));
-            if (bad) problems++;
-            deceptive |= trick;
+            var all = Pattern.Matches(text).Select(m => m.Value.TrimEnd('.', ',', ';', ':', '!', '?')).Where(v => v.Length > 0).Distinct().ToList();
+            var links = new List<LinkCheck>();
+            var problems = 0;
+            var deceptive = false;
+            foreach (var raw in all.Take(MaxLinks))
+            {
+                var (signals, bad, trick) = Judge(raw);
+                var shown = Defang.Url(raw.Length > MaxLength ? raw[..MaxLength] : raw);
+                links.Add(new LinkCheck(shown, signals));
+                if (bad) problems++;
+                deceptive |= trick;
+            }
+            if (all.Count > MaxLinks)
+            {
+                links.Add(new LinkCheck($"{all.Count - MaxLinks} more", ["There are a lot of links in this message."]));
+                problems++;
+            }
+            return new Scan(links, problems, deceptive);
         }
-        if (all.Count > MaxLinks)
+        catch (RegexMatchTimeoutException)
         {
-            links.Add(new LinkCheck($"{all.Count - MaxLinks} more", ["There are a lot of links in this message."]));
-            problems++;
+            // Fail closed: one problem, so the message is held and never cleared.
+            return new Scan([new LinkCheck("[could not check]", [CouldNotCheckNote])], 1, false);
         }
-        return new Scan(links, problems, deceptive);
     }
 
     /// <summary>Returns the address signals that fired (empty when none did), whether any is a problem, and whether the address is disguised.</summary>
@@ -61,6 +72,7 @@ public static class LinkFinder
     public const string NotSecureNote = "It is not a secure page.";
     public const string RiskyWordsNote = "The address mentions signing in, downloading or a prize.";
     public const string VeryLongNote = "The address is very long.";
+    public const string CouldNotCheckNote = "The link could not be fully checked.";
 
     /// <param name="maxLength">Real mail uses <see cref="MaxLength"/>. The Link check on /try allows longer ones, because shop and
     /// tracking links are often several hundred letters long and that alone says nothing.</param>
@@ -88,8 +100,15 @@ public static class LinkFinder
         { notes.Add(ShortenerNote); disguised = true; }
         if (hasScheme && uri.Scheme == Uri.UriSchemeHttp)
             notes.Add(NotSecureNote);
-        if (RiskyWords.IsMatch(host + uri.AbsolutePath))
-            notes.Add(RiskyWordsNote);
+        try
+        {
+            if (RiskyWords.IsMatch(host + uri.AbsolutePath))
+                notes.Add(RiskyWordsNote);
+        }
+        catch (RegexMatchTimeoutException)
+        {
+            return ([CouldNotCheckNote], true, false);
+        }
 
         // A plain http page alone is not enough to worry about.
         var problem = notes.Any(n => n != NotSecureNote);

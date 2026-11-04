@@ -17,7 +17,7 @@ public interface ILinkInspector
 /// Follows a link the way a careful person would, without ever running or drawing the page:
 /// GET only, http and https on ports 80 and 443, at most 5 redirects, 5 seconds a hop, 1 MB read, no cookies, no sign-in headers.
 /// Every hop looks the name up again and refuses any address that is not an ordinary public one, and the connection itself
-/// is pinned to the address that passed (see <see cref="CreateClient"/>), so the name cannot change between the check and the visit.
+/// (see <see cref="CreateClient"/>) looks it up again and only dials an address from an all-public answer.
 /// The page text is read only to look for a password box. It is never kept and never passed on.
 /// Any timeout, error or refused address ends as "could not verify, treated as unsafe".
 /// </summary>
@@ -128,8 +128,10 @@ public sealed partial class LinkInspector : ILinkInspector
             var refusal = IpGuard.RefuseUrl(current) ?? await RefuseResolvedAsync(current, ct);
             if (refusal is not null)
             {
-                chain.Add(new LinkHop(Shown(current.AbsoluteUri), "blocked"));
-                return Bail(refusal);
+                // One message for every refused target, so blocked, internal and unresolvable addresses look the same. The detail stays in the server log.
+                _logger?.LogInformation("Link check refused a hop ({Reason}).", refusal);
+                chain.Add(new LinkHop("(blocked address)", "blocked"));
+                return Bail("It could not be reached.");
             }
             if (!seen.Add(current.AbsoluteUri))
             {
@@ -234,7 +236,7 @@ public sealed partial class LinkInspector : ILinkInspector
         }
     }
 
-    // Looks the name up now and refuses it if ANY answer is not a public address. The connection is pinned again at connect time.
+    // Looks the name up now and refuses it if ANY answer is not a public address. The connect step looks it up and checks it again before dialling.
     private async Task<string?> RefuseResolvedAsync(Uri uri, CancellationToken ct)
     {
         var host = uri.IdnHost.Trim('[', ']');
