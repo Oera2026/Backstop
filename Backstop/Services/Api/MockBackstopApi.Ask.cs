@@ -261,6 +261,6 @@ public sealed partial class MockBackstopApi
             _checks[result.Id] = new(result, original, DateTimeOffset.Now);
             MarkVisitorItem(result.Id);
         }
-        Changed?.Invoke();
+        RaiseChanged();
     }
 }

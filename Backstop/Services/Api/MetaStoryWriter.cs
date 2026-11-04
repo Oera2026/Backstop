@@ -199,16 +199,14 @@ public sealed class MetaStoryWriter : IStoryWriter
         {
             if (string.IsNullOrWhiteSpace(content)) return Fail(MetaFailures.BadReply("Empty response", null));
             var raw = content.Trim();
-            if (raw.StartsWith("```json", StringComparison.OrdinalIgnoreCase)) raw = raw[7..];
-            else if (raw.StartsWith("```")) raw = raw[3..];
-            if (raw.EndsWith("```")) raw = raw[..^3];
+            raw = MetaHttp.JsonIn(raw);
 
             using var inner = JsonDocument.Parse(raw.Trim());
             var root = inner.RootElement;
             if (root.ValueKind != JsonValueKind.Object) return Fail(MetaFailures.BadReply("Not an object", null));
 
             // Only a real JSON true counts, and it can only make the story stricter.
-            var sensitive = root.TryGetProperty("sensitive", out var sv) && sv.ValueKind == JsonValueKind.True;
+            var sensitive = root.TryGetProperty("sensitive", out var sv) && MetaHttp.IsTrue(sv);
 
             var title = InputGuard.SafeText(Str(root, "title"), 60, digitRun: 5, allowAdvice: true);
             if (title is null || !root.TryGetProperty("pages", out var pagesEl) || pagesEl.ValueKind != JsonValueKind.Array)

@@ -40,8 +40,8 @@ public interface IMailService
     /// <summary>MOCK: pretends to send. Nothing leaves the app. Refuses no-reply addresses and tells the helper about first-time recipients.</summary>
     SendResult Send(string to, string subject, string body);
 
-    /// <summary>Keeps a private-looking message back for the helper. Nothing is sent until the helper approves. Returns false for a no-reply address.</summary>
-    bool HoldOutgoing(string to, string subject, string body, IReadOnlyList<string> reasons);
+    /// <summary>Keeps a private-looking message back for the helper. Nothing is sent until the helper approves. Returns null when kept, or plain words saying why it was refused.</summary>
+    string? HoldOutgoing(string to, string subject, string body, IReadOnlyList<string> reasons);
 
     // --- Demo support ---
     IReadOnlyList<Scenario> Scenarios { get; }

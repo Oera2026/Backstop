@@ -305,9 +305,9 @@
     // The message is kept for the helper. Nothing is sent until they approve it.
     private void AskHelper()
     {
-        if (!Mail.HoldOutgoing(_to, _subject, _body, _reasons))
+        if (Mail.HoldOutgoing(_to, _subject, _body, _reasons) is { } refused)
         {
-            _error = "That is a no-reply address. Nobody reads messages sent to it, so we cannot send this.";
+            _error = refused;
             _stage = Stage.Form;
             return;
         }

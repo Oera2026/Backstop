@@ -123,7 +123,7 @@ else
         try
         {
             _item = await Api.GetReviewItemAsync(Id);
-            _check = await Api.GetCheckAsync(Id);
+            _check = await Api.GetCheckForHelperAsync(Id);
         }
         catch (BackstopApiException ex) { _problem = ex.Message; }
         _loading = false;

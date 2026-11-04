@@ -38,17 +38,17 @@ public sealed partial class MockBackstopApi
         foreach (var m in guardian.GetQueue())
         {
             var (tone, icon, word) = MailRisk(m);
-            items.Add(new(m.Id, HelperItemKind.Mail, m.CallRequested ? HelperGroup.Calls : HelperGroup.Decide, "Mail", m.FromName, m.Subject,
+            items.Add(new(m.Id, HelperItemKind.Mail, m.CallRequested ? HelperGroup.Calls : HelperGroup.Decide, "Mail", Defang.ForHelper(m.FromName), Defang.ForHelper(m.Subject),
                 m.AwaitingScan ? "The checker could not finish. It will try again." : m.Summary, m.ReceivedAt, $"helper/{m.Id}", tone, icon, word, m.CallRequested));
         }
 
         foreach (var o in guardian.GetHeldOutgoing())
-            items.Add(new(o.Id, HelperItemKind.Outgoing, HelperGroup.Decide, "Being sent", $"{User} wants to send to {Defang.ForHelper(o.ToAddress)}", o.Subject,
+            items.Add(new(o.Id, HelperItemKind.Outgoing, HelperGroup.Decide, "Being sent", $"{User} wants to send to {Defang.ForHelper(o.ToAddress)}", Defang.ForHelper(o.Subject),
                 $"{Defang.ForHelper(o.Body)} {string.Join(" ", o.Reasons)}".Trim(), o.At, null, "check", "hourglass", "Held back"));
 
         foreach (var n in guardian.GetNotices())
-            items.Add(new(n.Id, HelperItemKind.NewPerson, HelperGroup.Info, "New person", "Wrote to someone new", n.Address,
-                $"First time. Subject: {n.Subject}", n.At, null, "info", "user", ""));
+            items.Add(new(n.Id, HelperItemKind.NewPerson, HelperGroup.Info, "New person", "Wrote to someone new", Defang.ForHelper(n.Address),
+                $"First time. Subject: {Defang.ForHelper(n.Subject)}", n.At, null, "info", "user", ""));
 
         var waitingForChecker = guardian.GetQueue().Count(m => m.AwaitingScan);
         if (waitingForChecker > 0)
@@ -104,13 +104,13 @@ public sealed partial class MockBackstopApi
         {
             var byChecker = m.State == MessageState.Blocked && m.HelperDecision is null;
             var blocked = m.State == MessageState.Blocked;
-            list.Add(new(m.ReceivedAt, blocked ? "cross" : "check", $"{m.FromName}: {m.Subject}",
+            list.Add(new(m.ReceivedAt, blocked ? "cross" : "check", Defang.ForHelper($"{m.FromName}: {m.Subject}"),
                 byChecker ? "Blocked by the checker" : blocked ? "You blocked it" : "You approved it", blocked ? "block" : "safe"));
         }
 
         lock (_gate)
         {
-            foreach (var c in _checks.Values.Where(x => x.Result.Status is ReviewStatus.Released or ReviewStatus.Blocked))
+            foreach (var c in _checks.Values.Where(x => x.Result.Status is ReviewStatus.Released or ReviewStatus.Blocked && CanSee(x)))
             {
                 var blocked = c.Result.Status == ReviewStatus.Blocked;
                 list.Add(new(c.AskedAt ?? c.Result.CheckedAt, blocked ? "cross" : "check", TitleFor(c.Result, c.Original),
@@ -127,7 +127,7 @@ public sealed partial class MockBackstopApi
         }
 
         foreach (var n in guardian.GetSeenNotices())
-            list.Add(new(n.At, "user", $"Wrote to someone new: {n.Address}", "You saw it", "safe"));
+            list.Add(new(n.At, "user", $"Wrote to someone new: {Defang.ForHelper(n.Address)}", "You saw it", "safe"));
 
         return list.OrderByDescending(e => e.At).ToList();
     }
@@ -142,7 +142,7 @@ public sealed partial class MockBackstopApi
             _help[i] = _help[i] with { Done = true };
             Log("check", $"You helped {User} with \"{title}\".");
         }
-        Changed?.Invoke();
+        RaiseChanged();
     }
 
     public void MarkCalled(string id)
@@ -157,7 +157,7 @@ public sealed partial class MockBackstopApi
                 done = true;
             }
         }
-        if (done) Changed?.Invoke();
+        if (done) RaiseChanged();
         else guardian.CalledBack(id);
     }
 
@@ -178,7 +178,7 @@ public sealed partial class MockBackstopApi
             _people.Add(person);
             Log("plus", $"You added {name} to the people {User} can message.");
         }
-        Changed?.Invoke();
+        RaiseChanged();
         return person;
     }
 
@@ -192,6 +192,6 @@ public sealed partial class MockBackstopApi
             _people.Remove(p);
             Log("minus", $"You took {p.Name} off the people {User} can message.");
         }
-        Changed?.Invoke();
+        RaiseChanged();
     }
 }

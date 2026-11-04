@@ -34,7 +34,7 @@ public sealed class MetaCallGuard
     public int VisitorDayLimit { get; }
 
     public MetaCallGuard(IConfiguration config) : this(
-        config.GetValue("MetaAI:MaxCallsPerMinute", 40),
+        int.TryParse(config["MetaAI:MaxCallsPerMinute"], out var perMinute) && perMinute > 0 ? perMinute : 40,
         null, Read(config, "META_AI_MAX_CALLS_PER_IP_PER_MINUTE", "MetaAI:MaxCallsPerIpPerMinute", 15),
         Read(config, "META_AI_MAX_CALLS_PER_DAY", "MetaAI:MaxCallsPerDay", 1500),
         Read(config, "META_AI_MAX_CALLS_PER_IP_PER_DAY", "MetaAI:MaxCallsPerIpPerDay", 200)) { }

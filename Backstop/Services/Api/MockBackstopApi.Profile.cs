@@ -20,7 +20,7 @@ public sealed partial class MockBackstopApi
     public void SetPresence(ProfileRole role, Presence presence)
     {
         lock (_gate) _presence[role] = presence;
-        Changed?.Invoke();
+        RaiseChanged();
     }
 
     public bool SetProfilePhoto(ProfileRole role, byte[] bytes)
@@ -34,7 +34,7 @@ public sealed partial class MockBackstopApi
             _photos[Profile.PhotoKey(role)] = new ContactPhoto(bytes, type);
             _profilePhotoVersion[role] = Guid.NewGuid().ToString("N")[..8];
         }
-        Changed?.Invoke();
+        RaiseChanged();
         return true;
     }
 
@@ -45,7 +45,7 @@ public sealed partial class MockBackstopApi
             _photos.Remove(Profile.PhotoKey(role));
             _profilePhotoVersion.Remove(role);
         }
-        Changed?.Invoke();
+        RaiseChanged();
     }
 
     // Caller holds the lock.
