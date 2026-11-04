@@ -76,8 +76,9 @@ public interface IMailService
     /// <summary>
     /// Scans held mail that is waiting for the AI again (all of it, or just <paramref name="id"/>). Mail leaves
     /// the held state only when the AI answers. Returns how many got an answer. A failure leaves the mail held.
+    /// <paramref name="force"/> tries now even if a message is waiting out a timer's backoff: the helper asked.
     /// </summary>
-    Task<int> RescanAsync(string? id = null);
+    Task<int> RescanAsync(string? id = null, bool force = false);
 
     void Reset();
 }

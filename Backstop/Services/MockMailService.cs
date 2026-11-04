@@ -28,24 +28,32 @@ public sealed partial class MockMailService(MailStore store, IMetaScamChecker? m
         return m is { State: MessageState.Cleared } ? m : null;
     }
 
-    [GeneratedRegex(@"\b(?:\d[ -]?){13,19}\b")]
+    [GeneratedRegex(@"\b(?:[0-9][ -]?){13,19}\b")]
     private static partial Regex CardNumber();
-    [GeneratedRegex(@"\b(\d{2})-(\d{2})-(\d{2})\b")]
+    [GeneratedRegex(@"\b([0-9]{2})-([0-9]{2})-([0-9]{2})\b")]
     private static partial Regex SixDigitsDashed();
-    [GeneratedRegex(@"\b\d{8}\b")]
+    [GeneratedRegex(@"\b[0-9]{8}\b")]
     private static partial Regex AccountNumber();
 
     // MOCK: replace with the real outgoing data-loss check.
     public OutgoingCheck CheckOutgoing(string to, string subject, string body)
     {
         // Folded, so hidden characters and full-width digits cannot hide a card number.
-        var text = InputGuard.Fold($"{subject}\n{body}");
+        var text = PlainDigits(InputGuard.Fold($"{subject}\n{body}"));
         var reasons = new List<string>();
         if (HasCardNumber(text)) reasons.Add("It looks like a card number.");
         if (HasBankCode(text)) reasons.Add("It looks like a bank code.");
         if (SensitivePatterns.Secret.IsMatch(text)) reasons.Add("It looks like a password or secret code.");
         return new OutgoingCheck(reasons.Count > 0, reasons);
     }
+
+    // Digits from any alphabet count, so a card number or bank code cannot hide in them.
+    private static string PlainDigits(string text) =>
+        string.Create(text.Length, text, (to, from) =>
+        {
+            for (var i = 0; i < to.Length; i++)
+                to[i] = char.IsDigit(from[i]) ? (char)('0' + System.Globalization.CharUnicodeInfo.GetDecimalDigitValue(from[i])) : from[i];
+        });
 
     // Long numbers are only card numbers when they pass the card checksum (Luhn), so phone and order numbers are left alone.
     private static bool HasCardNumber(string text) =>
@@ -374,7 +382,7 @@ public sealed partial class MockMailService(MailStore store, IMetaScamChecker? m
     /// blocked when the AI answers, using the same policy as a new message. No answer leaves it exactly as it was.
     /// <paramref name="id"/> null is the timer's sweep, which skips messages still backing off.
     /// </summary>
-    public async Task<int> RescanAsync(string? id = null)
+    public async Task<int> RescanAsync(string? id = null, bool force = false)
     {
         if (metaChecker is null) return 0;
         var now = Clock();
@@ -384,7 +392,7 @@ public sealed partial class MockMailService(MailStore store, IMetaScamChecker? m
         {
             lock (_scanGate)
             {
-                if (id is null && _backoff.TryGetValue(msg.Id, out var b) && now < b.NextTry) continue;
+                if (id is null && !force && _backoff.TryGetValue(msg.Id, out var b) && now < b.NextTry) continue;
                 if (!_scanning.Add(msg.Id)) continue; // already being scanned
             }
             var ok = false;

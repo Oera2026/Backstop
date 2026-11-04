@@ -16,6 +16,11 @@
     </div>
 }
 
+@if (_scanNote is not null)
+{
+    <p class="done-note" role="status"><Icon Name="refresh" /> @_scanNote</p>
+}
+
 @{
     // The one thing to do first, then everything else in a short list.
     var todo = digest.In(HelperGroup.Urgent).Concat(digest.In(HelperGroup.Decide)).Concat(digest.In(HelperGroup.Calls)).ToList();
@@ -73,6 +78,7 @@
     private IReadOnlyList<MemoryCard> _memories = [];
     private IReadOnlyList<ActivityEntry> _activity = [];
     private bool _scanning, _more;
+    private string? _scanNote;
 
     protected override Task OnInitializedAsync() => Load();
     protected override Task OnApiChangedAsync() => Load();
@@ -93,8 +99,19 @@
 
     private async Task Rescan()
     {
+        if (_scanning) return;
         _scanning = true;
-        try { await Mail.RescanAsync(); }
+        _scanNote = null;
+        try
+        {
+            var answered = await Mail.RescanAsync(force: true);
+            _scanNote = answered switch
+            {
+                0 => "No answer yet. Please try again later.",
+                1 => "Done. The checker answered 1 message.",
+                _ => $"Done. The checker answered {answered} messages.",
+            };
+        }
         finally { _scanning = false; }
     }
 
