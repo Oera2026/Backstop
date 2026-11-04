@@ -21,7 +21,7 @@
     // "Like my device" follows the device; the CSS only ever sees light or dark.
     root.dataset.scheme = s.theme === 'dark' || (s.theme === 'auto' && dark && dark.matches) ? 'dark' : 'light';
     var bar = document.querySelector('meta[name="theme-color"]');
-    if (bar) bar.setAttribute('content', root.dataset.scheme === 'dark' ? '#131C42' : '#1E3A8A');
+    if (bar) bar.setAttribute('content', root.dataset.scheme === 'dark' ? '#131C42' : '#0F4C5C');
   }
 
   if (dark && dark.addEventListener) dark.addEventListener('change', function () { apply(read()); });
