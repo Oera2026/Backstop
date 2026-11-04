@@ -57,8 +57,6 @@ public sealed record CheckResult(
 
 // ---------- Show me ----------
 
-/// <summary>A box on the user's photo, in percent of its width and height.</summary>
-
 /// <summary>Shown on tasks that need care (medicines, electrics, chemicals).</summary>
 public sealed record CareNote(string Topic, string Text);
 

@@ -76,10 +76,8 @@ Icons are names from `Components/Shared/Icon.razor`.
 ```
 {
   id, title, goal,
-  photoUrl: string|null,                 // the user's photo, served by the back end
   picture: string,                       // the "what it looks like when done" picture: a drawing key the model picks from a fixed list, drawn by the app
   steps: string[],
-  highlight: { x, y, width, height, label } | null,   // percent of the photo
   needsCare: { topic: "Chemicals"|"Medicines"|"Electrics", text } | null,
   madeAt
 }
@@ -129,7 +127,7 @@ Changing the level or format calls `POST /explanations` again with the same `ori
 ```
 {
   id, title, date: "yyyy-MM-dd", summary,
-  photoUrl: string|null, picture: string,
+  picture: string,
   tags: string[], steps: string[],
   howYouDidIt: "Last time you reset the internet box by …",
   source: ShowMe|Explain,
@@ -161,7 +159,7 @@ Changing the level or format calls `POST /explanations` again with the same `ori
 
 `CallFirst` keeps the item held and sets `callRequested`.
 
-## Photos
+## Profile pictures
 
 | Method | Path | Response |
 |---|---|---|

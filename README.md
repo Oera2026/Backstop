@@ -37,6 +37,8 @@ Calls retry twice with backoff, honour `Retry-After`, and pause for 20 seconds i
 
 Explain and questions about a document go to Meta AI. Photos of a document are read by the AI; PDFs cannot be read yet, so Explain asks for a photo or pasted text. Show me guides and Remember questions also go to Meta AI: guides are written fresh for any goal (unsafe goals are refused), and memory answers are written only from the person's saved cards. Guide and story pictures are simple line drawings the app makes itself, from a picture the AI picks — that is the chosen art style, not generated imagery.
 
+What a visitor adds goes to Meta AI and is then disposed of. "Write my own email" on `/demo` and Show me photos are never stored. Check, Explain, Show me, Stories and Ask Me results, and Remember cards saved from them, are deleted after 30 minutes. An open safeguarding alert stays until the helper acts, without the person's words. Compose, Chat, Contacts, Calendar and profile pictures do not go to Meta and stay in memory until the demo resets or the app restarts.
+
 ## Data
 
 All state is in memory and resets when the app restarts. There is no database and no sign-in.

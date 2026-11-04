@@ -1,19 +1,19 @@
 # PROJECT STATE & ARCHITECTURE REPORT
 
-Generated 2026-11-01 from commit `2dc315c`. Updated 2026-11-03: the public Try it page (`/try`) is added (section 4). Other sections still describe 1 Nov and are partly out of date (sign-in cookies, the Render deployment and the Dockerfile now exist; Supabase persistence is still not wired).
+Generated 2026-11-01 from commit `2dc315c`. Sections 1 to 7 refreshed 2026-11-04. Sections 8 to 15 are dated records of what was added at the time; where they disagree with sections 1 to 7 or 16, the later text wins. Section 16 lists what is still open.
 
-**4 Nov 2026 update:** sign-in (cookie login, accounts, roles, `RoleGate`) and Supabase were removed by the owner. Nothing is gated; `/demo-start` is the start page and the guided tour is offered to everyone. All state is in memory. Sections below that mention sign-in, accounts or Supabase are history.
+**4 Nov 2026 update:** sign-in (cookie login, accounts, roles, `RoleGate`) and Supabase were removed by the owner. Nothing is gated; `/demo-start` is the start page and the guided tour is offered to everyone. All state is in memory. Anything below that mentions sign-in, accounts or Supabase is history.
 
 ## 1. Executive Summary & Core Stack
 
 - **Project Purpose:** **Backstop** is a safe email and messaging client for elderly people and adults with learning disabilities. Every incoming message is held until checked. The user never sees held mail (no sender, no subject, only "N messages being checked by your helper"). Anything unclear goes to a trusted **helper**, who approves, blocks, or asks to "call them first". Around the mail core sit assistive modes: Check (scam check), Show me (step guides), Explain, Remember (memory cards), Stories (social stories), Ask Me (AI chat), and Chat with approved people.
 - **Tech Stack:**
   - Frontend and backend: .NET 10 Blazor Server (interactive server render mode), Razor components, plain CSS (no UI framework), small vanilla JS (`wwwroot/js`).
-  - Database: none. All state is in memory (`MailStore`, `MockBackstopApi`). Data is synthetic.
-  - Third-party API: Meta Dev API (`https://api.meta.ai/v1/chat/completions`) with Muse models (default `muse-spark-1.3`). It is the only permitted external call.
-  - Deployment: none yet. Local `dotnet run` on port 5106. PWA manifest is present.
-  - Tooling noise: root `package.json` holds Astryx (`@astryxdesign/*`, stylex) deps left from a React template. AGENTS.md says they do not apply. Graphify and Impeccable skills are used for code navigation and design critique.
-- **Current Development Phase:** Feature-complete front-end MVP with a mock backend, plus a real Meta AI integration for scam checking and Ask Me. Now in UX polish and hardening (layout critique, phone fixes, motion). Helper permission tiers are partly built (model and API in place, setup UI and enforcement not yet).
+  - Database: none. All state is in memory (`MailStore`, `MockBackstopApi`). Seed data is synthetic.
+  - Third-party API: Meta Dev API (`https://api.meta.ai/v1/chat/completions`) with Muse models (default `muse-spark-1.3`). Besides that, only the `/try` link check may go out (AGENTS.md).
+  - Deployment: one Docker container on Render, with Cloudflare in front: https://backstop-4xz9.onrender.com/demo-start. Locally, `dotnet run` on port 5106. PWA manifest is present.
+  - Tooling: Graphify for code navigation (`graphify-out/`, git-ignored). The Impeccable skill and `.impeccable/` stay on disk but are git-ignored.
+- **Current Development Phase:** Final hardening for the 4 Nov 2026 submission. Features are complete on a mock back end, with real Meta AI behind Check, Ask Me, Explain, Show me, Stories and Remember questions. The Standard helper tier is the hard default and ceiling, enforced in the guardian service.
 
 ## 2. Directory Structure & File Inventory
 
@@ -23,9 +23,9 @@ Meta Hackathon/
 ├── README.md, PRODUCT.md, DESIGN.md, API_CONTRACT.md
 ├── docs/helper-permissions-plan.md   Plan: risk alerts + helper tiers
 ├── .env.example                 Placeholders only (real .env is git-ignored)
-├── package.json                 Astryx deps only (unused by the Blazor app)
-├── .claude/ (launch.json, skills/impeccable)   .impeccable/ (design.json, critiques)
-├── graphify-out/                Knowledge graph (built at 0ab498b, stale)
+├── .claude/launch.json          Tracked. .claude/skills/ and .impeccable/ are local only
+├── .github/workflows/ci.yml     Release build and the checks on every push
+├── graphify-out/                Knowledge graph (git-ignored; refresh with graphify update .)
 └── Backstop/
     ├── Program.cs               DI, .env loader, CSP/security headers, photo endpoints, --test-llama (Debug builds only)
     ├── Backstop.csproj          net10.0
@@ -35,12 +35,13 @@ Meta Hackathon/
     ├── Services/
     │   ├── Interfaces.cs        IMailService, IGuardianService
     │   ├── MailStore.cs         In-memory state + change events
+    │   ├── MailRescanService.cs, VisitorDataDisposalService.cs   Background timers
     │   ├── MockMailService.cs   Mock pipeline (tiers, Failed->Held), compose, contacts, calendar, search
-    │   ├── MockGuardianService.cs, MockData.cs (7 scenarios, contacts, seed)
+    │   ├── MockGuardianService.cs, MockData.cs (11 scenarios, contacts, seed)
     │   ├── Defang.cs, InputGuard.cs, ImageSniff.cs, NoReply.cs, UserClock.cs
     │   └── Api/
     │       ├── IBackstopApi.cs  Contract for all modes (see API_CONTRACT.md)
-    │       ├── MockBackstopApi (.cs, .Ask, .Chat, .Explain, .Stories), MockRiskRules.cs
+    │       ├── MockBackstopApi (.cs, .Ask, .Chat, .Disposal, .Explain, .Helper, .Stories), MockRiskRules.cs
     │       ├── Fixtures/        Chat, Check, Explain, Guide, Memory, Story fixtures
     │       ├── MetaAiScamChecker.cs  MetaAiScamChecker + MetaAiOptions (real HTTP)
     │       ├── IMetaScamChecker.cs  (IMetaScamChecker + MetaScamAnalysis)
@@ -52,9 +53,9 @@ Meta Hackathon/
     │   ├── Pages/User/   Home, Inbox, MessageView, Compose, Sent(View), Contacts, ContactEdit, Calendar(New),
     │   │                 Search, Check(+ResultView), Explain(+View), ShowMe, GuideView, Remember, MemoryView,
     │   │                 Stories, StoryNew, StoryView, MakeSense, AskMe, Messages, Conversation, Help, Welcome
-    │   ├── Pages/Helper/ Queue, Evidence, CheckReview, StoryReview, HelperMessages, HelperSettings
+    │   ├── Pages/Helper/ Queue, Evidence, CheckReview, History, HelperMessages, HelperSettings, HelperWelcome
     │   ├── Pages/Demo/DemoPanel.razor   Pages/Try.razor (public /try)   Pages/Settings.razor, Error, NotFound
-    │   ├── Helper/ ActivityLog, CheckQueue, EvidenceCard, SharedMemories, StoryQueue
+    │   ├── Helper/ ActivityLog, EvidenceCard, SharedMemories
     │   ├── Demo/PipelineTimeline.razor
     │   └── Shared/       StatusBadge, VerdictCard, Icon, ReadAloudButton, ChatLog/Composer, CameraCapture,
     │                     PicturePicker, ErrorState, LoadingState, LiveComponentBase, ModeComponentBase, etc.
@@ -66,11 +67,11 @@ Roughly 4,000 lines of C# in `Services/` and `Models/`, about 100 Razor componen
 
 ## 3. Architecture & Data Flow
 
-- **System Architecture:** Browser <-> SignalR circuit (Blazor Server) <-> Razor pages. Pages talk only to `IMailService`, `IGuardianService`, `IBackstopApi` (AGENTS rule 7). Mock singletons implement them over in-memory stores. `MetaAiScamChecker` and `MetaAssistant` (typed `HttpClient`, no redirects, no cookies) call Meta. Singleton `Changed` events plus `LiveComponentBase` push live updates between the user, helper, and demo views, which are the same server process (the demo's split screen uses iframes of `/` and `/helper`). Routes: `/` user, `/helper` helper, `/demo` demo panel, `/try` public check-an-email page.
+- **System Architecture:** Browser <-> SignalR circuit (Blazor Server) <-> Razor pages. Pages talk only to `IMailService`, `IGuardianService`, `IBackstopApi` (AGENTS rule 7). Mock singletons implement them over in-memory stores. `MetaAiScamChecker` and `MetaAssistant` (typed `HttpClient`, no redirects, no cookies) call Meta. Singleton `Changed` events plus `LiveComponentBase` push live updates between the user, helper, and demo views, which are the same server process (the demo's split screen uses iframes of `/inbox` and `/helper`). Routes: `/` opens the `/demo-start` page, `/inbox` user, `/helper` helper, `/demo` demo panel, `/try` public check-an-email page.
 - **Mail pipeline:** `Received -> Scanning -> (Cleared | Held | Blocked)`. Any error or unknown state becomes `Failed -> Held` (fail closed). The pipeline runs 4 tiers (Rules, Meta AI, Link check, Policy); no timings are shown or invented. Only `Cleared` is returned by `GetInbox` and `GetClearedMessage`. `Blocked` is final and invisible to the user.
 - **Floor rule:** Local checks (`MockRiskRules`, `InputGuard`) set a minimum. Meta's verdict can only be stricter (`LooksSafe -> BeCareful -> DontReply`), never looser. Failure or timeout means held.
-- **Data Models:** `MailMessage` (state, flags, links as defanged text, tiers, helper decision), `Scenario` (7 synthetic emails), `Contact`, `CalendarEvent`, `SentMessage`, `HeldOutgoing`, `HelperNotice`. In `Modes.cs`: `CheckResult`, `Guide`, `Explanation`, `MemoryCard`, `ReviewItem`, `Household`. Also `Story`, `ChatThread`/`ChatMessage`/`HeldChat`, `AskTurn`, and `HelperPermissions` (flags enum: RiskAlerts and ReviewHeldMail form an always-on floor, then SeeCheckRequests, SeeSharedMemories, SeeActivitySummary, SeeClearedMail, SeeFullActivity, SendAsUser, SeeChats). Tiers: Minimal and Standard only; Standard is the default and the ceiling (clamped in the guardian service).
-- **State Management & Integrations:** In-memory singletons guarded by locks, with `Changed` events. No persistence, so state resets on restart (`ResetDemo`). The only integration is Meta Dev API. Key resolution order: `MetaAI` config section, then `META_AI_KEY`, `MODEL_API_KEY`, `LLAMA_API_KEY`, `CHECKER_MODEL_API_KEY`. Images are sent only when inspection needs them. Inspected text is treated as passive data. Message content never renders as a clickable link (links are defanged).
+- **Data Models:** `MailMessage` (state, flags, links as defanged text, tiers, helper decision), `Scenario` (11 synthetic emails), `Contact`, `CalendarEvent`, `SentMessage`, `HeldOutgoing`, `HelperNotice`. In `Modes.cs`: `CheckResult`, `Guide`, `Explanation`, `MemoryCard`, `ReviewItem`, `Household`. Also `Story`, `ChatThread`/`ChatMessage`/`HeldChat`, `AskTurn`, and `HelperPermissions` (flags enum: RiskAlerts and ReviewHeldMail form an always-on floor, then SeeCheckRequests, SeeSharedMemories, SeeActivitySummary, SeeClearedMail, SeeFullActivity, SendAsUser, SeeChats). Tiers: Minimal and Standard only; Standard is the default and the ceiling (clamped in the guardian service).
+- **State Management & Integrations:** In-memory singletons guarded by locks, with `Changed` events. No persistence, so state resets on restart (`ResetDemo`). The only integration is Meta Dev API. Key resolution order: `MetaAI` config section, then `META_AI_KEY`, then `CHECKER_MODEL_API_KEY`. Images are sent only when inspection needs them. Inspected text is treated as passive data. Message content never renders as a clickable link (links are defanged).
 - **Security headers (Program.cs):** Strict CSP (`default-src 'self'`), nosniff, SAMEORIGIN, no-referrer, COOP, Permissions-Policy (camera self only). Uploads are type-sniffed from the bytes (`ImageSniff`).
 
 ## 4. Completed Features & Implementation Details
@@ -78,12 +79,12 @@ Roughly 4,000 lines of C# in `Services/` and `Models/`, about 100 Razor componen
 - Held-mail inbox with privacy rules (user sees only a count). Helper queue and evidence card (Approve, Block, Call them first) with defanged links, flags, the real rules score and the address signals that fired.
 - Compose with an outgoing-check "pause" for private details. Held outgoing mail goes to the helper. No-reply addresses are refused. First-time recipients raise a helper notice.
 - Contacts (with validated profile photos), calendar, search (cleared and sent mail and contacts only), sent items.
-- Modes: Check (text and images), Show me (guides with pictures, "I'm stuck"), Explain (with follow-up Q&A), Remember (cards, share with helper, memory Q&A), Stories (sensitive topics are held), Ask Me (live Muse chat that alerts the helper when someone may need help), and Chat with approved people (held chats go to the helper).
+- Modes: Check (text and images), Show me (guides with pictures, "I'm stuck"), Explain (with follow-up Q&A), Remember (cards, share with helper, memory Q&A), Stories (a sensitive topic still gets its story, and the helper is told), Ask Me (live Muse chat that alerts the helper when someone may need help), and Chat with approved people (held chats go to the helper).
 - Real Meta AI scam checker with tests. Ask Me AI with escalation.
 - Helper permission model (`Permissions.cs`) and `HelperAccess` get/set on the API. It gates chat-log reading (`GetChatLogAsync` throws unless allowed).
-- Demo panel with 7 scenarios, a "make the checker crash" toggle, and split screen.
+- Demo panel with 11 scenarios, a "make the checker crash" toggle, and split screen.
 - **Link check (`/try` only):** `ILinkInspector` (`Services/Links/`: `LinkInspector`, `IpGuard`, `LinkReputation`) opens pasted links server-side with an SSRF guard (public addresses only, re-checked on every hop and checked again at connect, ports 80/443, GET only, 5 redirects, 5s a hop, 1MB, no cookies or auth) and reports the redirect chain, final address and signals (raw IP, look-alike letters, shortener, link text mismatch, download, password box, optional Safe Browsing and URLhaus). The facts go to Meta through `IMetaScamChecker.CheckScamWithLinksAsync` so the explanation can mention them. Real mail stays address-only. Owner-approved exception, recorded in AGENTS.md. Tests: `LinkCheckTests.cs` and block 32.
-- **Public Try it page (`/try`, no sign-in):** for hackathon judges. A pasted or sample email (6 one-click examples) gets a verdict (Blocked, Held for helper, Safe), flagged signals, a plain AI explanation and a "what your helper sees" line. It calls `IMailService.TryCheckAsync` (`MockMailService.Try.cs`), which runs the same `MailAnalyzer`, Meta checker and `CheckOutgoing` as real mail but stores nothing, never opens links (defanged text only), caps input at 5,000 letters and 6 checks a minute per visitor, and holds (never Safe) when Meta AI gives no answer. Samples are in `Services/TryData.cs`; layout `TryLayout.razor`; page `Pages/Try.razor`; linked from `/login` and the README. Tests: block 31 in `--test-llama`.
+- **Public Try it page (`/try`, no sign-in):** for hackathon judges. A pasted or sample email (6 one-click examples) gets a verdict (Blocked, Held for helper, Safe), flagged signals, a plain AI explanation and a "what your helper sees" line. It calls `IMailService.TryCheckAsync` (`MockMailService.Try.cs`), which runs the same `MailAnalyzer`, Meta checker and `CheckOutgoing` as real mail but stores nothing, opens pasted links only through `ILinkInspector`, caps input at 5,000 letters and 6 checks a minute per visitor, and holds (never Safe) when Meta AI gives no answer. Samples are in `Services/TryData.cs`; layout `TryLayout.razor`; page `Pages/Try.razor`; linked from `/demo-start` and the README. Tests: block 31 in `--test-llama`.
 - Theme "Calm Clinical": CSS variables in `theme.css` only, 20px base, Atkinson Next font, 56px buttons, 3px focus ring, reduced-motion support, and read-aloud via `speechSynthesis`. `StatusBadge` combines icon, word, and colour. Welcome flow with text size and colour steps.
 - Design decisions: no self-explaining UI text, no lock or shield decoration, and no UI framework.
 
@@ -92,20 +93,19 @@ Roughly 4,000 lines of C# in `Services/` and `Models/`, about 100 Razor componen
 - **Helper permissions plan** (`docs/helper-permissions-plan.md`) is only partly built:
   - Done: the capability and tier model, and `HelperAccess`/`SetHelperAccess` on the API.
   - Not done: the risk-alert pipeline trigger, extended `HelperNotice` (Kind, Severity, MessageId), `INotificationChannel`, `IPermissionService`, `IGuardianService` capability checks, the Welcome step "Who helps you, and how much?", the Settings "Helper access" screen, and `SendAsUser` with Administrator safeguards (extra confirm, marked in Sent, activity log).
-- **Mocks:** all mail, guardian, and mode data. `MockMailService.Send` pretends to send. Photos are served from memory. There is no real mail provider. `MAIL_PROVIDER_CLIENT_ID/SECRET` and `LINK_CHECK_API_KEY` in `.env.example` are unused placeholders.
-- **Real vs mock mix:** `MockBackstopApi` is the only `IBackstopApi`. Scam checks and Ask Me use Meta only when a key is set. Confirm what the demo does without a key (expected: fail closed or held).
-- README still says "no API calls", which is outdated.
+- **Mocks:** all mail, guardian, and mode data. `MockMailService.Send` pretends to send. Photos are served from memory. There is no real mail provider.
+- **Real vs mock mix:** `MockBackstopApi` is the only `IBackstopApi`. Scam checks and Ask Me use Meta only when a key is set. With no key (run 4 Nov 2026): 10 of the 11 scenarios are held, `link-chain` is blocked by the local rules, and none is cleared.
 
 ## 6. Known Technical Debt, Bugs & Blockers
 
-- **Tests:** no xUnit or CI. `MetaScamCheckerTests.cs` is a hand-rolled runner inside the app assembly, run with `dotnet run -- --test-llama`. It is wrapped in `#if DEBUG`, so it does not exist in Release. No tests for mail pipeline, permissions, or UI.
+- **Tests:** no xUnit. The checks are a hand-rolled runner inside the app assembly (`dotnet run -- --test-llama`), wrapped in `#if DEBUG`, so they do not exist in Release. CI runs them on every push. They cover the services, plus real pages rendered to HTML (`PageFlowTests`). Clicks and browser behaviour are not automated.
 - **Naming debt:** cleared 4 Nov. The `Llama*` types, files and the `LLAMA_*` fallbacks are gone. Only the `--test-llama` flag keeps the old name.
-- **Permissions enforcement gap:** `Allows` is checked in few places. Pages may show things the tier should hide, and the guardian service is not yet the gate.
+- **Permissions:** Standard is enforced in the service. A few reads have no tier check (`GetCheckAsync`, `GetDecisionHistory` and one guardian read). No page can set a lower tier, so this only matters if tiers are extended.
 - **Persistence and scale:** in-memory singletons are shared by all users and circuits (one household). There is no auth, no multi-user model, and no database. `MockBackstopApi` is about 660 lines and is a god object (123 graph edges).
-- **Graph and docs stale:** `graphify-out` was built at `0ab498b` and needs `graphify update .`. README, API_CONTRACT, and AGENTS should be checked against recent commits.
+- **Graph:** `graphify-out` is git-ignored. Run `graphify update .` after each task (AGENTS.md).
 - **Open decisions:** whether email, SMS, or push alerts to helpers are allowed. Hard rule 3 forbids external calls beyond Meta. Whether the live API has been exercised end to end with a real key is not recorded in the repo.
 - No TODO/FIXME comments found in `.cs` or `.razor` files.
-- Last manual verification of all three views and 7 scenarios is not recorded.
+- Last full check: 4 Nov 2026, Release build with no key at 360px in Chromium: all 11 scenarios and the own-email flow, no errors.
 
 ## 7. Configuration & Environment Context
 
@@ -113,16 +113,18 @@ Roughly 4,000 lines of C# in `Services/` and `Models/`, about 100 Razor componen
   - `META_AI_KEY` 
   - `META_AI_ENDPOINT_URL` (default `https://api.meta.ai/v1/chat/completions`)
   - `META_AI_MODEL` (default `muse-spark-1.3`; alternate `muse-wonder-1.0`)
-  - `META_AI_TIMEOUT_SECONDS` (placeholder in `.env.example`; code default 30)
-  - Unused placeholders: `MAIL_PROVIDER_CLIENT_ID`, `MAIL_PROVIDER_CLIENT_SECRET`, `LINK_CHECK_API_KEY`
+  - `META_AI_TIMEOUT_SECONDS` (code default 45; values under 30 are raised to 30)
+  - `META_AI_MAX_CALLS_PER_DAY`, `META_AI_MAX_CALLS_PER_IP_PER_MINUTE`, `META_AI_MAX_CALLS_PER_IP_PER_DAY`
+  - `CLIENT_IP_HEADER` (see section 16), `DEMO_RESET_SECRET`, `ENABLE_DIAGNOSTICS`
+  - `SAFE_BROWSING_API_KEY`, `URLHAUS_AUTH_KEY` (optional, `/try` only)
   - `.env` is read from the repo root (`Backstop/../.env`) at startup and is git-ignored. Config section `MetaAI` is also supported.
 - **Run / build:**
   - `cd Backstop && dotnet run` -> http://localhost:5106
   - `.claude/launch.json`: `dotnet run --project Backstop --urls http://localhost:5106 -p:BaseOutputPath=bin-preview/`
   - Meta checker tests: `cd Backstop && dotnet run -- --test-llama`
-  - Requires the .NET 10 SDK. There is no Makefile and no real npm scripts (`npm test` is a stub).
-  - After changes (AGENTS.md): run the app and check `/`, `/helper`, and `/demo` with all 7 scenarios.
-- **Hard rules (AGENTS.md):** synthetic data only (`example.com/.net/.org`, `.test`), no secrets in the repo, Meta API is the only network egress, held mail shows no sender or subject, fail closed, AI can only tighten verdicts, and the UI talks only to the service interfaces.
+  - Requires the .NET 10 SDK.
+  - After changes (AGENTS.md): run the app and check `/`, `/helper`, and `/demo` with all 11 scenarios.
+- **Hard rules (AGENTS.md):** synthetic data only (`example.com/.net/.org`, `.test`), no secrets in the repo, Meta API is the only network egress apart from the `/try` link check, held mail shows no sender or subject, fail closed, AI can only tighten verdicts, and the UI talks only to the service interfaces.
 
 ## 8. Sender check (added 2026-11-03)
 
@@ -154,11 +156,11 @@ Roughly 4,000 lines of C# in `Services/` and `Models/`, about 100 Razor componen
 ## 11. One-tap helper decisions with undo (added 2026-11-03)
 
 - Review found: the evidence card already had Approve, Block and "Call them first", with an "are you sure?" step for Approve, a 6 second undo that lived in the page (leaving cancelled it), and a body that opened by default. Changed to the one-tap flow below; the rest (sender, subject, AI explanation, sender checks, watch-for tip, defanged text-only body) was already there.
-- Buttons on a held message: **Safe, let it through**, **Not safe, block it**, **Ring {user}** (a `tel:` link; renamed 4 Nov, see section 15). No confirmation step. Full-width at phone width, 56px high, real `<button>`/`<a>` elements. "Check again" replaces Safe while the AI has not checked the message (Safe stays refused until it has). The body is collapsed by default.
-- `IGuardianService`: `Propose(id, safe)`, `Undo(id)`, `GetPending(id)`, `TakeFailure(id)`, `GetRingHref()`, `DecisionWindowSeconds` (10). The decision waits out the window **in the service** (a one-second-scale timer calls `CommitDue`), so nothing changes for the user until it ends, "Blocked is final" is kept (an undo never un-blocks or recalls mail anyone saw), and leaving the page does not lose the decision. A later tap replaces the pending one. `Approve`/`Block` still work as the immediate form and share the same save path.
+- Buttons on a held message: **Safe, let it through**, **Not safe, block it**, **Call {sender} first** (the Ring button was removed 4 Nov, because no number is ever collected). No confirmation step. Full-width at phone width, 56px high, real `<button>`/`<a>` elements. "Check again" replaces Safe while the AI has not checked the message (Safe stays refused until it has). The body is collapsed by default.
+- `IGuardianService`: `Propose(id, safe)`, `Undo(id)`, `GetPending(id)`, `TakeFailure(id)`, `DecisionWindowSeconds` (10). The decision waits out the window **in the service** (a one-second-scale timer calls `CommitDue`), so nothing changes for the user until it ends, "Blocked is final" is kept (an undo never un-blocks or recalls mail anyone saw), and leaving the page does not lose the decision. A later tap replaces the pending one. `Approve`/`Block` still work as the immediate form and share the same save path.
 - Fail closed: if saving throws or is refused, the message stays Held, the pending decision is dropped and the card shows "We could not save that. The message is still held, so please try again." (once, via `TakeFailure`). Test seam: `SaveCheck`.
-- Ring them: no phone number is stored anywhere in the app and none is collected, so `GetRingHref()` returns null and the button is hidden. `MockGuardianService.UserPhone` is the one place a saved number would be read from; it is cleaned to digits and `+`. Because of this, "Call them first" is no longer reachable from the card (the `CallFirst` service method and its tests are unchanged).
-- What the user sees: an approved message shows "Your helper checked this one. It's safe." (`MessageView`); a block shows "Your helper blocked this one." on the inbox (`IMailService.RecentHelperBlocks`, a count for the last day, nothing else about the message). Held mail is still never visible.
+- Ring them: removed 4 Nov 2026. No phone number is stored anywhere in the app.
+- What the user sees: an approved message shows "Your helper checked this one. It's safe." (`MessageView`). A block shows nothing at all (changed 4 Nov 2026, owner decision). Held mail is still never visible.
 - No memory backlog exists in the project, so a "Not safe" decision feeds nothing back.
 - Tier: unchanged. `SendAsUser` and `SeeChats` stay off, asking for a higher tier is clamped to Standard, and the tests now assert this after a decision.
 - Tests: `Services/HelperDecisionTests.cs` (block 36 of `--test-llama`), with a fake clock and the timer switched off.
@@ -189,7 +191,7 @@ Roughly 4,000 lines of C# in `Services/` and `Models/`, about 100 Razor componen
 - **Call {sender} first** is on the evidence card when there is no phone number to ring (renamed 4 Nov, see section 15).
 - **Rescans back off** (45s doubling to 30 min per message) on the timer; the helper's "Check again" always tries.
 - **Retries count against the Meta caps** (`MetaRetryBudget`, a handler inside the resilience pipeline). Over the cap a retry is not sent.
-- **Shared state is bounded.** `MailStore` caps messages (600), sent (300), notices (200), held outgoing (200) and events (300), oldest first, never a message mid-check. Show me photos have a 64 MB total budget and are not kept when no guide matches. `MailStore.Find/Query` return copies; changes go through `TryChange`/`Update`.
+- **Shared state is bounded.** `MailStore` caps messages (600), sent (300), notices (200), held outgoing (200) and events (300), oldest first, never a message mid-check. Show me photos are no longer kept at all (section 16). `MailStore.Find/Query` return copies; changes go through `TryChange`/`Update`.
 - **Demo controls.** "Make these modes fail" is per visitor (by address). "Empty Remember" needs the reset code. The demo panel no longer shows the guide bar (it used to send the visitor away from `/demo` to the first slide).
 - **Sign-in.** Locks are per visitor and email, the failure table is bounded, and `/account/login` is rate limited to 10 tries a minute per visitor.
 - **Hygiene.** CSP `connect-src 'self' wss:` (no `ws:`), no inline import map, `SendAsUser` and the helper Write page removed (out of scope), compiler warnings fixed.
@@ -200,12 +202,35 @@ Roughly 4,000 lines of C# in `Services/` and `Models/`, about 100 Razor componen
 A review drove every route in Chromium at 360px and 1440px as the user, the helper and the demo visitor (no AI key, so fail-closed paths), and the fixes below followed. Snapshot: `.impeccable/critique/2026-11-04T12-15-46Z__backstop-components.md`.
 
 - **Demo guide** (`DemoBar`, `DemoTour`, `tour.js`, `GuideToggle`): its place is saved per tab and put back on reload; a reload or deep link stays on the page; only the demo landing (`?tour=1`) starts at slide 1; no guide inside the demo panel's frames; the Guide button starts on the current page. 8 user slides (was 32) and 6 helper slides (was 14).
-- **Inbox**: "N messages are being checked by your helper" (`HeldCount`), a time on each row, Today / Yesterday / Earlier groups, the newest 15 first with "Show older messages". The mail page is called Inbox everywhere (it was "My messages", which clashed with the chat tab "Messages"). "Your helper blocked a message today."
+- **Inbox**: "N messages are being checked by your helper" (`HeldCount`), a time on each row, Today / Yesterday / Earlier groups, the newest 15 first with "Show older messages". The mail page is called Inbox everywhere (it was "My messages", which clashed with the chat tab "Messages").
 - **Compose**: quick answers add a line instead of replacing typed text; Back during the send countdown cancels it and keeps the text ("Not sent."); Enter in To and Subject moves to the next field (`data-enter-next` in `backstop.js`); a new message does not inherit an earlier reply's text.
 - **Sign-in**: a wrong password keeps the typed email (short HttpOnly cookie, never the URL). Account display names match the household (Margaret, Priya).
 - **User tools**: "Read this to me" toggles to Stop and stops when the page is left; the Ask Me and chat composers fit 360px at every text size; a held Check keeps "Don't reply or send anything until Priya has looked." when local rules found a problem; Technical details only show with diagnostics on; the no-key line is "This is not switched on yet."; Check results have two buttons chosen by verdict and Delete asks first; Settings "Put everything back" asks first and Done returns to the last page (`PageHistory`); on phones the header logo reads "Home".
 - **Helper**: one decision vocabulary ("Safe, let it through" / "Not safe, block it"; "Safe, send it" / "Not safe, don't send"; "Safe, show it" / "Not safe, don't show"); held chats, outgoing mail and "Take off" ask Yes / No in place; the evidence card's decision bar is two buttons across on phones (137px, was 281px); "Call {sender} first … on a number you already have", undoable (`IGuardianService.CancelCall`); the could-not-finish line sits inside the verdict banner and the rules score moves to the "What looked wrong" heading; Helper Settings lists access above Done and no longer lists the removed "Send mail as them".
 - **Visual pass**: no sideways scroll at 360px at Normal or Extra large text (crawl of every route); 18px text floor (tab labels, counts, tags, status); amber now only means "being checked" — the role tag, picture tiles, nav count, focus halo and the floating Ask Me button use teal; presence (Online) is a neutral teal dot, not the green tick of Safe; badges no longer look like buttons; no overshooting easing; DESIGN.md rewritten to the shipped theme.
 - **Unchanged by owner decision**: the helper still cannot approve a message until the AI has checked it ("Check again" replaces Safe while `AwaitingScan`).
-- **Not done**: a reload on a page still loses unsaved typing (Blazor Server page state; no draft store exists). `GetRingHref()` still returns null, so the "Ring {user}" branch never shows.
+- **Not done**: a reload on a page still loses unsaved typing (Blazor Server page state; no draft store exists).
 
+## 16. Audit, visitor data and housekeeping (4 Nov 2026)
+
+- **Blocked mail is silent.** The inbox notice and `IMailService.RecentHelperBlocks` are gone. A page test checks the inbox never says "blocked".
+- **Visitor data goes to Meta AI, then is disposed of** (owner decision, recorded in AGENTS.md).
+  - "Write my own email" on `/demo` runs the full pipeline through `IMailService.CheckOnceAsync` and is never stored. Only the outcome comes back, and the form clears.
+  - Show me photos go to the AI and are never kept. `Guide.PhotoUrl` and `MemoryCard.PhotoUrl` are gone.
+  - `MockBackstopApi.Disposal.cs` and `VisitorDataDisposalService` delete Check, Explain, Show me and Stories results, Ask Me escalations, Remember cards saved from them, help requests and new activity lines 30 minutes after they are made. Seeded data is left alone. An open safeguarding alert stays until the helper acts, without the person's words.
+  - Meta error bodies are no longer logged, because they could quote a visitor.
+  - Limits: a check held for the helper can be read on the public `/helper` page during those 30 minutes. Compose, Chat, Contacts, Calendar and profile pictures do not go to Meta and are not disposed of. What Meta keeps is outside this app.
+- **Housekeeping.** Removed held stories (`StoryStatus`, `StoryReview`, queue branches), the Ring button and `UserPhone`, `markWelcomed`, the show-password script, `backstop.speak`, `.nav-signout`, and the `Theme Colours` file. `.dockerignore` matches `.gitignore` for env files and secrets. Added `PageFlowTests` and CI.
+- **Open: do visitors share one limit on the live site?** Not settled. A local simulation confirmed that a client-plus-edge `X-Forwarded-For` chain gives every visitor the proxy's identity, so they share every per-visitor cap. Setting `CLIENT_IP_HEADER=CF-Connecting-IP` fixes that, but where Cloudflare is not in front it lets anyone fake an address. On the live site a client-sent `CF-Connecting-IP` got a Cloudflare 403, and a spoofed `X-Forwarded-For` did not get round the cap. Telling the two cases apart needs a second network:
+  1. In the Render logs, search `Circuit opened. Visitor`. Note the fingerprint and `Forwarded-for entries: N`. N leaves out the entry that was used, so N=1 means two entries.
+  2. Open `/try` on wifi, then on a phone on mobile data, and compare the fingerprints.
+  3. Same fingerprint, or one that changes on reload: set `CLIENT_IP_HEADER=CF-Connecting-IP` on Render, redeploy and repeat. Different and stable: leave it empty.
+- **Open: audit findings not yet fixed, most urgent first.**
+  1. `/try`: a regex with no timeout can stall the server on a hostile page (`LinkInspector.cs`).
+  2. The demo panel shows nothing when the 12-a-minute cap refuses a run.
+  3. Safeguarding gaps: missed phrases and curly apostrophes, Ask Me not alerting when the AI fails, Stories, Show me and Explain skipping the scan.
+  4. Ask Me can show "Looks safe" for nothing, and gives no fixed warning on money requests.
+  5. Check hides links from the AI. Text expansion and zero-width characters can get past the local checks.
+  6. Double-tapping Send can send after Undo. Switching stories can crash the session. Photo capture may drop the connection (unconfirmed).
+  7. The evidence card's button can name the suspected scammer ("Call {sender} first"). The reconnect dialog is jargon.
+- **Open: owner decisions.** The helper can only block during an AI outage. `link-chain` is blocked with no AI key, while AGENTS.md says everything must hold. Blocklist failures are skipped rather than treated as unsafe. `.env.example` holds default values, while AGENTS.md says empty placeholders only. `style-src 'unsafe-inline'` and real brand names in detection lists go beyond the written rules.
