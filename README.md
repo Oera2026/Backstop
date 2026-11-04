@@ -101,7 +101,7 @@ Notes for the host:
 | `/compose` | User | Write a message. Private details trigger the pause screen |
 | `/explain`, `/check`, `/ask-me` | User | Explain a letter, check a message, Ask Me |
 | `/helper` | Helper | Queue of held messages and recent decisions |
-| `/helper/{id}` | Helper | Evidence card: Approve, Block, Call them first |
+| `/helper/{id}` | Helper | Evidence card: Safe, let it through · Not safe, block it · Call the sender first |
 | `/login` | Public | Sign in, or "Try the demo" (both sides, with a User / Helper switch and a guided walk-around) |
 | `/try` | Public | Paste an email or pick an example and see whether Backstop would block it, and why |
 | `/demo` | Demo | Simulate incoming email, watch the four checks, split-screen user and helper |
