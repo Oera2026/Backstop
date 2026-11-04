@@ -11,7 +11,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Backstop.Tests;
 
-public class LlamaScamCheckerTests
+public class MetaScamCheckerTests
 {
     private sealed class DelegatingHandlerStub(Func<HttpRequestMessage, Task<HttpResponseMessage>> handler) : HttpMessageHandler
     {
@@ -1199,10 +1199,10 @@ public class LlamaScamCheckerTests
             throw new InvalidOperationException("checker crashed");
     }
 
-    private sealed class StubMeta(MetaScamAnalysis analysis) : ILlamaScamChecker, IMetaScamChecker
+    private sealed class StubMeta(MetaScamAnalysis analysis) : IMetaScamChecker
     {
-        public Task<LlamaScamAnalysis> CheckScamAsync(string text, CancellationToken ct = default) =>
-            Task.FromResult((LlamaScamAnalysis)analysis);
+        public Task<MetaScamAnalysis> CheckScamAsync(string text, CancellationToken ct = default) =>
+            Task.FromResult((MetaScamAnalysis)analysis);
 
         public Task<MetaScamAnalysis> CheckScamAsync(string? text, byte[]? imageBytes = null, string? mimeType = null, CancellationToken ct = default) =>
             Task.FromResult(analysis);

@@ -59,25 +59,22 @@ public sealed class AccountStore
         email = (email ?? "").Trim();
         if (email.Length is 0 or > 200 || string.IsNullOrEmpty(password) || password.Length > 200) return null;
         var key = $"{visitor ?? "unknown"}|{email}";
-        if (IsLocked(key)) return null;
+
+        // The try is counted BEFORE the slow check, in one step, so a burst of parallel guesses cannot all slip in ahead of the lock.
+        if (_failures.Count >= MaxTracked) Sweep();
+        var now = DateTime.UtcNow;
+        var tries = _failures.AddOrUpdate(key, (1, now), (_, f) => now - f.Since > Window ? (1, now) : (f.Count + 1, f.Since));
+        if (tries.Count > MaxTries) return null;
 
         // Same work whether or not the account exists, so timing does not reveal which emails are real.
         _accounts.TryGetValue(email, out var account);
         var hash = Hash(password, account?.Salt ?? new byte[16]);
         var ok = account is not null && CryptographicOperations.FixedTimeEquals(hash, account.Hash);
-        if (ok) { _failures.TryRemove(key, out _); return account; }
-
-        if (_failures.Count >= MaxTracked) Sweep();
-        _failures.AddOrUpdate(key, (1, DateTime.UtcNow), (_, f) => (f.Count + 1, f.Since));
-        return null;
+        if (ok) _failures.TryRemove(key, out _);
+        return ok ? account : null;
     }
 
-    private bool IsLocked(string key)
-    {
-        if (!_failures.TryGetValue(key, out var f)) return false;
-        if (DateTime.UtcNow - f.Since > Window) { _failures.TryRemove(key, out _); return false; }
-        return f.Count >= 5;
-    }
+    private const int MaxTries = 5;
 
     // Forgets misses older than the window, so typed-in emails cannot fill memory. Still full: start again.
     private void Sweep()

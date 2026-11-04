@@ -24,6 +24,7 @@ public static class IpGuard
                 || (b[0] == 169 && b[1] == 254)                  // link-local and metadata
                 || (b[0] == 172 && b[1] is >= 16 and <= 31)      // 172.16/12
                 || (b[0] == 192 && b[1] == 168)                  // 192.168/16
+                || (b[0] == 192 && b[1] == 88 && b[2] == 99)     // 6to4 relay anycast
                 || (b[0] == 192 && b[1] == 0 && b[2] is 0 or 2)  // 192.0.0/24, 192.0.2/24
                 || (b[0] == 198 && b[1] is 18 or 19)             // benchmarking
                 || (b[0] == 198 && b[1] == 51 && b[2] == 100)    // documentation

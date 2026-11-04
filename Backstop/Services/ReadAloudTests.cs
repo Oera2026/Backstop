@@ -12,7 +12,7 @@ namespace Backstop.Tests;
 
 /// <summary>
 /// Read aloud button tests. The project has no bUnit, so this uses Blazor's own Renderer with a fake browser:
-/// the real component is rendered, clicked and disposed. Called from LlamaScamCheckerTests.RunAllTests.
+/// the real component is rendered, clicked and disposed. Called from MetaScamCheckerTests.RunAllTests.
 /// </summary>
 public static class ReadAloudTests
 {

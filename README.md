@@ -65,6 +65,8 @@ Set these as environment variables (locally in the untracked `.env`, in producti
 | `MetaAI__MaxCallsPerMinute` | Cap on calls to Meta per minute. Default 40. |
 | `META_AI_MAX_CALLS_PER_DAY` | Cap on calls to Meta per UTC day for the whole app, retries included. Default 1500. A restart resets the count. |
 | `META_AI_MAX_CALLS_PER_IP_PER_MINUTE` | Cap on calls to Meta per visitor per minute. Default 15. |
+| `META_AI_MAX_CALLS_PER_IP_PER_DAY` | Cap on calls to Meta per visitor per UTC day. Default 200, so one visitor cannot use up the whole app's day. |
+| `ENABLE_DIAGNOSTICS` | Set to `true` to show "Test the connection" (settings and Meta's raw reply). Off by default outside development. |
 | `CLIENT_IP_HEADER` | Optional. A header the host sets to the visitor address (for example `CF-Connecting-IP`). Empty uses `X-Forwarded-For`. |
 | `DEMO_RESET_SECRET` | The code needed for "Reset demo" and "Empty Remember" on `/demo`. With no value, both are switched off. |
 | `ACCOUNT_USER_PASSWORD`, `ACCOUNT_HELPER_PASSWORD` | Passwords for the made-up accounts `sam@example.com` (user side) and `alex@example.com` (helper side). With no value, that account cannot sign in. |

@@ -804,3 +804,10 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 .try-link__final { margin: 0 0 .5rem; overflow-wrap: anywhere; }
 .try-signals__detail { display: block; }
 .try-chain--single { list-style: none; padding-left: 0; }
+
+/* Landing page: the two demo sides first, the account sign-in folded away underneath. */
+.page--login .sidecards { margin-top: 1.25rem; }
+.login-existing { margin-top: 1.5rem; border-top: 1px solid var(--border, currentColor); padding-top: 1rem; }
+.login-existing > summary { min-height: 56px; display: flex; align-items: center; cursor: pointer; font-weight: 700; }
+.login-existing > summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+.login-existing[open] > summary { margin-bottom: .5rem; }

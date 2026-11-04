@@ -78,7 +78,7 @@ public sealed class MetaAiOptions
 /// 3. Prompt injection protection: Inspected text and images are strictly treated as untrusted passive data.
 /// 4. Cost conservation: Sends plain text payloads for emails/chats; only transmits image payloads when images are provided.
 /// </summary>
-public sealed class MetaAiScamChecker : ILlamaScamChecker, IMetaScamChecker, IMetaDiagnostics
+public sealed class MetaAiScamChecker : IMetaScamChecker, IMetaDiagnostics
 {
     private readonly HttpClient _http;
     private readonly IConfiguration _config;
@@ -116,6 +116,7 @@ public sealed class MetaAiScamChecker : ILlamaScamChecker, IMetaScamChecker, IMe
     /// </summary>
     public async Task<string> DiagnoseAsync(CancellationToken ct)
     {
+        if (!DiagnosticsAllowed(_config)) return "The connection test is switched off.";
         var key = _options.ApiKey;
         var url = _options.ChatUrl;
         var model = _options.Model;
@@ -193,6 +194,11 @@ public sealed class MetaAiScamChecker : ILlamaScamChecker, IMetaScamChecker, IMe
         return string.Join('\n', lines);
     }
 
+    /// <summary>The connection test shows settings and Meta's raw reply, so it runs only in development or when ENABLE_DIAGNOSTICS is true.</summary>
+    internal static bool DiagnosticsAllowed(IConfiguration config) =>
+        string.Equals(config["ASPNETCORE_ENVIRONMENT"] ?? config["DOTNET_ENVIRONMENT"], "Development", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(config["ENABLE_DIAGNOSTICS"], "true", StringComparison.OrdinalIgnoreCase);
+
     private static string Explain(int status, string body, string model, List<string>? models)
     {
         if (status is >= 200 and < 300) return "none. The connection works. If a check still failed, the problem is in that one request, not the connection.";
@@ -210,11 +216,6 @@ public sealed class MetaAiScamChecker : ILlamaScamChecker, IMetaScamChecker, IMe
         if (status >= 500) return "Meta had a problem on its side. Try again later.";
         return "unexpected status. See the reply above.";
     }
-    // Legacy shape. Awaited, not ContinueWith: a cancel or a fault must still come back as the fail-closed answer, never as a
-    // cancelled task or an AggregateException. CheckCoreAsync already turns every failure into that answer.
-    public async Task<LlamaScamAnalysis> CheckScamAsync(string text, CancellationToken ct) =>
-        await CheckScamAsync(text, null, null, ct);
-
     public Task<MetaScamAnalysis> CheckScamAsync(
         string? text,
         byte[]? imageBytes = null,

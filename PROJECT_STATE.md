@@ -17,7 +17,7 @@ Generated 2026-11-01 from commit `2dc315c`. Updated 2026-11-03: the public Try i
 
 ```
 Meta Hackathon/
-├── AGENTS.md / GEMINI.md        Agent rules (hard rules, theme, a11y, copy rules)
+├── AGENTS.md                    Agent rules (hard rules, theme, a11y, copy rules)
 ├── README.md, PRODUCT.md, DESIGN.md, API_CONTRACT.md
 ├── docs/helper-permissions-plan.md   Plan: risk alerts + helper tiers
 ├── .env.example                 Placeholders only (real .env is git-ignored)
@@ -40,10 +40,10 @@ Meta Hackathon/
     │       ├── IBackstopApi.cs  Contract for all modes (see API_CONTRACT.md)
     │       ├── MockBackstopApi (.cs, .Ask, .Chat, .Explain, .Stories), MockRiskRules.cs
     │       ├── Fixtures/        Chat, Check, Explain, Guide, Memory, Story fixtures
-    │       ├── LlamaScamChecker.cs  MetaAiScamChecker + MetaAiOptions (real HTTP)
-    │       ├── ILlamaScamChecker.cs (IMetaScamChecker + legacy alias)
+    │       ├── MetaAiScamChecker.cs  MetaAiScamChecker + MetaAiOptions (real HTTP)
+    │       ├── IMetaScamChecker.cs  (IMetaScamChecker + MetaScamAnalysis)
     │       ├── MetaAssistant.cs, IAssistant.cs   Ask Me via Muse
-    │       └── LlamaScamCheckerTests.cs   Custom test runner (not xUnit)
+    │       └── MetaScamCheckerTests.cs   Custom test runner (not xUnit)
     ├── Components/
     │   ├── App.razor, Routes.razor, _Imports.razor
     │   ├── Layout/ (UserLayout, HelperLayout, DemoLayout, WelcomeLayout, TryLayout, AppNav, ReconnectModal)
@@ -96,12 +96,11 @@ Roughly 4,000 lines of C# in `Services/` and `Models/`, about 100 Razor componen
 
 ## 6. Known Technical Debt, Bugs & Blockers
 
-- **Tests:** no xUnit or CI. `LlamaScamCheckerTests.cs` is a hand-rolled runner inside the app assembly, run with `dotnet run -- --test-llama`. It is wrapped in `#if DEBUG`, so it does not exist in Release. No tests for mail pipeline, permissions, or UI.
-- **Naming debt:** `LlamaScamChecker.cs`, `ILlamaScamChecker`, `LlamaScamAnalysis`, and `LLAMA_*` env fallbacks are legacy aliases after the move to Meta Muse. Duplicate record types (`MetaScamAnalysis` and `LlamaScamAnalysis`).
+- **Tests:** no xUnit or CI. `MetaScamCheckerTests.cs` is a hand-rolled runner inside the app assembly, run with `dotnet run -- --test-llama`. It is wrapped in `#if DEBUG`, so it does not exist in Release. No tests for mail pipeline, permissions, or UI.
+- **Naming debt:** cleared 4 Nov. The `Llama*` types, files and the `LLAMA_*` fallbacks are gone. Only the `--test-llama` flag keeps the old name.
 - **Permissions enforcement gap:** `Allows` is checked in few places. Pages may show things the tier should hide, and the guardian service is not yet the gate.
 - **Persistence and scale:** in-memory singletons are shared by all users and circuits (one household). There is no auth, no multi-user model, and no database. `MockBackstopApi` is about 660 lines and is a god object (123 graph edges).
 - **Graph and docs stale:** `graphify-out` was built at `0ab498b` and needs `graphify update .`. README, API_CONTRACT, and AGENTS should be checked against recent commits.
-- **Cleanup:** root Astryx and node_modules are unused. `Backstop/bin-preview` is a build artifact. `GEMINI.md` duplicates agent guidance.
 - **Open decisions:** whether email, SMS, or push alerts to helpers are allowed. Hard rule 3 forbids external calls beyond Meta. Whether the live API has been exercised end to end with a real key is not recorded in the repo.
 - No TODO/FIXME comments found in `.cs` or `.razor` files.
 - Last manual verification of all three views and 7 scenarios is not recorded.
@@ -109,9 +108,9 @@ Roughly 4,000 lines of C# in `Services/` and `Models/`, about 100 Razor componen
 ## 7. Configuration & Environment Context
 
 - **Environment variables (names only):**
-  - `META_AI_KEY` (alternates: `MODEL_API_KEY`, `LLAMA_API_KEY`, `CHECKER_MODEL_API_KEY`)
+  - `META_AI_KEY` 
   - `META_AI_ENDPOINT_URL` (default `https://api.meta.ai/v1/chat/completions`)
-  - `META_AI_MODEL` (default `muse-spark-1.3`; alternates `LLAMA_MODEL`, `muse-spark-1.3`, `muse-wonder-1.0`)
+  - `META_AI_MODEL` (default `muse-spark-1.3`; alternate `muse-wonder-1.0`)
   - `META_AI_TIMEOUT_SECONDS` (placeholder in `.env.example`; code default 30)
   - Unused placeholders: `MAIL_PROVIDER_CLIENT_ID`, `MAIL_PROVIDER_CLIENT_SECRET`, `LINK_CHECK_API_KEY`
   - `.env` is read from the repo root (`Backstop/../.env`) at startup and is git-ignored. Config section `MetaAI` is also supported.
@@ -192,4 +191,4 @@ Roughly 4,000 lines of C# in `Services/` and `Models/`, about 100 Razor componen
 - **Demo controls.** "Make these modes fail" is per visitor (by address). "Empty Remember" needs the reset code. The demo panel no longer shows the guide bar (it used to send the visitor away from `/demo` to the first slide).
 - **Sign-in.** Locks are per visitor and email, the failure table is bounded, and `/account/login` is rate limited to 10 tries a minute per visitor.
 - **Hygiene.** CSP `connect-src 'self' wss:` (no `ws:`), no inline import map, `SendAsUser` and the helper Write page removed (out of scope), compiler warnings fixed.
-- Tests: `Services/ReviewFixTests.cs` (block 37 of `--test-llama`), and the injection tests in `LinkCheckTests` and `LlamaScamCheckerTests`.
+- Tests: `Services/ReviewFixTests.cs` (block 37 of `--test-llama`), and the injection tests in `LinkCheckTests` and `MetaScamCheckerTests`.

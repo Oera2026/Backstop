@@ -8,13 +8,13 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Backstop.Tests;
 
-/// <summary>"Next time, watch for…" tip tests. Nothing here touches the network. Called from LlamaScamCheckerTests.RunAllTests.</summary>
+/// <summary>"Next time, watch for…" tip tests. Nothing here touches the network. Called from MetaScamCheckerTests.RunAllTests.</summary>
 public static class WatchForTests
 {
-    private sealed class FixedMeta(MetaScamAnalysis analysis) : ILlamaScamChecker, IMetaScamChecker
+    private sealed class FixedMeta(MetaScamAnalysis analysis) : IMetaScamChecker
     {
         public Task<MetaScamAnalysis> CheckScamAsync(string? text, byte[]? imageBytes = null, string? mimeType = null, CancellationToken ct = default) => Task.FromResult(analysis);
-        public Task<LlamaScamAnalysis> CheckScamAsync(string text, CancellationToken ct = default) => Task.FromResult((LlamaScamAnalysis)analysis);
+        public Task<MetaScamAnalysis> CheckScamAsync(string text, CancellationToken ct = default) => Task.FromResult((MetaScamAnalysis)analysis);
     }
 
     private sealed class Handler(Func<HttpRequestMessage, Task<HttpResponseMessage>> f) : HttpMessageHandler

@@ -21,6 +21,17 @@ public sealed class MailStore
 
     public event Action? Changed;
 
+    // One broken listener (a closed page) must not undo a change that is already saved, or stop the others hearing about it.
+    private void Raise()
+    {
+        var handlers = Changed;
+        if (handlers is null) return;
+        foreach (var h in handlers.GetInvocationList().Cast<Action>())
+        {
+            try { h(); } catch (Exception) { /* a listener failed; the data is already saved */ }
+        }
+    }
+
     public MailStore() => HoldUnfinished();
 
     /// <summary>
@@ -42,7 +53,7 @@ public sealed class MailStore
             }
             n = open.Count;
         }
-        if (n > 0) Changed?.Invoke();
+        if (n > 0) Raise();
         return n;
     }
 
@@ -74,7 +85,7 @@ public sealed class MailStore
             _all.Add(message);
             if (_all.Count > MaxMessages) TrimMessages(keep: message);
         }
-        Changed?.Invoke();
+        Raise();
     }
 
     // Oldest first: blocked mail, then cleared, then held. A message still being checked is never dropped. Caller holds the lock.
@@ -108,7 +119,7 @@ public sealed class MailStore
             if (m is null || !allowed(m)) return false;
             change(m);
         }
-        Changed?.Invoke();
+        Raise();
         return true;
     }
 
@@ -116,7 +127,7 @@ public sealed class MailStore
     public void Update(Action change)
     {
         lock (_gate) change();
-        Changed?.Invoke();
+        Raise();
     }
 
     // --- Contacts, sent mail, calendar, helper notices ---
@@ -160,7 +171,7 @@ public sealed class MailStore
                 _contacts[i] = _contacts[i] with { PhotoVersion = Guid.NewGuid().ToString("N")[..8] };
             }
         }
-        Changed?.Invoke();
+        Raise();
     }
 
     public IReadOnlyList<SentMessage> Sent()
@@ -209,7 +220,7 @@ public sealed class MailStore
             if (notice is not null) _notices.Add(notice);
             TrimLists();
         }
-        Changed?.Invoke();
+        Raise();
     }
 
     /// <summary>Put a private-looking outgoing message on hold for the helper. Nothing is sent.</summary>
@@ -228,7 +239,7 @@ public sealed class MailStore
             _heldOutgoing.Add(held);
             TrimLists();
         }
-        Changed?.Invoke();
+        Raise();
         return held;
     }
 
@@ -269,7 +280,7 @@ public sealed class MailStore
             }
             TrimLists();
         }
-        Changed?.Invoke();
+        Raise();
         return true;
     }
 
@@ -296,7 +307,7 @@ public sealed class MailStore
             _events.Add(e);
             if (_events.Count > MaxEvents) _events.RemoveAt(0);
         }
-        Changed?.Invoke();
+        Raise();
     }
 
     public void DismissNotice(string id)
@@ -307,7 +318,7 @@ public sealed class MailStore
             if (n is null || n.Seen) return;
             n.Seen = true;
         }
-        Changed?.Invoke();
+        Raise();
     }
 
     // --- Helper access and mail activity (shared by the guardian service and the API) ---
@@ -320,7 +331,7 @@ public sealed class MailStore
     public void SetHelperAccess(HelperPermissions access)
     {
         lock (_gate) _helperAccess = access;
-        Changed?.Invoke();
+        Raise();
     }
 
     /// <summary>What the helper did with mail. Newest last. Kept short so memory stays small.</summary>
@@ -331,7 +342,7 @@ public sealed class MailStore
             _activity.Add(new ActivityEntry(DateTimeOffset.Now, icon, text));
             if (_activity.Count > 200) _activity.RemoveRange(0, _activity.Count - 200);
         }
-        Changed?.Invoke();
+        Raise();
     }
 
     public IReadOnlyList<ActivityEntry> Activity()
@@ -354,6 +365,6 @@ public sealed class MailStore
             _activity.Clear();
         }
         HoldUnfinished();
-        Changed?.Invoke();
+        Raise();
     }
 }

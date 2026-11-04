@@ -7,7 +7,7 @@ namespace Backstop.Tests;
 
 /// <summary>
 /// One-tap helper decisions with a 10 second undo. The clock is a fake one and the timer is off, so nothing here waits.
-/// Called from LlamaScamCheckerTests.RunAllTests.
+/// Called from MetaScamCheckerTests.RunAllTests.
 /// </summary>
 public static class HelperDecisionTests
 {

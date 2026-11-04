@@ -85,10 +85,14 @@ public static partial class InputGuard
         r = Spaces().Replace(r, " ");
         if (r.Length == 0 || r.Length > max) return null;
         if (LooksLikeInjection(r)) return null;
-        if (Unsafe().IsMatch(r) || Regex.IsMatch(r, $@"\d{{{digitRun},}}")) return null;
+        if (Unsafe().IsMatch(r) || HasLongNumber(r, digitRun)) return null;
         if (!allowAdvice && Orders().IsMatch(r)) return null;
         return r;
     }
+
+    // A run of digits is refused (phone and account numbers), except a plain year such as 2026.
+    private static bool HasLongNumber(string r, int digitRun) =>
+        Regex.Matches(r, $@"\d{{{digitRun},}}").Any(m => !(m.Length == 4 && (m.Value.StartsWith("19") || m.Value.StartsWith("20"))));
 
     /// <summary>A mail address and nothing else. Rejects line breaks, spaces, several addresses and odd characters.</summary>
     public static bool IsPlainAddress(string? a) =>

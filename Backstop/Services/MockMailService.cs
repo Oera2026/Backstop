@@ -189,8 +189,12 @@ public sealed partial class MockMailService(MailStore store, IMetaScamChecker? m
     /// The real pipeline, in order: Rules, Meta AI, Link check, Policy. What happens to the message is worked out
     /// from its own text. Cleared needs every check to pass AND Meta AI to answer. Any error ends in Failed -> Held.
     /// </summary>
+    // Each visitor can add a few messages a minute, so nobody can fill the shared queue and push other held mail out.
+    internal MetaCallGuard ReceiveGuard { get; set; } = new(limit: 600, visitorLimit: 12);
+
     public async Task<MailMessage?> ReceiveAsync(InboundMail mail, bool simulateFailure, Action<int, TierResult>? onTier = null)
     {
+        if (ClientIdentity.Current is { } visitor && !ReceiveGuard.TryEnter(visitor, out _, out _, out _)) return null;
         var msg = MockData.CreateMessage(mail);
         store.Add(msg); // state Received: invisible to the user
 

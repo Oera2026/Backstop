@@ -1,15 +1,19 @@
 @using Backstop.Services.Api
 @inject IMetaDiagnostics Diagnostics
+@inject IConfiguration Config
 @* What went wrong in plain words, then a closed box with the technical detail for someone investigating. *@
 <div class="failure" role="alert">
     <p class="failure__message"><Icon Name="alert" /> <span>@(Message ?? Failure.Message)</span></p>
     <details class="failure__tech">
         <summary>Technical details</summary>
         <pre>@Failure.Technical</pre>
-        <button type="button" class="btn btn-quiet" @onclick="RunTest" disabled="@_running">@(_running ? "Testing..." : "Test the connection")</button>
-        @if (_result is not null)
+        @if (_canTest)
         {
-            <pre aria-live="polite">@_result</pre>
+            <button type="button" class="btn btn-quiet" @onclick="RunTest" disabled="@_running">@(_running ? "Testing..." : "Test the connection")</button>
+            @if (_result is not null)
+            {
+                <pre aria-live="polite">@_result</pre>
+            }
         }
     </details>
 </div>
@@ -20,6 +24,8 @@
     [Parameter] public string? Message { get; set; }
 
     private bool _running;
+    private bool _canTest => string.Equals(Config["ASPNETCORE_ENVIRONMENT"], "Development", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(Config["ENABLE_DIAGNOSTICS"], "true", StringComparison.OrdinalIgnoreCase);
     private string? _result;
 
     private async Task RunTest()

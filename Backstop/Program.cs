@@ -118,7 +118,6 @@ builder.Services.Configure<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>
 builder.Services.AddTransient<IAssistant>(sp => sp.GetRequiredService<MetaAssistant>());
 builder.Services.AddTransient<IStoryWriter>(sp => sp.GetRequiredService<MetaStoryWriter>());
 builder.Services.AddTransient<IDocumentExplainer>(sp => sp.GetRequiredService<MetaDocumentExplainer>());
-builder.Services.AddTransient<ILlamaScamChecker>(sp => sp.GetRequiredService<MetaAiScamChecker>());
 builder.Services.AddTransient<IMetaScamChecker>(sp => sp.GetRequiredService<MetaAiScamChecker>());
 builder.Services.AddTransient<IMetaDiagnostics>(sp => sp.GetRequiredService<MetaAiScamChecker>());
 
@@ -172,7 +171,7 @@ builder.Services.AddScoped<Microsoft.AspNetCore.Components.Server.Circuits.Circu
 #if DEBUG
 if (args.Contains("--test-llama"))
 {
-    await Backstop.Tests.LlamaScamCheckerTests.RunAllTests();
+    await Backstop.Tests.MetaScamCheckerTests.RunAllTests();
     return;
 }
 #endif
@@ -185,6 +184,7 @@ app.UseForwardedHeaders();
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
+    app.UseHsts(); // only sent on https requests (the host's proxy sets the scheme)
 }
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 // Browser-side limits. Nothing the app shows can load script or content from anywhere else, and the app
@@ -223,7 +223,7 @@ app.MapGet("/contact-photo/{id}", (string id, HttpContext http, IMailService mai
     http.Response.Headers.XContentTypeOptions = "nosniff";
     http.Response.Headers.CacheControl = "private, max-age=3600";
     return Results.File(photo.Bytes, photo.ContentType);
-});
+}).RequireAuthorization();
 
 // Photos added in Show me. MOCK: served from memory, typed by the sniffed bytes.
 app.MapGet("/mode-photo/{id}", (string id, HttpContext http, IBackstopApi api) =>
@@ -233,7 +233,7 @@ app.MapGet("/mode-photo/{id}", (string id, HttpContext http, IBackstopApi api) =
     http.Response.Headers.XContentTypeOptions = "nosniff";
     http.Response.Headers.CacheControl = "private, max-age=3600";
     return Results.File(photo.Bytes, photo.ContentType);
-});
+}).RequireAuthorization();
 
 // Sign in with an email and password. Nobody is told which half was wrong.
 app.MapPost("/account/login", async (HttpContext http, AccountStore accounts, IConfiguration config, [Microsoft.AspNetCore.Mvc.FromForm] string? email, [Microsoft.AspNetCore.Mvc.FromForm] string? password) =>

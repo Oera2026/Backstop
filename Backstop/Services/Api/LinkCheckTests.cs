@@ -10,7 +10,7 @@ using Backstop.Services.Links;
 namespace Backstop.Tests;
 
 /// <summary>
-/// Link check tests. Nothing here touches the network: DNS and the web are faked. Called from LlamaScamCheckerTests.RunAllTests.
+/// Link check tests. Nothing here touches the network: DNS and the web are faked. Called from MetaScamCheckerTests.RunAllTests.
 /// </summary>
 public static class LinkCheckTests
 {

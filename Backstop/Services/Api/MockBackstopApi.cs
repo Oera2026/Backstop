@@ -40,7 +40,7 @@ public sealed class MockApiOptions
 /// trusted-person views see each other's changes live. Each call waits a little, like a real network call.
 /// Replace this class (and its registration in Program.cs) to wire the real back end.
 /// </summary>
-public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOptions options, ILlamaScamChecker? llamaChecker = null, IAssistant? assistant = null, IDocumentExplainer? documentExplainer = null, IMailService? mail = null, IStoryWriter? storyWriter = null) : IBackstopApi
+public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOptions options, IMetaScamChecker? metaChecker = null, IAssistant? assistant = null, IDocumentExplainer? documentExplainer = null, IMailService? mail = null, IStoryWriter? storyWriter = null) : IBackstopApi
 {
     private sealed record StoredCheck(CheckResult Result, string Original, DateTimeOffset? AskedAt);
 
@@ -123,7 +123,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
     /// (pictures, which local rules cannot read) a missing checker also holds it.
     /// </summary>
     private async Task<(Verdict Verdict, string Reason, ReviewStatus Status, FailureInfo? Failure)> ApplyAiAsync(
-        Func<ILlamaScamChecker, Task<MetaScamAnalysis>> ask, bool aiRequired, System.Runtime.CompilerServices.StrongBox<string?> aiTip,
+        Func<IMetaScamChecker, Task<MetaScamAnalysis>> ask, bool aiRequired, System.Runtime.CompilerServices.StrongBox<string?> aiTip,
         Verdict floorVerdict, string floorReason, List<RiskFlag> flags)
     {
         var r = await ApplyAiCoreAsync(ask, aiRequired, aiTip, floorVerdict, floorReason, flags);
@@ -136,15 +136,15 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
     }
 
     private async Task<(Verdict Verdict, string Reason, ReviewStatus Status, FailureInfo? Failure)> ApplyAiCoreAsync(
-        Func<ILlamaScamChecker, Task<MetaScamAnalysis>> ask, bool aiRequired, System.Runtime.CompilerServices.StrongBox<string?> aiTip,
+        Func<IMetaScamChecker, Task<MetaScamAnalysis>> ask, bool aiRequired, System.Runtime.CompilerServices.StrongBox<string?> aiTip,
         Verdict floorVerdict, string floorReason, List<RiskFlag> flags)
     {
         // Fail closed for every kind of content: without the AI checker nothing is called checked, and it is held.
-        if (llamaChecker is null)
+        if (metaChecker is null)
             return HoldForReview(flags, floorVerdict, "We could not check this, so your helper will look at it.", new("The checker is not switched on yet. Please tell the person who looks after this app.", "Code: NO_CHECKER\nWhat: No IMetaScamChecker is registered."));
 
         MetaScamAnalysis ai;
-        try { ai = await ask(llamaChecker); }
+        try { ai = await ask(metaChecker); }
         catch (OperationCanceledException) { throw; }
         catch (Exception ex)
         {
@@ -290,7 +290,7 @@ public sealed partial class MockBackstopApi(IGuardianService guardian, MockApiOp
         string? photoUrl = null;
         if (photoType is not null)
         {
-            var photoId = NewId("p");
+            var photoId = "p" + Guid.NewGuid().ToString("N"); // long and unguessable: photo addresses are not secret by sign-in alone
             KeepModePhoto(photoId, new ContactPhoto(request.Photo!, photoType));
             photoUrl = $"/mode-photo/{photoId}";
         }

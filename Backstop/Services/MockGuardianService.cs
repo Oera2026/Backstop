@@ -172,7 +172,11 @@ public sealed class MockGuardianService(MailStore store) : IGuardianService
         var why = store.Find(id)?.State is null or MessageState.Held
             ? "We could not save that. The message is still held, so please try again."
             : "This message was decided in another window before your choice was saved.";
-        lock (_pendingGate) _failures[id] = why;
+        lock (_pendingGate)
+        {
+            if (_failures.Count >= 200) _failures.Clear(); // nobody read them; keep the table small
+            _failures[id] = why;
+        }
     }
 
     public string? GetRingHref()

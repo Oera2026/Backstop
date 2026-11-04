@@ -13,7 +13,7 @@ namespace Backstop.Tests;
 /// <summary>
 /// Fixes from the 3 Nov code review: a helper's decision cannot be overtaken by a rescan, rescans back off, Meta retries count
 /// against the daily cap, shared state stays bounded and private to each visitor where it should be, and sign-in locks are per visitor.
-/// Called from LlamaScamCheckerTests.RunAllTests.
+/// Called from MetaScamCheckerTests.RunAllTests.
 /// </summary>
 public static class ReviewFixTests
 {

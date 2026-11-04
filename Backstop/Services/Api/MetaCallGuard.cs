@@ -22,6 +22,7 @@ public sealed class MetaCallGuard
     private readonly Func<DateTime> _now;
     private DateOnly _day;
     private int _dayCount;
+    private readonly Dictionary<string, (DateOnly Day, int Count)> _byVisitorDay = [];
 
     /// <summary>Calls per minute for the whole app.</summary>
     public int Limit { get; }
@@ -29,14 +30,18 @@ public sealed class MetaCallGuard
     public int VisitorLimit { get; }
     /// <summary>Calls per UTC day for the whole app.</summary>
     public int DayLimit { get; }
+    /// <summary>Calls per UTC day for one visitor, so one visitor cannot use up the whole app's day.</summary>
+    public int VisitorDayLimit { get; }
 
     public MetaCallGuard(IConfiguration config) : this(
         config.GetValue("MetaAI:MaxCallsPerMinute", 40),
         null, Read(config, "META_AI_MAX_CALLS_PER_IP_PER_MINUTE", "MetaAI:MaxCallsPerIpPerMinute", 15),
-        Read(config, "META_AI_MAX_CALLS_PER_DAY", "MetaAI:MaxCallsPerDay", 1500)) { }
+        Read(config, "META_AI_MAX_CALLS_PER_DAY", "MetaAI:MaxCallsPerDay", 1500),
+        Read(config, "META_AI_MAX_CALLS_PER_IP_PER_DAY", "MetaAI:MaxCallsPerIpPerDay", 200)) { }
 
-    internal MetaCallGuard(int limit, Func<DateTime>? now = null, int visitorLimit = int.MaxValue, int dayLimit = int.MaxValue)
+    internal MetaCallGuard(int limit, Func<DateTime>? now = null, int visitorLimit = int.MaxValue, int dayLimit = int.MaxValue, int visitorDayLimit = int.MaxValue)
     {
+        VisitorDayLimit = Math.Max(1, visitorDayLimit);
         Limit = Math.Max(1, limit);
         VisitorLimit = Math.Max(1, visitorLimit);
         DayLimit = Math.Max(1, dayLimit);
@@ -83,7 +88,19 @@ public sealed class MetaCallGuard
             }
 
             var today = DateOnly.FromDateTime(now);
-            if (today != _day) { _day = today; _dayCount = 0; }
+            if (today != _day) { _day = today; _dayCount = 0; _byVisitorDay.Clear(); }
+            var visitorDay = 0;
+            if (visitor is not null)
+            {
+                if (_byVisitorDay.TryGetValue(visitor, out var vd) && vd.Day == today) visitorDay = vd.Count;
+                if (visitorDay >= VisitorDayLimit)
+                {
+                    used = visitorDay;
+                    retryAfterSeconds = (int)Math.Max(1, Math.Ceiling((today.AddDays(1).ToDateTime(TimeOnly.MinValue) - now).TotalSeconds));
+                    denial = Denial.PerVisitor;
+                    return false;
+                }
+            }
             if (_dayCount >= DayLimit)
             {
                 used = _dayCount;
@@ -103,6 +120,11 @@ public sealed class MetaCallGuard
             _calls.Enqueue(now);
             mine?.Enqueue(now);
             _dayCount++;
+            if (visitor is not null)
+            {
+                if (_byVisitorDay.Count >= MaxTrackedVisitors && !_byVisitorDay.ContainsKey(visitor)) _byVisitorDay.Clear();
+                _byVisitorDay[visitor] = (today, visitorDay + 1);
+            }
             used = _calls.Count;
             retryAfterSeconds = 0;
             denial = Denial.None;

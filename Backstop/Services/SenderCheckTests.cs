@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace Backstop.Tests;
 
 /// <summary>
-/// Sender check tests. Nothing here touches the network. Called from LlamaScamCheckerTests.RunAllTests.
+/// Sender check tests. Nothing here touches the network. Called from MetaScamCheckerTests.RunAllTests.
 /// All people and domains are made up (example.*, .test). The few real brand names used are the detection list itself:
 /// they are only compared as text and never sent anywhere.
 /// </summary>
