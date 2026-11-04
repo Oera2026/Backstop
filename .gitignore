@@ -18,3 +18,5 @@ bin-preview/
 .claude/skills/
 .impeccable/
 .tmp-run/
+
+.claude/worktrees/

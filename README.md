@@ -33,7 +33,7 @@ Backstop calls the Meta Dev API (`https://api.meta.ai/v1`, Muse models such as `
 
 Text and images being inspected are passed as data, never as instructions. Images are sent only when a picture check needs them. Any endpoint other than `https://api.meta.ai` is refused before a request is sent.
 
-Calls retry twice with backoff, honour `Retry-After`, and pause for 20 seconds if most recent calls fail. A per-minute call cap (default 40, shared by all visitors) holds items instead of calling Meta when it is exceeded. With no `META_AI_KEY`, every check fails closed and Ask Me says it cannot answer.
+A slow or failed call is tried once more, honours `Retry-After`, and pauses for 20 seconds if most recent calls fail. A per-minute call cap (default 40, shared by all visitors) holds items instead of calling Meta when it is exceeded. With no `META_AI_KEY`, every check fails closed and Ask Me says it cannot answer.
 
 Explain and questions about a document go to Meta AI. Photos of a document are read by the AI; PDFs cannot be read yet, so Explain asks for a photo or pasted text. Show me guides and Remember questions also go to Meta AI: guides are written fresh for any goal (unsafe goals are refused), and memory answers are written only from the person's saved cards. Guide and story pictures are simple line drawings the app makes itself, from a picture the AI picks — that is the chosen art style, not generated imagery.
 
@@ -63,7 +63,7 @@ Set these as environment variables (locally in the untracked `.env`, in producti
 |---|---|
 | `PORT` | Port to listen on. Defaults to 5106. |
 | `META_AI_KEY` | Meta Dev API key. |
-| `META_AI_ENDPOINT_URL`, `META_AI_MODEL`, `META_AI_TIMEOUT_SECONDS` | Meta endpoint (must be on `https://api.meta.ai`), model and timeout in seconds. Muse models take 10 to 30 seconds to answer, so the default is 45 and anything under 30 is raised to 30. The timeout applies to checks and chat; social stories always wait at least 180 seconds, because a story with painted scenes takes about 40 for a short story and longer for up to 12 pages. |
+| `META_AI_ENDPOINT_URL`, `META_AI_MODEL`, `META_AI_TIMEOUT_SECONDS` | Meta endpoint (must be on `https://api.meta.ai`), model and timeout in seconds. Muse models take 10 to 30 seconds to answer, so the default is 45 and anything under 30 is raised to 30. The timeout is per try, and applies to checks and chat; social stories always wait at least 180 seconds, because a story with painted scenes takes about 40 for a short story and longer for up to 12 pages. |
 | `MetaAI__MaxCallsPerMinute` | Cap on calls to Meta per minute. Default 40. |
 | `META_AI_MAX_CALLS_PER_DAY` | Cap on calls to Meta per UTC day for the whole app, retries included. Default 1500. A restart resets the count. |
 | `META_AI_MAX_CALLS_PER_IP_PER_MINUTE` | Cap on calls to Meta per visitor per minute. Default 15. |
@@ -96,12 +96,14 @@ Notes for the host:
 
 | Route | Who | What |
 |---|---|---|
-| `/` | User | Inbox (cleared mail only), banner when mail is held |
+| `/` | Public | Opens the start page, `/demo-start` |
+| `/inbox` | User | Inbox (cleared mail only), banner when mail is held |
 | `/message/{id}` | User | Read a cleared message, with "Read this to me" |
 | `/compose` | User | Write a message. Private details trigger the pause screen |
 | `/explain`, `/check`, `/ask-me` | User | Explain a letter, check a message, Ask Me |
+| `/home`, `/sent`, `/contacts`, `/calendar`, `/search`, `/show-me`, `/remember`, `/stories`, `/messages`, `/help`, `/settings`, `/welcome` | User | The other user pages |
 | `/helper` | Helper | Queue of held messages and recent decisions |
-| `/helper/{id}` | Helper | Evidence card: Safe, let it through · Not safe, block it · Call the sender first |
+| `/helper/{id}` | Helper | Evidence card: Safe, let it through · Not safe, block it · Call the user first |
 | `/demo-start` | Public | Start page: pick the user side or the helper side, each with a guided walk-around |
 | `/try` | Public | Paste an email or pick an example and see whether Backstop would block it, and why |
 | `/demo` | Demo | Simulate incoming email, watch the four checks, split-screen user and helper |
@@ -121,7 +123,7 @@ You get a verdict (**Blocked**, **Held for helper** or **Safe**), the warning si
 
 ## Try the demo
 
-1. Open `/demo`. Side by side is on by default.
+1. Open `/demo`. Side by side is on by default on wide screens.
 2. Pick one of the eleven example emails (or write your own) and press **Simulate incoming email**.
 3. Safe mail appears in the user pane. Held mail appears in the helper pane, and the user pane only shows that a message is being checked.
 4. Approve in the helper pane and the message moves into the user inbox live.

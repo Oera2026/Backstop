@@ -38,6 +38,7 @@ These are assumptions for the mock. Change them to match the real service.
 | `CheckContentAsync` | POST | `/checks` | `CheckRequest { kind: Message\|Picture, text?, picture? (file), pictureName? }` | `CheckResult` |
 | `GetConversationAnalysisAsync` | POST | `/checks/conversation` | `{ conversation: string }` (one message per line, `Name: text`) | `CheckResult` with `thread` |
 | `GetCheckAsync` | GET | `/checks/{id}` | – | `CheckResult` or 404 |
+| `GetCheckForHelperAsync` | GET | `/helper/checks/{id}` | – | `CheckResult`, or 404 when the helper's tier hides it |
 | `GetAskedChecksAsync` | GET | `/checks?asked=true` | – | `CheckResult[]`, newest first |
 | `AskTrustedPersonAsync` | POST | `/checks/{id}/ask` | – | `CheckResult` (status `Held`) |
 | `DeleteCheckAsync` | DELETE | `/checks/{id}` | – | 204 |
