@@ -81,29 +81,30 @@ public static class MockData
         State = MessageState.Received,
     };
 
-    /// <summary>Starting state of the demo: two cleared messages and one already held.</summary>
+    /// <summary>Starting state of the demo: old mail already checked, plus one already held.</summary>
     public static List<MailMessage> Seed()
     {
         var now = DateTimeOffset.Now;
+        var contacts = SeedContacts();
         var list = new List<MailMessage>
         {
-            new()
+            CheckSeed(new()
             {
                 Id = "seed1", FromName = "Priya Sandhu", FromAddress = "priya.sandhu@example.com",
-                Subject = "Sunday lunch", ReceivedAt = now.AddHours(-20), State = MessageState.Cleared,
+                Subject = "Sunday lunch", ReceivedAt = now.AddHours(-20),
                 Body = "Hi Mum,\n\nWe will come at one o'clock on Sunday. Please do not cook too much!\n\nLove, Priya",
-            },
-            new()
+            }, contacts),
+            CheckSeed(new()
             {
                 Id = "seed2", FromName = "Oakfield Library", FromAddress = "news@oakfield-library.example.org",
-                Subject = "Large print book club", ReceivedAt = now.AddDays(-2), State = MessageState.Cleared,
+                Subject = "Large print book club", ReceivedAt = now.AddDays(-2),
                 Body = "Dear reader,\n\nThe large print book club meets on Thursday at 2pm in the reading room. Tea and biscuits are provided.\n\nOakfield Library",
-            },
+            }, contacts),
         };
 
         // Already held when the demo starts. Its flags come from the local rules; it is not AI-scanned yet.
         var held = CreateMessage(Scenarios.First(s => s.Id == "payment-redirect").Mail);
-        var analysis = MailAnalyzer.Analyze(held.AsInbound(), SeedContacts());
+        var analysis = MailAnalyzer.Analyze(held.AsInbound(), contacts);
         var decision = MailAnalyzer.Decide(analysis, null);
         held.ReceivedAt = now.AddMinutes(-35);
         held.Flags = [.. decision.Flags];
@@ -120,17 +121,62 @@ public static class MockData
         held.State = MessageState.Held;
         list.Add(held);
 
-        // Everyday mail so search and the inbox have something to work with. All of it is Cleared.
+        // Everyday mail so search and the inbox have something to work with. It is checked below;
+        // anything the rules flag is Held instead of Cleared.
         for (var i = 0; i < Everyday.Length; i++)
         {
             var (name, address, subject, body) = Everyday[i];
-            list.Add(new MailMessage
+            list.Add(CheckSeed(new MailMessage
             {
                 Id = $"m{i + 1:00}", FromName = name, FromAddress = address, Subject = subject, Body = body,
-                ReceivedAt = now.AddHours(-(30 + i * 9)), State = MessageState.Cleared,
-            });
+                ReceivedAt = now.AddHours(-(30 + i * 9)),
+            }, contacts));
         }
         return list;
+    }
+
+    /// <summary>
+    /// Old mail is checked by the local rules at startup (no network, no AI call), so Cleared means it passed
+    /// a check. Anything the rules flag is Held for a helper instead. Returns the same message.
+    /// </summary>
+    private static MailMessage CheckSeed(MailMessage m, IReadOnlyList<Contact> contacts)
+    {
+        var analysis = MailAnalyzer.Analyze(m.AsInbound(), contacts);
+        var clean = analysis is { RulesScore: 0, LinkProblems: 0, SenderProblem: false, AtRisk: false }
+            && !MailAnalyzer.IsSerious(analysis);
+        if (clean)
+        {
+            m.Flags = [.. analysis.Flags];
+            m.Links = [.. analysis.Links];
+            m.SenderSignals = [.. analysis.SenderSignals];
+            m.Summary = "Nothing unusual found.";
+            m.Concern = Concern.None;
+            m.WatchFor = null;
+            m.RulesScore = 0;
+            m.Tiers =
+            [
+                analysis.RulesTier,
+                new TierResult("Meta AI", TierStatus.Skipped, "Not run for seeded mail."),
+                analysis.LinkTier,
+                new TierResult("Policy", TierStatus.Passed, "Local checks passed. Cleared."),
+            ];
+            m.AwaitingScan = false;
+            m.State = MessageState.Cleared;
+            return m;
+        }
+        var decision = MailAnalyzer.Decide(analysis, null);
+        m.Flags = [.. decision.Flags];
+        m.Links = [.. analysis.Links];
+        m.SenderSignals = [.. analysis.SenderSignals];
+        m.Summary = decision.Summary;
+        m.Concern = decision.Concern;
+        m.WatchFor = decision.WatchFor;
+        m.RulesScore = decision.RulesScore;
+        // As with the held seed above: no tier record is made up, and it cannot be approved until the AI has scanned it.
+        m.Tiers = [];
+        m.AwaitingScan = true;
+        m.State = MessageState.Held;
+        return m;
     }
 
     // MOCK: 50 made-up everyday messages. Names and domains are fictional (example.com / .net / .org only).
