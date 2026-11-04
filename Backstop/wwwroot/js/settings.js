@@ -55,8 +55,9 @@
     if (tz) document.cookie = 'backstop.tz=' + encodeURIComponent(tz) + '; path=/; max-age=31536000; samesite=lax';
   } catch (e) { /* the server's zone is used instead */ }
 
-  // First visit to the home page goes to the welcome screens. The demo panel shows pages in frames, so frames are left alone.
-  if (location.pathname === "/" && window.self === window.top && !welcomed() && location.search.indexOf("tour=1") < 0) location.replace("/welcome");
+  // The base address opens the start page, where the visitor picks a side. The demo panel shows pages in frames,
+  // so frames are left alone, and the guided walk-around (?tour=1) goes straight to its side.
+  if (location.pathname === "/" && window.self === window.top && location.search.indexOf("tour=1") < 0) location.replace("/demo-start");
 })();
 
 // First visit to the helper queue goes to the helper welcome. Frames (the demo panel) are left alone.

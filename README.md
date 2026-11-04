@@ -5,7 +5,7 @@ Backstop holds every incoming message until it is checked. The user never sees h
 
 > All data is synthetic: made-up people, messages and domains (`example.com`, `example.net`, `example.org`, `.test`). There is no real email provider. No secrets are in this repo.
 
-**Live URL:** https://backstop-301g.onrender.com/home
+**Live URL:** https://backstop-4xz9.onrender.com/demo-start
 
 Built with .NET 10 Blazor Server and plain CSS. No UI framework.
 
