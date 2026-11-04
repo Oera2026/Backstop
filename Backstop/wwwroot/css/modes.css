@@ -404,6 +404,8 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 .held__verdict { font-weight: 800; display: flex; align-items: center; gap: .5rem; }
 .held__text { font-size: calc(1.1rem * var(--tx)); overflow-wrap: anywhere; }
 .held__actions { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: .25rem; }
+.held__actions .btn { flex: 1 1 10rem; }
+.held .ask { margin-top: .25rem; }
 
 
 /* A three-way choice in a narrow card stacks, so no label wraps onto three lines */
@@ -532,7 +534,6 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 /* Demo guide: User / Helper switch and the walk-around. One compact row; the step words fold away. */
 .card--spaced { margin-block-start: 1.5rem; }
 .more-toggle { margin-block: 1rem; }
-.actions--helper .btn-primary { flex: 1 1 100%; }
 
 /* Welcome walkthrough: practice messages */
 .walk__card { margin-block: 1rem; }
@@ -608,6 +609,8 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 .hero__words p { margin: 0; font-weight: 600; }
 .hero__go { width: 100%; justify-content: center; }
 @media (min-width: 600px) { .hero__go { width: auto; justify-self: start; } }
+.hero__extra { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem 1rem; }
+@media (max-width: 599px) { .hero { gap: .75rem; padding: 1rem; } .hero__body .pic { width: 3rem; height: 3rem; } .hero__words { gap: .25rem; } }
 .rows--compact .row { min-height: 72px; padding: .75rem 1rem; }
 .rows--compact .row .pic { width: 3rem; height: 3rem; }
 .rows--compact .row .pic .icon { width: 1.6rem; height: 1.6rem; }
@@ -615,10 +618,15 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
   .rows--compact .row { display: grid; grid-template-columns: auto 1fr; align-items: start; gap: .5rem .75rem; }
   .rows--compact .row__side { grid-column: 2; display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
   .rows--compact .row .btn { grid-column: 1 / -1; }
+  .rows--compact .row .ask { grid-column: 1 / -1; }
 }
 
-/* Header: one compact bar, who you are helping inside it */
-.header-for { display: inline-flex; align-items: center; gap: .5rem; margin: 0 auto 0 .75rem; padding: .25rem .9rem; font-weight: 800; font-size: calc(.95rem * var(--tx)); color: var(--text); background: var(--band); border-radius: 999px; }
+/* An action that cannot be taken back: the first tap turns the row into a question with Yes and No */
+.ask { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .75rem; flex: 1 1 100%; }
+.ask__q { flex: 1 1 100%; margin: 0; font-weight: 800; overflow-wrap: anywhere; }
+.ask .btn { flex: 1 1 8rem; }
+
+/* Header: one compact bar, who you are helping is said once, in the role tag */
 .site-header--helper { flex-wrap: nowrap; }
 .guide-toggle { display: inline-flex; align-items: center; gap: .4rem; min-height: 56px; padding: 0 .9rem; font: inherit; font-weight: 800; color: inherit; background: transparent; border: var(--line) solid currentColor; border-radius: var(--radius); cursor: pointer; }
 .guide-toggle[aria-pressed="true"] { background: var(--accent-soft); color: var(--navy); border-color: var(--accent-soft); }
@@ -627,7 +635,6 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
   .brand__word { display: none; }
   .nav-signout { display: none !important; }
   .site-header { flex-wrap: nowrap; padding-right: 4.5rem; }
-  .header-for { margin-left: .5rem; }
   .guide-toggle { padding: 0 .6rem; }
 }
 
@@ -675,15 +682,10 @@ mark.hl sup { font-weight: 800; font-size: .7em; margin-left: .15em; }
 @media (max-width: 959px) {
   .guide-toggle__text { display: none; }
   .guide-toggle { min-width: 48px; justify-content: center; }
-  .header-for { min-width: 0; padding: .2rem .7rem; font-size: .85rem; white-space: nowrap; }
-  .header-for .icon { display: none; }
   .progress { white-space: nowrap; }
   .progress__dot { width: 1.25rem; }
 }
-.role-tag__who { display: none; }
 @media (max-width: 959px) {
-  .header-for { display: none; }
-  .role-tag__who { display: inline; }
   .site-header--helper { gap: 0 .5rem; }
 }
 

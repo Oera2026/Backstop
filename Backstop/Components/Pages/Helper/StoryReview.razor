@@ -49,9 +49,11 @@ else
                 <ErrorState Message="@_problem" />
             }
             <div class="actions actions--helper">
-                <button type="button" class="btn btn-quiet" @onclick="() => Decide(ReviewDecision.Release)" disabled="@_working"><Icon Name="check" /> Approve</button>
-                <button type="button" class="btn btn-quiet btn-danger" @onclick="() => Decide(ReviewDecision.Block)" disabled="@_working"><Icon Name="cross" /> Do not show</button>
-                <button type="button" class="btn btn-text" @onclick="() => Decide(ReviewDecision.CallFirst)" disabled="@_working"><Icon Name="phone" /> Call @UserName first</button>
+                <button type="button" class="btn btn-primary" @onclick="() => Decide(ReviewDecision.Release)" disabled="@_working"><Icon Name="check" /> Safe, show it</button>
+                <button type="button" class="btn btn-quiet btn-danger" @onclick="() => Decide(ReviewDecision.Block)" disabled="@_working"><Icon Name="cross" /> Not safe, don't show</button>
+                <div class="actions__links">
+                    <button type="button" class="btn btn-text" @onclick="() => Decide(ReviewDecision.CallFirst)" disabled="@_working"><Icon Name="phone" /> Call @UserName first</button>
+                </div>
             </div>
         </div>
     </article>

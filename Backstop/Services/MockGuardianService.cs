@@ -185,6 +185,13 @@ public sealed class MockGuardianService(MailStore store) : IGuardianService
         return digits.Count(char.IsAsciiDigit) >= 7 && digits.LastIndexOf('+') <= 0 ? "tel:" + digits : null;
     }
 
+    public void CancelCall(string id)
+    {
+        string? subject = null;
+        if (store.TryChange(id, m => m.State == MessageState.Held && m.CallRequested, m => { m.CallRequested = false; subject = m.Subject; }))
+            store.AddActivity("phone", $"You will not call about \"{subject}\" after all.");
+    }
+
     public void CallFirst(string id)
     {
         string? subject = null;

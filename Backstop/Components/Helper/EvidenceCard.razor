@@ -1,5 +1,6 @@
 @implements IDisposable
 @inject IGuardianService Guardian
+@inject IBackstopApi Api
 
 <article class="evidence" aria-labelledby="ev-title">
     <p class="evidence__status">
@@ -19,14 +20,6 @@
         </div>
     }
 
-    @if (Message.AwaitingScan && Message.State == MessageState.Held)
-    {
-        <div class="banner banner--check" role="status">
-            <Icon Name="hourglass" />
-            <p>The checker could not finish. This message stays held and is checked again soon.</p>
-        </div>
-    }
-
     <p class="lead">@Message.Summary</p>
     @if (Message.State is MessageState.Held or MessageState.Blocked)
     {
@@ -37,7 +30,13 @@
     @if (ShownFlags.Count > 0)
     {
         <section class="card" aria-labelledby="ev-flags">
-            <h2 id="ev-flags">What looked wrong</h2>
+            <h2 id="ev-flags">
+                What looked wrong
+                @if (Message.RulesScore > 0)
+                {
+                    <span class="card__meta">Rules score @Message.RulesScore</span>
+                }
+            </h2>
             <ul class="flags">
                 @foreach (var f in ShownFlags)
                 {
@@ -92,7 +91,7 @@
     }
 
     <details class="card fold">
-        <summary>The message (text only, links made safe)</summary>
+        <summary>The message</summary>
         <pre class="preview">@Defang.ForHelper(Message.Body)</pre>
     </details>
 
@@ -100,54 +99,60 @@
     {
         @* One tap decides. Nothing changes for the user until the undo window ends. *@
         <div class="actionbar" role="group" aria-label="Your decision">
-    @if (_pend is { } p)
-    {
-        <div class="toast" role="status">
-            <Icon Name="hourglass" />
-            <span>@(p.Safe ? "Safe, letting it through" : "Not safe, blocking it") in @p.SecondsLeft @(p.SecondsLeft == 1 ? "second" : "seconds").</span>
-            <button type="button" class="btn btn-primary" @onclick="Undo"><Icon Name="arrow-left" /> Undo</button>
-        </div>
-    }
-            <div class="actions actions--helper">
-                @if (Message.AwaitingScan)
-                {
-                    <button type="button" class="btn btn-quiet" disabled="@_scanning" @onclick="Rescan">
-                        <Icon Name="refresh" /> @(_scanning ? "Checking…" : "Check again")
+            @if (_pend is { } p)
+            {
+                <div class="toast" role="status">
+                    <Icon Name="hourglass" />
+                    <span>@(p.Safe ? "Safe, letting it through" : "Not safe, blocking it") in @p.SecondsLeft @(p.SecondsLeft == 1 ? "second" : "seconds").</span>
+                    <button type="button" class="btn btn-primary" @onclick="Undo"><Icon Name="arrow-left" /> Undo</button>
+                </div>
+            }
+            else
+            {
+                <div class="actions actions--helper">
+                    @if (Message.AwaitingScan)
+                    {
+                        <button type="button" class="btn btn-quiet" disabled="@_scanning" @onclick="Rescan">
+                            <Icon Name="refresh" /> @(_scanning ? "Checking…" : "Check again")
+                        </button>
+                    }
+                    else
+                    {
+                        <button type="button" class="btn btn-primary" @onclick="@(() => Choose(true))">
+                            <Icon Name="check" /> Safe, let it through
+                        </button>
+                    }
+                    @* Block only stands out when the checker is very sure. When it is not sure, both choices weigh the same. *@
+                    <button type="button" class="btn @(Message.Concern == Concern.Strong ? "btn-block" : "btn-quiet btn-danger")" @onclick="@(() => Choose(false))">
+                        <Icon Name="cross" /> Not safe, block it
                     </button>
-                }
-                else
-                {
-                    <button type="button" class="btn btn-primary" @onclick="@(() => Choose(true))">
-                        <Icon Name="check" /> Safe, let it through
-                    </button>
-                }
-                @* Block only stands out when the checker is very sure. When it is not sure, both choices weigh the same. *@
-                <button type="button" class="btn @(Message.Concern == Concern.Strong ? "btn-block" : "btn-quiet btn-danger")" @onclick="@(() => Choose(false))">
-                    <Icon Name="cross" /> Not safe, keep it blocked
-                </button>
-                @if (Guardian.GetRingHref() is { } tel)
-                {
-                    <a class="btn btn-text" href="@tel" @onclick="@(() => Guardian.CallFirst(Message.Id))"><Icon Name="phone" /> Ring them</a>
-                }
-                else if (!Message.CallRequested)
-                {
-                    <button type="button" class="btn btn-text" @onclick="@(() => Guardian.CallFirst(Message.Id))"><Icon Name="phone" /> Call them first</button>
-                }
-            </div>
+                    <div class="actions__links">
+                        @if (Guardian.GetRingHref() is { } tel)
+                        {
+                            <a class="btn btn-text" href="@tel" @onclick="@(() => Guardian.CallFirst(Message.Id))"><Icon Name="phone" /> Ring @UserName</a>
+                        }
+                        else if (!Message.CallRequested)
+                        {
+                            <button type="button" class="btn btn-text" @onclick="@(() => Guardian.CallFirst(Message.Id))"><Icon Name="phone" /> Call @Message.FromName first</button>
+                        }
+                    </div>
+                </div>
+            }
             @if (_error is not null)
             {
                 <p class="form-error" role="alert">@_error</p>
             }
-            <p class="call-note" role="status">
-                @if (Message.CallRequested)
-                {
-                    <Icon Name="phone" /><span>You will call @Message.FromName before you decide.</span>
-                }
-                else if (_undone)
-                {
-                    <span>Undone. The message is still held.</span>
-                }
-            </p>
+            @if (Message.CallRequested)
+            {
+                <p class="call-note" role="status">
+                    <span>You will call @Message.FromName on a number you already have before you decide.</span>
+                    <button type="button" class="btn btn-text" @onclick="@(() => Guardian.CancelCall(Message.Id))">Undo</button>
+                </p>
+            }
+            else if (_undone)
+            {
+                <p class="call-note" role="status"><span>Undone. The message is still held.</span></p>
+            }
         </div>
     }
     else
@@ -188,20 +193,18 @@
         _ => "We cannot tell if this is safe.",
     };
 
-    // The rules score is the real number from the local rules. It is not a chance of anything.
-    private string VerdictSub => Message.Concern switch
-    {
-        Concern.Strong => $"Rules score: {Message.RulesScore}. We suggest you block it.",
-        Concern.Some => $"Rules score: {Message.RulesScore}. Please read it with care.",
-        _ => $"Rules score: {Message.RulesScore}. Please read it with care.",
-    };
+    // When the checker could not finish, that is the first thing to say. The suggestion follows it.
+    private string VerdictSub => (Message.AwaitingScan ? "The checker could not finish. " : "")
+        + (Message.Concern == Concern.Strong ? "We suggest you block it." : "Please read it with care.");
+
+    private string UserName => Api.Household.UserName;
 
     private string DecisionText => (Message.State, Message.HelperDecision) switch
     {
-        (MessageState.Blocked, null) => "The checker blocked this automatically. The user never saw it.",
-        (MessageState.Blocked, _) => "Done. You blocked this message. The user will never see it.",
-        (MessageState.Cleared, null) => "The checker cleared this message. The user can read it.",
-        _ => "Done. You approved this message. It is now in the user's inbox.",
+        (MessageState.Blocked, null) => $"The checker blocked this automatically. {UserName} never saw it.",
+        (MessageState.Blocked, _) => $"Done. You blocked this message. {UserName} will never see it.",
+        (MessageState.Cleared, null) => $"The checker cleared this message. {UserName} can read it.",
+        _ => $"Done. You approved this message. It is now in {UserName}'s inbox.",
     };
 
     // The decision itself lives in the service. It waits out the undo window there, so leaving this page does not lose it,

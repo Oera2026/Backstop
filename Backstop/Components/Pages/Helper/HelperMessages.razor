@@ -59,10 +59,21 @@ else
                     <p class="held__verdict"><Icon Name="hourglass" /> @VerdictCard.WordFor(h.Verdict)@(h.Flags.Count > 0 ? $": {h.Flags[0].Title.ToLowerInvariant()}" : "")</p>
                     <p class="held__text">@h.Preview</p>
                     <p class="held__why">@h.Reason</p>
-                    <div class="held__actions">
-                        <button type="button" class="btn btn-primary" disabled="@_busy" @onclick="@(() => Decide(h.Id, ReviewDecision.Release))"><Icon Name="check" /> Let it through</button>
-                        <button type="button" class="btn btn-quiet" disabled="@_busy" @onclick="@(() => Decide(h.Id, ReviewDecision.Block))"><Icon Name="cross" /> Block</button>
-                    </div>
+                    @if (_ask is { } a && a.Id == h.Id)
+                    {
+                        <div class="ask" role="group" aria-label="@(a.Release ? "Let this through?" : "Block this message?")">
+                            <p class="ask__q">@(a.Release ? "Let this message through?" : "Block this message?")</p>
+                            <button type="button" class="btn @(a.Release ? "btn-primary" : "btn-block")" disabled="@_busy" @onclick="@(() => Confirm(h.Id, a.Release))"><Icon Name="@(a.Release ? "check" : "cross")" /> @(a.Release ? "Yes, let it through" : "Yes, block it")</button>
+                            <button type="button" class="btn btn-quiet" @onclick="@(() => _ask = null)">No</button>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="held__actions">
+                            <button type="button" class="btn btn-primary" disabled="@_busy" @onclick="@(() => _ask = (h.Id, true))"><Icon Name="check" /> Safe, let it through</button>
+                            <button type="button" class="btn btn-quiet btn-danger" disabled="@_busy" @onclick="@(() => _ask = (h.Id, false))"><Icon Name="cross" /> Not safe, block it</button>
+                        </div>
+                    }
                 </div>
             }
 
@@ -94,7 +105,18 @@ else
                             <span class="row__from">@p.Name</span>
                             <span class="row__subject">@p.Relationship</span>
                         </span>
-                        <button type="button" class="btn btn-quiet" @onclick="@(() => RemovePerson(p.Id))"><Icon Name="minus" /> Take off</button>
+                        @if (_askRemove == p.Id)
+                        {
+                            <div class="ask" role="group" aria-label="@($"Take {p.Name} off the list?")">
+                                <p class="ask__q">Take @p.Name off the list?</p>
+                                <button type="button" class="btn btn-block" @onclick="@(() => RemovePerson(p.Id))"><Icon Name="minus" /> Yes, take off</button>
+                                <button type="button" class="btn btn-quiet" @onclick="@(() => _askRemove = null)">No</button>
+                            </div>
+                        }
+                        else
+                        {
+                            <button type="button" class="btn btn-quiet" @onclick="@(() => _askRemove = p.Id)"><Icon Name="minus" /> Take off</button>
+                        }
                     </div>
                 </li>
             }
@@ -136,8 +158,19 @@ else
         catch (BackstopApiException ex) { _peopleProblem = ex.Message; }
     }
 
+    // Block and take-off cannot be taken back, so the first tap turns the row into a question. Approving asks too.
+    private (string Id, bool Release)? _ask;
+    private string? _askRemove;
+
+    private async Task Confirm(string id, bool release)
+    {
+        _ask = null;
+        await Decide(id, release ? ReviewDecision.Release : ReviewDecision.Block);
+    }
+
     private void RemovePerson(string id)
     {
+        _askRemove = null;
         try
         {
             Api.RemoveChatPerson(id);
