@@ -5,7 +5,7 @@
 
 @* Demo visitors only: a guide that goes through one side page by page, lighting up what it talks about. *@
 <AuthorizeView Roles="@Roles.Demo">
-    @if (Tour.Active)
+    @if (_ready && !_framed && Tour.Active)
     {
         var s = Tour.Current;
         <section class="tourcard" role="region" aria-label="Guide" aria-live="polite">
@@ -42,20 +42,41 @@
 @code {
     [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
 
-    private string _key = "";
-    private bool _isDemo;
+    private string _key = "", _saved = "";
+    private bool _isDemo, _ready, _framed;
 
     private string Here => Nav.ToBaseRelativePath(Nav.Uri);
-    private static TourSide SideOf(string path) => path.StartsWith("helper", StringComparison.OrdinalIgnoreCase) ? TourSide.Helper : TourSide.User;
+    private static TourSide SideOf(string path) => DemoTour.SideOf(path);
 
     protected override async Task OnInitializedAsync()
     {
         _isDemo = AuthState is not null && (await AuthState).User.IsInRole(Roles.Demo);
         Tour.Changed += OnChanged;
         Nav.LocationChanged += OnMoved;
-        // Every load of the app starts the guide again, from its first slide, on the side being looked at.
-        if (_isDemo && !Tour.Begun) { Tour.Begin(SideOf(Here)); return; }
+        // A new load of the page waits for the first render, to read where this tab left the guide.
+        // A layout change in the same circuit just carries on.
+        if (!_isDemo || !Tour.Begun) return;
+        _ready = true;
         if (Tour.Side != SideOf(Here) && !DemoTour.Matches(Tour.Current, Here)) Tour.Start(SideOf(Here));
+        Tour.Follow(Here);
+    }
+
+    // Puts the guide back where this tab left it. Only the landing from the demo sign-in (?tour=1)
+    // starts again and goes to slide 1. Anything else stays on the page the visitor is on.
+    private async Task Resume()
+    {
+        var side = SideOf(Here);
+        if (Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(new Uri(Nav.Uri).Query).ContainsKey("tour"))
+        {
+            Tour.Start(side);
+            Go();
+            return;
+        }
+        if (DemoTour.TryParse(await JS.InvokeAsync<string?>("backstopTour.load"), out var savedSide, out var index, out var active))
+            Tour.Restore(side, savedSide == side ? index : 0, active);
+        else
+            Tour.Start(side);
+        // The guide follows the page, or keeps its place when the page has no slides.
         Tour.Follow(Here);
     }
 
@@ -72,8 +93,19 @@
         if (!_isDemo) return;
         try
         {
-            // The first slide may be on another page: go there.
-            if (firstRender && Tour.Active && !DemoTour.Matches(Tour.Current, Here)) { Go(); return; }
+            if (firstRender && !_ready)
+            {
+                // Inside a frame (the split screen on the demo panel) there is no guide.
+                if (await JS.InvokeAsync<bool>("backstopTour.framed")) { _framed = true; return; }
+                await Resume();
+                _ready = true;
+                StateHasChanged();
+                return;
+            }
+            if (_framed || !_ready) return;
+            // Keep this tab's place for a reload.
+            var saved = Tour.Save();
+            if (saved != _saved) { _saved = saved; await JS.InvokeVoidAsync("backstopTour.save", saved); }
             // Light up what this slide is about whenever the slide or the page changes.
             var key = Tour.Active ? $"{Tour.Side}|{Tour.Index}|{Here}" : "off";
             if (key == _key) return;
@@ -101,8 +133,6 @@
     }
 
     private void Back() { Tour.Back(); Go(); }
-
-
 
     public async ValueTask DisposeAsync()
     {

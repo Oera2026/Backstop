@@ -127,6 +127,7 @@
   // and starts again if the page replaces it.
   function show(selector) {
     hide();
+    if (framed()) return;
     document.documentElement.classList.add('tour-on');
     sel = selector; started = Date.now();
     ensure(); cancelAnimationFrame(frame); loop();
@@ -140,9 +141,12 @@
     return true;
   }
 
+  // Inside a frame (the split screen on the demo panel) there is no guide: the page around it has the controls.
+  function framed() { return window.self !== window.top; }
+
   // Keeps the place in the guide when the page is reloaded (this tab only).
   function save(value) { try { sessionStorage.setItem('backstop.tour', value); } catch (e) { /* blocked */ } }
   function load() { try { return sessionStorage.getItem('backstop.tour') || ''; } catch (e) { return ''; } }
 
-  window.backstopTour = { show: show, hide: hide, tap: tap, save: save, load: load };
+  window.backstopTour = { show: show, hide: hide, tap: tap, save: save, load: load, framed: framed };
 })();
