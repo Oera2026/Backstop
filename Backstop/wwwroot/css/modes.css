@@ -809,7 +809,6 @@ section.chat .chat__log { max-height: min(24rem, calc(100vh - 22rem)); max-heigh
   .try-mailform textarea { flex: 1; min-height: 8rem; resize: none; }
   .try-grid > .try-slot { grid-area: result; margin: 0; align-self: stretch; overflow-y: auto; min-height: 0; }
   .try-form .field { margin-bottom: .75rem; }
-  .try-pair { grid-template-columns: 1fr 1fr; }
   .try-mode { margin-bottom: .25rem; }
   .try-mode__opt { min-height: 48px; }
   .try-panel > .lead { margin-bottom: .6rem; line-height: 1.4; }
@@ -826,6 +825,11 @@ section.chat .chat__log { max-height: min(24rem, calc(100vh - 22rem)); max-heigh
   .try-mailform textarea { min-height: 6rem; }
   .try-mailform .actions, .try-linkform .actions { margin-top: .25rem; }
 }
+/* Tidy alignment: one column of fields with one left edge, and no space kept for an error that is not there. */
+.try-pair { grid-template-columns: minmax(0, 1fr); }
+.try-form .form-error:empty { display: none; }
+.try-form .field input, .try-form .field textarea { width: 100%; box-sizing: border-box; }
+@media (min-width: 64rem) { .page--try .try-samples { grid-auto-rows: 1fr; align-content: stretch; } .try-mode { margin-top: 0; } .try-panel--link { align-self: start; } .try-panel--link .try-form > .actions { margin-bottom: 0; } .try-panel--link .try-form .field:last-of-type { margin-bottom: .75rem; } }
 /* The wait is shown at the foot of the screen, wherever the visitor has scrolled to */
 .try-status { position: fixed; inset-inline: .75rem; bottom: max(.75rem, env(safe-area-inset-bottom)); max-width: 30rem; margin-inline: auto; z-index: 30; padding: 0 1.25rem; background: var(--bg); border: var(--line) solid var(--border); border-radius: var(--radius-lg); }
 .try-status .loading { min-height: 0; padding: .75rem 0; row-gap: .5rem; }
