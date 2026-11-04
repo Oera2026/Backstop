@@ -25,14 +25,15 @@ public sealed partial class MockBackstopApi
         var title = draft.Title;
         var pages = draft.Pages.Select(p => p with { Text = Fill(p.Text) }).ToList();
 
-        // Floor: a sensitive topic is always held for the helper first, whatever the AI said. Nothing can lower this.
-        var held = draft.Sensitive || StoryFixtures.IsSensitive(text);
+        // A sensitive topic never blocks the story. The carer is told, and the person gets their story straight away.
+        // The word list is a floor: the AI cannot lower it.
+        var notify = draft.Sensitive || StoryFixtures.IsSensitive(text);
 
-        var story = new Story(NewId("s"), title, when, pages, held ? StoryStatus.Held : StoryStatus.Ready, DateTimeOffset.Now);
+        var story = new Story(NewId("s"), title, when, pages, StoryStatus.Ready, DateTimeOffset.Now);
         lock (_gate)
         {
             _stories[story.Id] = new(story, text);
-            if (held) Log("story", $"{User} made a story about \"{Shorten(text)}\". It is waiting for you.");
+            if (notify) Log("story", $"{User} made a story about \"{Shorten(text)}\". It may be a sensitive topic, so you may want to ask how they are.");
         }
         Changed?.Invoke();
         return ForUser(story);

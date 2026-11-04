@@ -495,7 +495,7 @@ public class MetaScamCheckerTests
             Assert(!MetaStoryWriter.ParseContent("not json").Success, "Rubbish is refused");
             Assert(MetaStoryWriter.ParseContent("{\"title\":\"A\",\"pages\":[{\"heading\":\"B\",\"text\":\"C.\",\"picture\":\"nope\",\"scene\":[{\"shape\":\"bad\"}]}]}").Pages[0].Scene is null, "A page with no valid items has no scene");
 
-            // Through the app: a failed writer gives no story; sensitive topics are always held for the helper.
+            // Through the app: a failed writer gives no story; sensitive topics reach the carer but never block the story.
             var failApi = new MockBackstopApi(new MockGuardianService(new MailStore()), new MockApiOptions(), null, null, null, null, new StubWriter(new StoryDraft(false, "", [], false)));
             var threw = false;
             try { await failApi.MakeStoryAsync(new StoryRequest("I am going to the dentist", null)); } catch (BackstopApiException) { threw = true; }
@@ -508,10 +508,12 @@ public class MetaScamCheckerTests
             var goodApi = new MockBackstopApi(new MockGuardianService(new MailStore()), new MockApiOptions(), null, null, null, null, new StubWriter(good));
             Assert((await goodApi.MakeStoryAsync(new StoryRequest("I am going to the dentist", null))).Status == StoryStatus.Ready, "A normal story is ready");
             var localHold = await goodApi.MakeStoryAsync(new StoryRequest("I owe the bank money", null));
-            Assert(localHold.Status == StoryStatus.Held && localHold.Pages.Count == 0, "A sensitive topic is held even when the AI says it is fine");
+            Assert(localHold.Status == StoryStatus.Ready && localHold.Pages.Count > 0, "A sensitive topic still gets its story");
+            var holiday = await goodApi.MakeStoryAsync(new StoryRequest("I am going on holiday to Ibiza with my brother and I am nervous", null));
+            Assert(holiday.Status == StoryStatus.Ready, "A nervous holiday story is ready");
             var aiHold = new MockBackstopApi(new MockGuardianService(new MailStore()), new MockApiOptions(), null, null, null, null, new StubWriter(good with { Sensitive = true }));
             var held = await aiHold.MakeStoryAsync(new StoryRequest("I am going to the dentist", null));
-            Assert(held.Status == StoryStatus.Held && held.Pages.Count == 0, "The AI sensitive flag holds a story");
+            Assert(held.Status == StoryStatus.Ready && held.Pages.Count > 0, "The AI sensitive flag tells the carer but does not hold the story");
             Console.WriteLine("PASS: Social stories are checked, clamped and fail closed.");
 
             // Anyone who may need help reaches the helper, even with no AI at all.
